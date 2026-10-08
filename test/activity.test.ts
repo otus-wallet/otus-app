@@ -27,7 +27,7 @@ import {
 } from '@solana/kit';
 
 import { exactJson, NoHistory, readPage, type Landed } from '@otus-wallet/sdk/activity/history';
-import { summarize, type Act, type Activity } from '@otus-wallet/sdk/activity/summary';
+import { summarize, type Activity, type Told } from '@otus-wallet/sdk/activity/summary';
 import { short } from '@otus-wallet/sdk/format';
 import { SQUADS_V4 } from '@otus-wallet/sdk/programs/squads';
 import { apart, rows, text, type Naming } from '../src/ui/view/activity.ts';
@@ -120,7 +120,7 @@ test('address poisoning: dust from a copy is caught against an address you know,
 });
 
 test('rows: each in a line, opened for all it told; a copy of an address you sent to on the page caught', () => {
-    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], acts: [] as Act[], signed: true, programs: [] as Address[], main: null, squads: [], memo: null };
+    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], instructions: [] as Told[], held: [], signed: true, programs: [] as Address[], main: null, squads: [], memo: null };
     const naming: Naming = { wallet: WALLET, symbol: (m) => (m === MINT ? 'USDC' : short(m)), who: (a) => (a === WALLET ? `${short(a)} (you)` : a === FRIEND ? 'Fio' : short(a)), program: (a) => (a === JUPITER ? 'Jupiter v6' : short(a)), known: [] };
     const real = key(60);
     const copy = Array.from({ length: 30 }, (_, i) => `${real.slice(0, 4)}${key(61 + i).slice(4, -4)}${real.slice(-4)}`).find((a) => a !== real && isAddress(a)) as Address;
@@ -150,7 +150,7 @@ test('rows: each in a line, opened for all it told; a copy of an address you sen
 });
 
 test('a token made and minted, one burned, an account opened: said as such, rent apart', () => {
-    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], acts: [] as Act[], signed: true, programs: [] as Address[], main: null, squads: [], memo: null, other: null };
+    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], instructions: [] as Told[], held: [], signed: true, programs: [] as Address[], main: null, squads: [], memo: null, other: null };
     const naming: Naming = { wallet: WALLET, symbol: (m) => (m === MINT ? 'USDC' : 'LAB'), who: (a) => short(a), program: (a) => short(a), known: [] };
     const made = key(62);
     const [minted, burned, opened] = rows(
@@ -167,28 +167,29 @@ test('a token made and minted, one burned, an account opened: said as such, rent
     assert.deepEqual([text(opened.title), text(opened.sub)], ['Opened an account', '0.00144768 SOL of rent']);
 });
 
-test('what moved no balance: a delegate given or revoked, an authority, a nonce moved on; never named by limits or guards', () => {
-    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], acts: [] as Act[], signed: true, programs: [] as Address[], main: null, squads: [], memo: null, other: null, kind: 'other' as const, moves: [] };
-    const naming: Naming = { wallet: WALLET, symbol: (m) => (m === MINT ? 'USDC' : short(m)), who: (a) => (a === FRIEND ? 'Fio' : short(a)), program: (a) => (a === 'L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95' ? 'Lighthouse' : a === 'ComputeBudget111111111111111111111111111111' ? 'Compute Budget' : 'Token Program'), known: [] };
-    const [approved, unlimited, revoked, closer, nonce, nonceAccount, guarded] = rows(
+test('what moved no balance: told by the review\'s decoders and words; never named by limits or guards', () => {
+    const [SYSTEM, TOKEN, BUDGET, GUARD] = ['11111111111111111111111111111111', 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', 'ComputeBudget111111111111111111111111111111', 'L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95'] as Address[];
+    const ix = (program: Address, name: string, accounts: Record<string, Address>, args: Record<string, string> = {}): Told => ({ program, programName: null, source: 'plugin', name, accounts: Object.entries(accounts).map(([role, address]) => ({ role, address })), args: Object.entries(args).map(([name, value]) => ({ name, value })) });
+    const limit = ix(BUDGET, 'SetComputeUnitLimit', {}, { units: '200000' });
+    const guard: Told = { program: GUARD, programName: null, source: 'unknown', name: 'Unknown instruction', accounts: [], args: [] };
+    const mine = key(70);
+    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], held: [{ address: mine, mint: MINT, decimals: 6, owner: WALLET }], signed: true, programs: [] as Address[], main: null, squads: [], memo: null, other: null, kind: 'other' as const, moves: [] };
+    const naming: Naming = { wallet: WALLET, symbol: (m) => (m === MINT ? 'USDC' : short(m)), who: (a) => (a === FRIEND ? 'Fio' : short(a)), program: (a) => short(a), known: [] };
+    const [approved, closer, cancelled, nonceAccount] = rows(
         [
-            { ...base, signature: 'a1', acts: [{ kind: 'approve', account: key(70), delegate: FRIEND, units: 100_000_000n, mint: MINT, decimals: 6 }] },
-            { ...base, signature: 'a2', acts: [{ kind: 'approve', account: key(70), delegate: FRIEND, units: 2n ** 64n - 1n, mint: MINT, decimals: 6 }] },
-            { ...base, signature: 'a3', acts: [{ kind: 'revoke', account: key(70), mint: MINT }] },
-            { ...base, signature: 'a4', acts: [{ kind: 'authority', account: key(70), role: 'close', to: FRIEND }] },
-            { ...base, signature: 'a5', acts: [{ kind: 'nonce', account: key(71) }] },
-            { ...base, signature: 'a7', acts: [{ kind: 'nonce-account', account: key(71), authority: WALLET }], rent: { yours: 0n, theirs: 0n, opened: 1_447_680n } },
-            { ...base, signature: 'a6', programs: ['ComputeBudget111111111111111111111111111111' as Address, 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address, 'L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95' as Address] },
+            { ...base, signature: 'a1', instructions: [limit, ix(TOKEN, 'Approve', { source: mine, delegate: FRIEND, owner: WALLET }, { amount: '100000000' }), guard] },
+            { ...base, signature: 'a2', instructions: [ix(TOKEN, 'SetAuthority', { owned: mine, owner: WALLET }, { authorityType: '3', newAuthority: FRIEND })] },
+            { ...base, signature: 'a3', instructions: [limit, ix(SYSTEM, 'AdvanceNonceAccount', { nonceAccount: key(71) })] },
+            { ...base, signature: 'a4', instructions: [ix(SYSTEM, 'CreateAccount', { payer: WALLET, newAccount: key(71) }, { lamports: '1447680', space: '80', programAddress: SYSTEM }), ix(SYSTEM, 'InitializeNonceAccount', { nonceAccount: key(71) }, { nonceAuthority: WALLET })] },
         ],
         naming,
     );
-    assert.deepEqual([approved.icon, text(approved.title), text(approved.sub)], ['key', 'Approved a delegate', 'Fio can move up to 100 USDC']);
-    assert.equal(text(unlimited.sub), 'Fio can move all your USDC');
-    assert.deepEqual([text(revoked.title), text(revoked.sub)], ['Revoked a delegate', 'on your USDC account']);
-    assert.deepEqual([text(closer.title), text(closer.sub)], ['Changed a close authority', 'to Fio']);
-    assert.deepEqual([text(nonce.title), text(nonce.sub)], ['Moved a nonce on', 'What was signed on it can no longer run']);
-    assert.deepEqual([text(nonceAccount.title), text(nonceAccount.sub)], ['Opened a nonce account', '0.00144768 SOL of rent']);
-    assert.deepEqual([text(guarded.title), text(guarded.sub)], ['Token Program', '']); // not Compute Budget, nor Lighthouse
+    assert.deepEqual([approved.icon, text(approved.title), text(approved.sub)], ['key', 'Approved a delegate', 'Fio, up to 100 USDC']);
+    assert.equal(approved.details[0].text, 'Fio may move up to 100 USDC from your USDC account'); // the review's own words
+    assert.deepEqual([text(closer.title), text(closer.sub)], ['Changed an authority', 'Right to close → Fio']);
+    assert.deepEqual([cancelled.icon, text(cancelled.title)], ['refresh', 'Moved a nonce on']);
+    assert.equal(cancelled.details[0].text, `Moves the nonce of ${short(key(71))} on: what was signed on it can no longer run`); // not first: no durable nonce
+    assert.deepEqual([text(nonceAccount.title), nonceAccount.details[1].text], ['Opened a nonce account', `Makes ${short(key(71))} a durable nonce account, answering to ${short(WALLET)}`]);
 });
 
 test('what left the wallet unsigned, a delegate moved: told apart, and never taken as an address you know', async () => {

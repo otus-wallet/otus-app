@@ -50,7 +50,7 @@ export function selfNamed(r: Review, told: Map<number, IdlInstruction>): Map<Add
 // its name, arguments and account names from its program's IDL (`idl`), where that tells it; what it does stays what
 // the simulation shows.
 function instructionView(e: Explained, i: number, accounts: Map<Address, Review['accounts'][number]>, n: Names, risky: boolean, idl?: IdlInstruction): InstructionView {
-    const told = story(e, n, risky);
+    const told = story(e, n, risky, i === 0);
     return {
         number: i + 1,
         name: idl?.name ?? e.name,

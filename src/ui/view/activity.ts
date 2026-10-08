@@ -5,11 +5,13 @@
 import type { Address } from '@solana/kit';
 
 import { COMPUTE_BUDGET_PROGRAM_ADDRESS } from '@solana-program/compute-budget';
+import { LEGACY_MEMO_PROGRAM_ADDRESS_V1, LEGACY_MEMO_PROGRAM_ADDRESS_V3, MEMO_PROGRAM_ADDRESS } from '@solana-program/memo';
 
-import type { Act, Activity, Move } from '@otus-wallet/sdk/activity/summary';
+import type { Activity, Move, Told } from '@otus-wallet/sdk/activity/summary';
 import { LIGHTHOUSE } from '@otus-wallet/sdk/programs/addresses';
 import { alike } from '../../shell/state.ts';
-import { amount, short, sol } from '@otus-wallet/sdk/format';
+import { amount, cap, short, sol } from '@otus-wallet/sdk/format';
+import { story, type Names } from '@otus-wallet/sdk/review/effects';
 import type { Step } from '@otus-wallet/sdk/programs/squads';
 
 export type RowIcon = 'send' | 'receive' | 'swap' | 'plus' | 'trash' | 'key' | 'refresh' | 'shield' | 'box' | 'cross' | 'bang';
@@ -97,7 +99,7 @@ function row(a: Activity, n: Naming, copies: Address | null): Row {
         signature: a.signature,
         time: a.time,
         icon: head.icon,
-        tone: a.error ? 'danger' : copies || taken ? 'warn' : 'plain',
+        tone: a.error || head.danger ? 'danger' : copies || taken ? 'warn' : 'plain',
         title: head.title,
         sub: copies && a.other ? [{ text: `${side} ${n.who(a.other)} · copies ${apart(copies, a.other)}` }] : head.sub,
         details: details(a, n, copies),
@@ -106,7 +108,7 @@ function row(a: Activity, n: Naming, copies: Address | null): Row {
 }
 
 // The line: what happened, in a few words, and with whom or through what.
-function headline(a: Activity, n: Naming, outs: Move[], ins: Move[], by: string): { icon: RowIcon; title: Part[]; sub: Part[] } {
+function headline(a: Activity, n: Naming, outs: Move[], ins: Move[], by: string): { icon: RowIcon; title: Part[]; sub: Part[]; danger?: boolean } {
     const what = (m: Move, list: Move[]): Part[] => [{ text: quantity(m, n), way: m.units < 0n ? 'out' : 'in' }, ...(list.length > 1 ? [{ text: ` +${list.length - 1}` }] : [])];
     const lead = (list: Move[]) => list.find((m) => m.mint !== null) ?? list[0]; // a token before SOL that may be rent
     const words = (s: string): Part[] => (s ? [{ text: s }] : []);
@@ -129,8 +131,11 @@ function headline(a: Activity, n: Naming, outs: Move[], ins: Move[], by: string)
         case 'burn':
             return { icon: 'trash', title: [{ text: 'Burned ' }, ...what(lead(outs), outs)], sub: words(by) };
     }
-    const act = a.acts.find((x) => x.kind !== 'nonce' || a.acts.length === 1); // a nonce moved on, said when it is all there is
-    if (act) return actLine(act, a, n);
+    const about = subjectOf(a);
+    if (about) {
+        const told = story({ ...about.told, data: new Uint8Array() }, namesFor(a, n), false, about.index === 0);
+        return { icon: iconOf(about.told.name), title: words(titleOf(about.told.name)), sub: words(told.args ? cap(told.args) : ''), danger: told.effects.some((e) => e.tone === 'danger') };
+    }
     if (a.rent.yours < 0n) return { icon: 'box', title: words('Closed a token account'), sub: words(`${sol(-a.rent.yours)} SOL of rent freed`) };
     if (a.rent.yours > 0n) return { icon: 'box', title: words('Opened a token account'), sub: words(by) };
     if (a.rent.opened > 0n) return { icon: 'box', title: words('Opened an account'), sub: words(`${sol(a.rent.opened)} SOL of rent`) };
@@ -139,31 +144,61 @@ function headline(a: Activity, n: Naming, outs: Move[], ins: Move[], by: string)
     return { icon: 'box', title: words(by || programs[0] || 'Transaction'), sub: words(by ? '' : programs.slice(1).join(', ')) };
 }
 
-const ROLE_NAMES = { mint: 'mint', freeze: 'freeze', close: 'close' } as const;
-const U64_MAX = 2n ** 64n - 1n; // an allowance without end
+// What says nothing of what a transaction is for: its limits and fee, a note, the guards Otus adds.
+const BACKGROUND = new Set<string>([COMPUTE_BUDGET_PROGRAM_ADDRESS, LIGHTHOUSE, MEMO_PROGRAM_ADDRESS, LEGACY_MEMO_PROGRAM_ADDRESS_V1, LEGACY_MEMO_PROGRAM_ADDRESS_V3]);
 
-// What a transaction did that moved no balance, in a line.
-function actLine(act: Act, a: Activity, n: Naming): { icon: RowIcon; title: Part[]; sub: Part[] } {
-    const words = (s: string): Part[] => [{ text: s }];
-    const symbol = (mint: Address | null) => (mint ? n.symbol(mint) : 'tokens');
-    switch (act.kind) {
-        case 'approve': {
-            const all = act.units === U64_MAX;
-            const units = act.decimals === null ? `${act.units} units of` : amount(act.units, act.decimals, false);
-            return { icon: 'key', title: words('Approved a delegate'), sub: words(`${n.who(act.delegate)} can move ${all ? 'all your' : `up to ${units}`} ${symbol(act.mint)}`) };
-        }
-        case 'revoke':
-            return { icon: 'key', title: words('Revoked a delegate'), sub: words(`on your ${symbol(act.mint)} account`) };
-        case 'authority':
-            if (act.role === 'owner') return { icon: 'key', title: words('Gave a token account away'), sub: words(act.to ? `to ${n.who(act.to)}` : '') };
-            return { icon: 'key', title: words(`Changed a ${ROLE_NAMES[act.role]} authority`), sub: words(act.to ? `to ${n.who(act.to)}` : 'Removed it') };
-        case 'nonce':
-            return { icon: 'refresh', title: words('Moved a nonce on'), sub: words('What was signed on it can no longer run') };
-        case 'nonce-account':
-            return { icon: 'box', title: words('Opened a nonce account'), sub: words(a.rent.opened > 0n ? `${sol(a.rent.opened)} SOL of rent` : `its authority ${n.who(act.authority)}`) };
-        case 'assign':
-            return { icon: 'bang', title: words(act.account === n.wallet ? 'Gave your wallet to a program' : 'Gave an account to a program'), sub: words(n.program(act.program)) };
-    }
+// The instruction a transaction that moved no balance is about: the last of Solana's own besides the background (a nonce
+// account opened after the account it opens; an approval after the account it may open). None when it calls another
+// program: then it goes by that program.
+function subjectOf(a: Activity): { told: Told; index: number } | null {
+    const about = a.instructions.map((told, index) => ({ told, index })).filter(({ told }) => !BACKGROUND.has(told.program));
+    if (!about.length || about.some(({ told }) => told.source === 'unknown')) return null;
+    return about[about.length - 1];
+}
+
+// A title in the past for what moved no balance; any instruction not here goes by its own name ("Sync native").
+const TITLES: Record<string, string> = {
+    Approve: 'Approved a delegate',
+    ApproveChecked: 'Approved a delegate',
+    Revoke: 'Revoked a delegate',
+    SetAuthority: 'Changed an authority',
+    FreezeAccount: 'Froze a token account',
+    ThawAccount: 'Thawed a token account',
+    CloseAccount: 'Closed a token account',
+    InitializeAccount: 'Opened a token account',
+    InitializeAccount2: 'Opened a token account',
+    InitializeAccount3: 'Opened a token account',
+    InitializeMint: 'Created a token',
+    InitializeMint2: 'Created a token',
+    CreateAccount: 'Opened an account',
+    CreateAccountWithSeed: 'Opened an account',
+    Assign: 'Gave an account to a program',
+    AssignWithSeed: 'Gave an account to a program',
+    InitializeNonceAccount: 'Opened a nonce account',
+    AdvanceNonceAccount: 'Moved a nonce on',
+    AuthorizeNonceAccount: 'Changed a nonce authority',
+    WithdrawNonceAccount: 'Withdrew from a nonce account',
+};
+const titleOf = (name: string) => TITLES[name] ?? cap(name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase());
+const iconOf = (name: string): RowIcon => (/Approve|Revoke|Authority/.test(name) ? 'key' : /Nonce/.test(name) ? 'refresh' : /^Assign/.test(name) ? 'bang' : 'box');
+
+// What the review's words need, from what the transaction listed: your token accounts by their token, the rest by name.
+function namesFor(a: Activity, n: Naming): Names {
+    const held = new Map(a.held.map((h) => [h.address, h]));
+    const decimals = new Map(a.held.map((h) => [h.mint, h.decimals]));
+    const yours = (x: Address) => held.get(x)?.owner === n.wallet;
+    return {
+        wallet: n.wallet,
+        who: (x) => (yours(x) ? `your ${n.symbol(held.get(x)!.mint)} account` : n.who(x)),
+        mine: (x) => x === n.wallet || yours(x),
+        existed: () => true,
+        mintOf: (x) => held.get(x)?.mint ?? null,
+        token: (mint) => ({ symbol: mint ? n.symbol(mint) : 'tokens', decimals: mint ? (decimals.get(mint) ?? null) : null, verified: false }),
+        program: (x) => n.program(x),
+        priorityFee: null,
+        payer: a.payer,
+        changes: () => [],
+    };
 }
 
 // A name for an address when Otus has one: yours, a contact's, a program's.
@@ -189,6 +224,14 @@ function details(a: Activity, n: Naming, copies: Address | null): Detail[] {
     if (copies && a.other) {
         const [it, real] = [apart(a.other, copies), apart(copies, a.other)];
         out.push({ text: a.kind === 'send' ? `${it} looks like ${real}: one of them may be forged` : `Dust from ${it}, made to look like ${real}: never send to it`, tone: 'warn' });
+    }
+    // What moved no balance, as the review words each instruction of Solana's own.
+    if (a.kind === 'other') {
+        const names = namesFor(a, n);
+        a.instructions.forEach((told, index) => {
+            if (told.source !== 'plugin' || BACKGROUND.has(told.program)) return;
+            for (const e of story({ ...told, data: new Uint8Array() }, names, false, index === 0).effects) out.push({ text: e.text, ...(e.tone === 'danger' || e.tone === 'warn' ? { tone: e.tone } : {}) });
+        });
     }
     if (!a.signed && a.moves.some((m) => m.units < 0n)) out.push({ text: "You didn't sign it: a delegate of your tokens moved them", tone: 'warn' });
     if (a.error) out.push({ text: `Failed: ${a.error}`, tone: 'danger' });
