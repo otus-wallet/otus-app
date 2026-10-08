@@ -9,7 +9,7 @@ import type { Activity } from '@otus-wallet/sdk/activity/summary';
 import { short } from '@otus-wallet/sdk/format';
 import { USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
-import { explorerOf, rpcFor } from '../../settings.ts';
+import { explorerOf, walletRpc } from '../../settings.ts';
 import type { State } from '../../shell/state.ts';
 import { cachedToken } from '../../tokens.ts';
 import { Button } from '../components/ui/button.tsx';
@@ -28,7 +28,7 @@ export const KNOWN_SYMBOLS: Record<string, string> = { [USDC]: 'USDC', [USDT]: '
 
 export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) => void }) {
     const account = current(state);
-    const rpc = rpcFor('solana:mainnet', state.settings);
+    const rpc = walletRpc(state.settings);
     const read = useActivity(rpc, account.address);
     const held = useHeldNow(rpc, account.address);
     const naming = useMemo((): Naming => {
@@ -96,7 +96,7 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
 
 // Who else has access, as a mark: green while only you can move your funds, amber once others can; Access on a click.
 function AccessMark({ state, go }: { state: State; go: (to: Screen) => void }) {
-    const read = useAccess(rpcFor('solana:mainnet', state.settings), current(state).address, state);
+    const read = useAccess(walletRpc(state.settings), current(state).address, state);
     const n = read.data ? others(read.data.grants) : null;
     return (
         <Tip text="Check who can move your funds">

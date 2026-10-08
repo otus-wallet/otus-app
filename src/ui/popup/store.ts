@@ -54,8 +54,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
  * shown, and once a transfer made here lands. A read that fails keeps what was read before; an error shows only when
  * nothing was ever read.
  */
-export function useHoldings(rpc: string, address: Address): Holdings | Error | undefined {
-    const read = useQuery({ queryKey: holdingsKey(rpc, address), queryFn: () => holdings(rpc, address), refetchInterval: REFRESH });
+export function useHoldings(rpc: string, address: Address, mainnet = true): Holdings | Error | undefined {
+    const read = useQuery({ queryKey: holdingsKey(rpc, address), queryFn: () => holdings(rpc, address, mainnet), refetchInterval: REFRESH });
     return read.data ?? read.error ?? undefined;
 }
 

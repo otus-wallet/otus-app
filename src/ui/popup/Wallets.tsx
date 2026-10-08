@@ -5,7 +5,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 import type { KeyStatus } from '../../shell/keys.ts';
-import { rpcFor } from '../../settings.ts';
+import { walletRpc } from '../../settings.ts';
 import type { Account, State } from '../../shell/state.ts';
 import { Button } from '../components/ui/button.tsx';
 import { Icon, Tile } from '../components/icons.tsx';
@@ -29,7 +29,7 @@ export function Wallets({ state, keys, go, setUp }: { state: State; keys: KeySta
     // A press becomes a drag only once it moves a little, so a click still picks the wallet.
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
     const accounts = order.flatMap((address) => state.accounts.filter((a) => a.address === address));
-    const rpc = rpcFor('solana:mainnet', state.settings);
+    const rpc = walletRpc(state.settings);
 
     const dropped = ({ active, over }: DragEndEvent) => {
         setTimeout(() => (dragging.current = false));

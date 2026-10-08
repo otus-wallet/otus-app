@@ -6,7 +6,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 
 import { short } from '@otus-wallet/sdk/format';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
-import { rpcFor } from '../../settings.ts';
+import { walletRpc } from '../../settings.ts';
 import type { Fix } from '../../send/fix.ts';
 import { signs, type State } from '../../shell/state.ts';
 import { cachedToken } from '../../tokens.ts';
@@ -25,7 +25,7 @@ import { TakeBack } from './TakeBack.tsx';
 
 export function Access({ state, go }: { state: State; go: (to: Screen) => void }) {
     const account = current(state);
-    const rpc = rpcFor('solana:mainnet', state.settings);
+    const rpc = walletRpc(state.settings);
     const read = useAccess(rpc, account.address, state);
     const held = useHeldNow(rpc, account.address);
     const naming = useMemo((): AccessNaming => {

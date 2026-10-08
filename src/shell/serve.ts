@@ -19,7 +19,7 @@ import { delegatesGiven, waitingOn } from '@otus-wallet/sdk/access/access';
 import { isTokenProgram } from '@otus-wallet/sdk/programs/addresses';
 import { timedOut } from '@otus-wallet/sdk/rpc';
 import type { Sent } from '../send/send.ts';
-import { rpcFor } from '../settings.ts';
+import { networkOf, rpcFor } from '../settings.ts';
 import { signInFields, signInText } from '../siws.ts';
 import type { TokenInfo } from '../tokens.ts';
 import { accountView, siteView, type Approval, type Life, type SiteView } from '../ui/view.ts';
@@ -153,8 +153,8 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
 }
 
 /** A transfer the popup made for one of your accounts to the address typed → reviewed and approved like a site's,
- *  with that address shown whole, then signed and sent on mainnet; `signed` hears the signature before it is sent. It
- *  is that account's alone to sign. The reply says whether it landed or failed onchain. */
+ *  with that address shown whole, then signed and sent on the network the wallet shows; `signed` hears the signature
+ *  before it is sent. It is that account's alone to sign. The reply says whether it landed or failed onchain. */
 export function own(bytes: Uint8Array, address: string, to: string, shell: Shell, signed?: (signature: Signature) => Promise<unknown>): Promise<Reply> {
     return reply(
         async () => {
@@ -162,7 +162,7 @@ export function own(bytes: Uint8Array, address: string, to: string, shell: Shell
             const account = accountOf(state, address);
             if (!account || !signs(account)) throw new Refused(NO_KEY);
             if (!isAddress(to)) throw new Refused('that is not a Solana address');
-            const cluster = 'solana:mainnet';
+            const cluster = networkOf(state.settings); // the network the wallet shows
             const chain = shell.chain(rpcFor(cluster, state.settings));
             // Built in the popup without a blockhash: it comes from the network while the transfer is reviewed.
             const way = { cluster, chain, site: OWN_SITE, recipient: to, blockhash: chain.latest(), context: { signedBefore: null, own: true, to } } as const;
@@ -187,15 +187,15 @@ export function own(bytes: Uint8Array, address: string, to: string, shell: Shell
 }
 
 /** What the popup made to take access back (a delegate revoked, a nonce moved on) → reviewed and approved like a site's
- *  transaction, then signed and sent on mainnet; `signed` hears the signature before it is sent. It is that account's
- *  alone to sign, and does nothing else. The reply says whether it landed or failed onchain. */
+ *  transaction, then signed and sent on the network the wallet shows; `signed` hears the signature before it is sent.
+ *  It is that account's alone to sign, and does nothing else. The reply says whether it landed or failed onchain. */
 export function takeBack(bytes: Uint8Array, address: string, shell: Shell, signed?: (signature: Signature) => Promise<unknown>): Promise<Reply> {
     return reply(
         async () => {
             const state = await shell.load();
             const account = accountOf(state, address);
             if (!account || !signs(account)) throw new Refused(NO_KEY);
-            const cluster = 'solana:mainnet';
+            const cluster = networkOf(state.settings); // the network the wallet shows
             const chain = shell.chain(rpcFor(cluster, state.settings));
             const way = { cluster, chain, site: TAKING_BACK, blockhash: chain.latest(), context: { signedBefore: null, own: true } } as const;
             const { r, p, signature: signedOnDevice } = await approved(bytes, account, way, shell, (r) => {

@@ -3,7 +3,7 @@ import { address, type Address } from '@solana/kit';
 
 import { TOKEN_PROGRAMS, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
-import { tokens } from '../tokens.ts';
+import { tokens, type TokenInfo } from '../tokens.ts';
 
 /** One asset of the wallet. `usd` is null when Jupiter has no price for it; `native`: SOL itself, not wrapped. */
 export type Holding = {
@@ -27,7 +27,9 @@ export type Holdings = { usd: number; sol: bigint; assets: Holding[] };
 export { USDC, USDT, WSOL };
 const ALWAYS: string[] = [USDC, USDT]; // listed beside SOL even at 0, as most wallets hold them
 const NAMES: Record<string, { symbol: string; name: string }> = { [WSOL]: { symbol: 'wSOL', name: 'Wrapped SOL' }, [USDC]: { symbol: 'USDC', name: 'USD Coin' }, [USDT]: { symbol: 'USDT', name: 'USDT' } }; // when Jupiter does not answer
-export async function holdings(rpcUrl: string, owner: Address): Promise<Holdings> {
+/** `mainnet`: Jupiter's names and prices, and USDC and USDT listed at 0, are mainnet's: on another network the same
+ *  addresses are other tokens, or none, and nothing has a price. */
+export async function holdings(rpcUrl: string, owner: Address, mainnet = true): Promise<Holdings> {
     const rpc = rpcAt(rpcUrl);
     const [{ value: sol }, ...lists] = await Promise.all([
         rpc.getBalance(owner, { commitment: 'confirmed' }).send(),
@@ -49,8 +51,9 @@ export async function holdings(rpcUrl: string, owner: Address): Promise<Holdings
             });
         }
     });
-    for (const mint of ALWAYS) if (!units.has(mint)) units.set(mint, { units: 0n, decimals: 6, source: null, most: 0n });
-    const known = await tokens([WSOL, ...units.keys()]);
+    const always = mainnet ? ALWAYS : [];
+    for (const mint of always) if (!units.has(mint)) units.set(mint, { units: 0n, decimals: 6, source: null, most: 0n });
+    const known = mainnet ? await tokens([WSOL, ...units.keys()]) : new Map<string, TokenInfo | null>();
     const value = (mint: string, u: bigint, decimals: number) => {
         const price = known.get(mint)?.usdPrice;
         return typeof price === 'number' ? (Number(u) / 10 ** decimals) * price : null;
@@ -61,7 +64,7 @@ export async function holdings(rpcUrl: string, owner: Address): Promise<Holdings
         native,
         ...[...units].map(([mint, { units: u, decimals, source }]): Holding => {
             const t = known.get(mint);
-            const verified = t?.verified === true || ALWAYS.includes(mint);
+            const verified = t?.verified === true || always.includes(mint);
             return {
                 mint,
                 symbol: NAMES[mint]?.symbol ?? t?.symbol ?? '',

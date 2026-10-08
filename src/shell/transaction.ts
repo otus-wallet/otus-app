@@ -35,7 +35,7 @@ import { notice, squadsTold, type Inside, type ProposalTold } from '@otus-wallet
 import { SQUADS_V4 } from '@otus-wallet/sdk/programs/squads';
 import { prepare, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Sent } from '../send/send.ts';
-import { rpcFor, type Settings } from '../settings.ts';
+import { networkOf, rpcFor, type Settings } from '../settings.ts';
 import { accountView, describe, LEDGER_CLEAR, type Known, type Life, type Signer, type SiteView, type TransactionView } from '../ui/view.ts';
 import type { Answer } from './approvals.ts';
 import type { Shell } from './serve.ts';
@@ -58,7 +58,9 @@ const GUESSES: Cluster[] = ['solana:mainnet', 'solana:devnet', 'solana:testnet']
 export async function clusterOf(bytes: Uint8Array, named: Cluster | null, settings: Settings, shell: Shell): Promise<{ cluster: Cluster; chain: Chain }> {
     const { message } = await decode(bytes);
     let failure: unknown = null;
-    for (const cluster of named ? [named] : GUESSES) {
+    // A validator of your own (a local one) is guessed too, while it is the network the wallet shows.
+    const guesses = networkOf(settings) === 'solana:localnet' ? [...GUESSES, 'solana:localnet' as const] : GUESSES;
+    for (const cluster of named ? [named] : guesses) {
         try {
             const chain = shell.chain(rpcFor(cluster, settings));
             if (await landsOn(message, chain)) return { cluster, chain };

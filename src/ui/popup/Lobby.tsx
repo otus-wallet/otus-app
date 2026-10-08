@@ -3,7 +3,7 @@
 // the way to its activity and to settings.
 import { useEffect, useState } from 'react';
 
-import { explorerOf, rpcFor, type Settings } from '../../settings.ts';
+import { explorerOf, networkName, networkOf, walletRpc, type Settings } from '../../settings.ts';
 import { signs, type State } from '../../shell/state.ts';
 import { Button } from '../components/ui/button.tsx';
 import { Icon, Tile } from '../components/icons.tsx';
@@ -17,11 +17,13 @@ import { current, said, useHoldings } from './store.ts';
 
 export function Lobby({ state, go }: { state: State; go: (to: Screen) => void }) {
     const account = current(state);
-    const r = useHoldings(rpcFor('solana:mainnet', state.settings), account.address);
+    const mainnet = networkOf(state.settings) === 'solana:mainnet';
+    const r = useHoldings(walletRpc(state.settings), account.address, mainnet);
     const read = r && !(r instanceof Error) ? r : null;
-    const { usd, assets } = read ?? NOTHING; // while it is read, or when it cannot be: zeros, in grey
-    const day = read && dayChange(read);
-    const total = dollars(usd);
+    const { usd, sol, assets } = read ?? NOTHING; // while it is read, or when it cannot be: zeros, in grey
+    const day = mainnet && read && dayChange(read);
+    // Off mainnet nothing has a price: the balance is its SOL.
+    const total = mainnet ? dollars(usd) : `${amount({ units: sol, decimals: 9 })} SOL`;
     return (
         <main className="flex h-full flex-col">
             <WalletBar state={state} go={go} />
@@ -39,7 +41,7 @@ export function Lobby({ state, go }: { state: State; go: (to: Screen) => void })
                             </p>
                         </Tip>
                     )}
-                    {r instanceof Error && <p className="text-[10.5px] text-warn">{state.settings.rpc ? `Your RPC did not answer: ${said(r)}` : `Otus's RPC did not answer: ${said(r)}`}</p>}
+                    {r instanceof Error && <p className="text-[10.5px] text-warn">{`${{ custom: 'Your RPC', devnet: "Solana's devnet RPC", mainnet: "Otus's RPC" }[state.settings.network]} did not answer: ${said(r)}`}</p>}
                     {(!signs(account) || r instanceof Error) && (
                         <div className="mt-1.5 flex items-center justify-center gap-2">
                             {!signs(account) && (
@@ -82,6 +84,7 @@ export function Lobby({ state, go }: { state: State; go: (to: Screen) => void })
  *  of all wallets; then copying its address, and how many times it signed with Otus. */
 export function WalletBar({ state, go }: { state: State; go: (to: Screen) => void }) {
     const account = current(state);
+    const network = networkOf(state.settings); // said beside the name when it is not mainnet
     const n = account.signatures ?? 0;
     return (
         <header className="flex items-center gap-1 border-b border-dashed border-rule px-2.5 pt-2.5 pb-2">
@@ -89,6 +92,7 @@ export function WalletBar({ state, go }: { state: State; go: (to: Screen) => voi
                 <Tile address={account.address} size={22} />
             </button>
             <button type="button" onClick={() => go('wallets')} className="wallet flex h-9 min-w-0 flex-1 cursor-pointer items-center justify-center gap-[7px] rounded-md border border-transparent hover:border-rule">
+                {network !== 'solana:mainnet' && <span className="network shrink-0 rounded-[3px] border border-current px-1 py-px text-[9.5px] font-bold text-warn uppercase">{networkName(network)}</span>}
                 <span className="max-w-[120px] truncate font-bold">{account.label}</span>
                 <span className="text-[10.5px] whitespace-nowrap text-ink-2">{short(account.address)}</span>
                 <Icon name="down" size={12} stroke={2.5} />

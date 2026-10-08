@@ -9,7 +9,7 @@ import { LedgerError } from '../../ledger/hid.ts';
 import { address, solanaApp } from '../../ledger/solana.ts';
 import { sol } from '@otus-wallet/sdk/format';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
-import { rpcFor } from '../../settings.ts';
+import { walletRpc } from '../../settings.ts';
 import { load, nameTaken, signs, type Account, type State } from '../../shell/state.ts';
 import { Checkbox } from '../components/ui/checkbox.tsx';
 import { Button } from '../components/ui/button.tsx';
@@ -201,7 +201,7 @@ async function withBalances(rows: { path: string; address: Address }[], state: S
 
 // Each address's SOL on mainnet, from the RPC set in settings: none for an account that does not exist yet.
 async function lamportsOf(addresses: Address[], state: State): Promise<(bigint | null)[]> {
-    const rpc = rpcAt(rpcFor('solana:mainnet', state.settings));
+    const rpc = rpcAt(walletRpc(state.settings));
     const { value } = await rpc.getMultipleAccounts(addresses, { encoding: 'base64', dataSlice: { offset: 0, length: 0 }, commitment: 'confirmed' }).send();
     return value.map((a) => a?.lamports ?? 0n);
 }

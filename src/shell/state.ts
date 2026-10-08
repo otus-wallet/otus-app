@@ -1,7 +1,7 @@
 import { isAddress, type Address } from '@solana/kit';
 
 import { pathBytes } from '../ledger/solana.ts';
-import { DEFAULT_SETTINGS, type Settings } from '../settings.ts';
+import { DEFAULT_SETTINGS, settingsOf, type Settings } from '../settings.ts';
 
 /** An account Otus shows. `key`: where the vault keeps its key (a secret, and the account's index on a phrase).
  *  `ledger`: its key is on a Ledger, at this derivation path. None for an address you only watch. */
@@ -45,7 +45,7 @@ const MAX_CONTACTS = 200;
 
 export async function load(): Promise<State> {
     const state = (await chrome.storage.local.get(DEFAULTS)) as State;
-    return { ...state, settings: { ...DEFAULT_SETTINGS, ...state.settings } }; // settings saved before a newer one existed
+    return { ...state, settings: settingsOf(state.settings) }; // settings saved before a newer one existed
 }
 export const save = (part: Partial<State>) => chrome.storage.local.set(part);
 

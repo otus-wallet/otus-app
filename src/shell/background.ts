@@ -6,7 +6,7 @@ import { BUILD } from '../build.ts';
 import { rpcChain, type Chain } from '@otus-wallet/sdk/chain';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
 import { send } from '../send/send.ts';
-import { lockMinutes, rpcFor } from '../settings.ts';
+import { lockMinutes, walletRpc } from '../settings.ts';
 import { tokens } from '../tokens.ts';
 import type { Approval, Life } from '../ui/view.ts';
 import { answerOf, approve, type Answer } from './approvals.ts';
@@ -26,7 +26,7 @@ chrome.storage.session.get('lastTransfer').then(async ({ lastTransfer }) => {
     const last = lastTransfer as { pending?: boolean; signature?: Signature } | undefined;
     if (!last?.pending) return;
     if (!last.signature) return void chrome.storage.session.set({ lastTransfer: { ok: false, error: 'Otus stopped before it was signed', at: Date.now() } });
-    const status = await shell.chain(rpcFor('solana:mainnet', (await load()).settings)).status(last.signature).catch(() => null);
+    const status = await shell.chain(walletRpc((await load()).settings)).status(last.signature).catch(() => null);
     const outcome = status?.confirmed ? (status.error ? 'failed' : 'confirmed') : 'unknown';
     await chrome.storage.session.set({ lastTransfer: { ok: true, result: { signature: last.signature, outcome }, at: Date.now() } });
 });

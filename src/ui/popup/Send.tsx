@@ -10,7 +10,7 @@ import { isTokenProgram, TOKEN_2022_PROGRAM_ADDRESS } from '@otus-wallet/sdk/pro
 import { rpcAt } from '@otus-wallet/sdk/rpc';
 import { SIGN_WITHIN } from '../../send/lifetime.ts';
 import { feeOn, transfer, unplain, units as unitsOf, type Asset, type Lifetime, type Recipient } from '../../send/transfer.ts';
-import { explorerOf, rpcFor, type Settings } from '../../settings.ts';
+import { explorerOf, networkOf, walletRpc, type Settings } from '../../settings.ts';
 import { acquaintance, lookalike, named, nameTaken, onDevice, type Account, type Contact, type State } from '../../shell/state.ts';
 import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
@@ -55,8 +55,8 @@ type Found = { owner: string; data: readonly [string, string] } | null;
 
 export function Send({ state, go }: { state: State; go: (to: Screen) => void }) {
     const account = current(state);
-    const rpc = rpcFor('solana:mainnet', state.settings);
-    const r = useHoldings(rpc, account.address);
+    const rpc = walletRpc(state.settings);
+    const r = useHoldings(rpc, account.address, networkOf(state.settings) === 'solana:mainnet');
     if (draft.account !== account.address) draft = { account: account.address, asset: 'native', amount: '', to: '' };
     const [typed, setTyped] = useState(draft);
     const [failure, setFailure] = useState('');

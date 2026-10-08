@@ -1,9 +1,10 @@
-// Every setting lives here, and only here: auto-lock, the RPC, the explorer, preflight, the trusted apps and the
+// Every setting lives here, and only here: auto-lock, the network, the explorer, preflight, the trusted apps and the
 // addresses you know, as sections that open one at a time.
 import { isAddress } from '@solana/kit';
 import { useState, type ReactNode } from 'react';
 
-import { EXPLORERS, explorerOf, LOCK_CHOICES, MAX_LOCK_AFTER, type Explorer } from '../../settings.ts';
+import { rpcAt } from '@otus-wallet/sdk/rpc';
+import { clusterOfGenesis, EXPLORERS, explorerOf, LOCK_CHOICES, MAX_LOCK_AFTER, networkName, networkOf, type Explorer, type Settings } from '../../settings.ts';
 import type { KeyStatus } from '../../shell/keys.ts';
 import { lookalike, named, nameTaken, type State } from '../../shell/state.ts';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion.tsx';
@@ -15,14 +16,14 @@ import { short } from '../dom.ts';
 import { cn } from '../lib/cn.ts';
 import type { Screen } from './App.tsx';
 import { Bar, ErrorLine, Sheet, TabBar } from './common.tsx';
-import { edit, setSettings } from './store.ts';
+import { edit, said, setSettings } from './store.ts';
 
 const REPO = 'https://github.com/otus-wallet/otus-extension';
 
 export function Settings({ state, keys, go }: { state: State; keys: KeyStatus; go: (to: Screen) => void }) {
     const minutes = state.settings.lockAfter;
     const apps = Object.keys(state.sites).length;
-    const host = state.settings.rpc && URL.canParse(state.settings.rpc) ? new URL(state.settings.rpc).host : null;
+    const network = networkName(networkOf(state.settings));
     return (
         <Sheet bar={<Bar title="Settings" />} foot={<TabBar at="settings" go={go} />}>
             <Accordion type="single" collapsible className="sections flex flex-col gap-2">
@@ -31,8 +32,8 @@ export function Settings({ state, keys, go }: { state: State; keys: KeyStatus; g
                         <AutoLock minutes={minutes} />
                     </Section>
                 )}
-                <Section id="rpc" icon="server" title="RPC" value={host ?? "Otus's"}>
-                    <Rpc rpc={state.settings.rpc} />
+                <Section id="network" icon="server" title="Network" value={state.settings.network === 'custom' ? `Custom · ${network}` : network}>
+                    <NetworkChoice settings={state.settings} />
                 </Section>
                 <Section id="explorer" icon="external" title="Explorer" value={explorerOf(state.settings).name}>
                     <ExplorerChoice chosen={state.settings.explorer} />
@@ -144,29 +145,51 @@ const Choice = ({ text, on, onClick }: { text: string; on: boolean; onClick: () 
     </button>
 );
 
-// Mainnet's endpoint: your own, with your provider key if it has one; shown with its secrets hidden.
-function Rpc({ rpc }: { rpc: string | null }) {
+// The network the wallet shows: mainnet through Otus's RPC, Solana's public devnet, or an endpoint of your own (with
+// your provider key if it has one, shown with its secrets hidden), whose network it says itself when you save it.
+function NetworkChoice({ settings }: { settings: Settings }) {
+    const [picking, setPicking] = useState(settings.network === 'custom'); // Custom chosen: its endpoint shows
     const [typed, setTyped] = useState('');
     const [error, setError] = useState('');
-    const keep = () => {
+    const [asking, setAsking] = useState(false);
+    const saved = settings.rpc !== null && settings.custom !== null;
+    const use = (network: 'mainnet' | 'devnet') => (setPicking(false), setError(''), void setSettings(() => ({ network })));
+    const pick = () => {
+        setPicking(true);
+        if (saved) void setSettings(() => ({ network: 'custom' })); // the endpoint saved before, at once
+    };
+    const keep = async () => {
         const url = typed.trim();
         if (!usable(url)) return setError('Use an https address, or http on localhost');
-        setError('');
-        setTyped('');
-        void setSettings(() => ({ rpc: url }));
+        setAsking(true);
+        try {
+            const custom = clusterOfGenesis(await rpcAt(url).getGenesisHash().send());
+            setError('');
+            setTyped('');
+            await setSettings(() => ({ network: 'custom', rpc: url, custom }));
+        } catch (e) {
+            setError(`It did not answer as a Solana RPC: ${said(e)}`);
+        } finally {
+            setAsking(false);
+        }
     };
     return (
         <>
-            <p className="text-[10.5px] break-all text-ink-2">{rpc ? `Mainnet: ${masked(rpc)}` : "Mainnet: Otus's"}</p>
-            <Input placeholder={rpc ? 'Another endpoint' : 'Your endpoint'} spellCheck={false} autoComplete="off" aria-label="Mainnet RPC" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && keep()} />
-            <ErrorLine>{error}</ErrorLine>
-            <Button size="sm" variant="default" onClick={keep}>
-                Save
-            </Button>
-            {rpc && (
-                <Button size="sm" onClick={() => void setSettings(() => ({ rpc: null }))}>
-                    Use Otus's
-                </Button>
+            <div className="flex gap-1.5">
+                <Choice text="Mainnet" on={!picking && settings.network === 'mainnet'} onClick={() => use('mainnet')} />
+                <Choice text="Devnet" on={!picking && settings.network === 'devnet'} onClick={() => use('devnet')} />
+                <Choice text="Custom" on={picking} onClick={pick} />
+            </div>
+            {!picking && <p className="text-[10.5px] text-ink-2">{settings.network === 'devnet' ? "Solana's public devnet RPC" : "Otus's RPC"}</p>}
+            {picking && (
+                <>
+                    {saved && <p className="text-[10.5px] break-all text-ink-2">{`${networkName(settings.custom!)}: ${masked(settings.rpc!)}`}</p>}
+                    <Input placeholder={saved ? 'Another endpoint' : 'Your endpoint'} spellCheck={false} autoComplete="off" aria-label="Your RPC" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void keep()} />
+                    <ErrorLine>{error}</ErrorLine>
+                    <Button size="sm" variant="default" disabled={asking} onClick={() => void keep()}>
+                        Save
+                    </Button>
+                </>
             )}
         </>
     );
