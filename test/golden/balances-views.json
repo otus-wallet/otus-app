@@ -1144,7 +1144,7 @@
     },
     "verdict": "danger",
     "title": "Not safe",
-    "sub": "1 critical · 1 warning",
+    "sub": "1 critical · 2 warnings",
     "chip": {
       "text": "1 critical",
       "tone": "danger"
@@ -1176,8 +1176,8 @@
     "proposals": [],
     "changes": [],
     "accounts": 6,
-    "hash": "BDCq TgiC gyHr 5Cpo AyE4 Jtqk NZTm q8RG 5ktr 5qqE CKr7",
-    "wire": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAUIAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQErKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrK/A2J2JGp1ud4zSe1CsV4jL2UY/CD1/NTx1k6B+b0lj3BqHYF5E3VCqYNDe9/ip6slV/U1yKeHIraKSdwAAAAAAGp9UXGMd0yShWY5hpHV62i164o5tLbVxzVVshAAAAAAan1RcZNYTQ/u2bs0MdEyBr5UQoG1e4VmzFN1/0AAAABN+teWL/sd2SXQqftebQDOYZW6i7OpH9B++YYMXpe7gDBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAAAkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJAwMFAQIEBQAMBAAAAAB0O6QLAAAABgEAOQYAAwB4tpo7AAAAAAQBAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcABQLgHAMA",
+    "hash": "CPCs 5xEq 83uL mwyf 2hs4 ejG7 Hgqn 1hX9 qruw byfh dhEs",
+    "wire": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAUIAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQErKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrK/A2J2JGp1ud4zSe1CsV4jL2UY/CD1/NTx1k6B+b0lj3LCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwGp9UXGMd0yShWY5hpHV62i164o5tLbVxzVVshAAAAAAan1RcZNYTQ/u2bs0MdEyBr5UQoG1e4VmzFN1/0AAAABN+teWL/sd2SXQqftebQDOYZW6i7OpH9B++YYMXpe7gDBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAAAkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJAwMFAQIEBQAMBAAAAAB0O6QLAAAABgEAOQYAAwB4tpo7AAAAAAQBAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcABQLgHAMA",
     "counts": {
       "programs": 1,
       "instructions": 1,
@@ -1185,9 +1185,9 @@
     },
     "programs": [
       {
-        "name": "Stake Program",
-        "address": "Stake11111111111111111111111111111111111111",
-        "standing": "known",
+        "name": "Unknown program",
+        "address": "3yS1JFVT284y8z1LC9MRoWxZjzFrdoD5axKsZiyMsfC7",
+        "standing": "unknown",
         "tone": "danger",
         "sub": "Uses 2 of your accounts",
         "subTone": "danger",
@@ -1251,6 +1251,147 @@
         "title": "An asset of yours goes to someone else",
         "note": "−50 SOL → HAgk…Kpqk"
       },
+      {
+        "tone": "warn",
+        "title": "You send almost all your SOL",
+        "note": ""
+      },
+      {
+        "tone": "warn",
+        "title": "3yS1…sfC7 is not a program Otus knows",
+        "note": "It uses 2 of your accounts · Otus can't read what it does"
+      },
+      {
+        "tone": "ok",
+        "title": "Changes",
+        "note": "−50 SOL"
+      },
+      {
+        "tone": "ok",
+        "title": "No owner or authority changes",
+        "note": "Owners and authorities stay as they are"
+      },
+      {
+        "tone": "ok",
+        "title": "Normal network fee",
+        "note": "0.000005 SOL for this transaction"
+      },
+      {
+        "tone": "ok",
+        "title": "Known site",
+        "note": "app.example.com · signed for before"
+      }
+    ],
+    "fee": "0.000005 SOL",
+    "guards": {
+      "held": true,
+      "text": "One guard locks your account to what you see"
+    },
+    "added": [
+      "Lighthouse: one guard on your accounts",
+      "Compute Budget: 204,000 compute units"
+    ],
+    "cluster": "solana:mainnet",
+    "expiry": null
+  },
+  {
+    "kind": "transaction",
+    "site": {
+      "origin": "https://app.example.com",
+      "host": "app.example.com",
+      "note": "Connected · 3 signatures",
+      "tone": "plain"
+    },
+    "account": {
+      "label": "Me",
+      "address": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+    },
+    "verdict": "warn",
+    "title": "Caution",
+    "sub": "1 warning · nothing critical",
+    "chip": {
+      "text": "1 warning",
+      "tone": "warn"
+    },
+    "signer": "ready",
+    "network": null,
+    "balances": [
+      {
+        "asset": "SOL",
+        "logo": "sol",
+        "icon": null,
+        "verified": true,
+        "amount": "−50.000005",
+        "tone": "plain",
+        "lines": [
+          {
+            "note": "To HAgk…Kpqk · Your stake account 3uWi…8KsQ",
+            "amount": "−50",
+            "tone": "plain"
+          },
+          {
+            "note": "Network fee",
+            "amount": "−0.000005",
+            "tone": "plain"
+          }
+        ]
+      }
+    ],
+    "proposals": [],
+    "changes": [],
+    "accounts": 6,
+    "hash": "BDCq TgiC gyHr 5Cpo AyE4 Jtqk NZTm q8RG 5ktr 5qqE CKr7",
+    "wire": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAUIAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQErKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrK/A2J2JGp1ud4zSe1CsV4jL2UY/CD1/NTx1k6B+b0lj3BqHYF5E3VCqYNDe9/ip6slV/U1yKeHIraKSdwAAAAAAGp9UXGMd0yShWY5hpHV62i164o5tLbVxzVVshAAAAAAan1RcZNYTQ/u2bs0MdEyBr5UQoG1e4VmzFN1/0AAAABN+teWL/sd2SXQqftebQDOYZW6i7OpH9B++YYMXpe7gDBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAAAkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJAwMFAQIEBQAMBAAAAAB0O6QLAAAABgEAOQYAAwB4tpo7AAAAAAQBAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcABQLgHAMA",
+    "counts": {
+      "programs": 1,
+      "instructions": 1,
+      "inner": 0
+    },
+    "programs": [
+      {
+        "name": "Stake Program",
+        "address": "Stake11111111111111111111111111111111111111",
+        "standing": "known",
+        "tone": "ok",
+        "sub": "Uses 2 of your accounts",
+        "subTone": "plain",
+        "meta": "",
+        "metaTone": "plain",
+        "inner": "",
+        "instructions": [
+          {
+            "number": 1,
+            "name": "Withdraw",
+            "args": "50 SOL → HAgk…Kpqk",
+            "source": "core",
+            "accounts": [
+              {
+                "name": "Your stake account 3uWi…8KsQ",
+                "role": "stake · writable",
+                "tone": "plain"
+              },
+              {
+                "name": "HAgk…Kpqk",
+                "role": "recipient · writable",
+                "tone": "plain"
+              },
+              {
+                "name": "4vJ9…kLKi (you)",
+                "role": "withdrawAuthority · signer · writable",
+                "tone": "plain"
+              }
+            ],
+            "effects": [
+              {
+                "text": "50 SOL from your stake account 3uWi…8KsQ to HAgk…Kpqk",
+                "tone": "warn"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "findings": [
       {
         "tone": "warn",
         "title": "You send almost all your SOL",

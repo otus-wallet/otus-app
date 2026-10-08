@@ -5,6 +5,7 @@ import { getTransferSolInstruction } from '@solana-program/system';
 import { getCloseAccountInstruction, getSyncNativeInstruction, getTransferCheckedInstruction, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { AccountRole, address, createNoopSigner, getAddressEncoder, getProgramDerivedAddress, getU32Encoder, getU64Encoder, type Address, type Instruction, type MaybeEncodedAccount } from '@solana/kit';
 
+import { short } from '@otus-wallet/sdk/format';
 import { TOKEN_2022_PROGRAM_ADDRESS } from '@otus-wallet/sdk/programs/core';
 import { review } from '@otus-wallet/sdk/review/review';
 import { prepare } from '@otus-wallet/sdk/prepare/prepare';
@@ -162,7 +163,7 @@ test('a swap: rent for your new token account on its own row, what goes out "Via
     assert.ok(!codes.some((c) => c.startsWith('danger')), codes.join());
 });
 
-test('a program Otus can’t read sending your stake’s SOL to a wallet: critical, known or not', async () => {
+test('your stake’s SOL to a wallet: critical through a program Otus can’t read; read in words, a stake withdraw is told', async () => {
     const STAKE = address('Stake11111111111111111111111111111111111111');
     const stake = key(43);
     const meta = new Uint8Array(200);
@@ -182,9 +183,15 @@ test('a program Otus can’t read sending your stake’s SOL to a wallet: critic
     };
     const before = [account(PAYER, SYSTEM, SOL), account(stake, STAKE, 50n * SOL, meta), account(THIEF, SYSTEM, SOL)];
     const after = [account(PAYER, SYSTEM, SOL - FEE), account(THIEF, SYSTEM, 51n * SOL)];
-    const { codes, rows } = await shown([withdraw], before, after);
-    assert.ok(codes.includes('danger:An asset of yours goes to someone else'), codes.join());
+    // The same accounts through a program Otus can't read: critical.
+    const blind = await shown([{ ...withdraw, programAddress: key(44) }], before, after);
+    assert.ok(blind.codes.includes('danger:An asset of yours goes to someone else'), blind.codes.join());
+    // The stake program's own Withdraw, read in words: where it goes is said, as a transfer's is.
+    const { codes, rows, view } = await shown([withdraw], before, after);
+    assert.ok(!codes.includes('danger:An asset of yours goes to someone else'), codes.join());
     assert.match(rows[0], /^SOL −50 To HAgk…Kpqk · Your stake account /);
+    const effect = view.programs.find((p) => p.address === STAKE)?.instructions[0];
+    assert.deepEqual([effect?.name, effect?.effects[0].text], ['Withdraw', `50 SOL from your stake account ${short(stake)} to ${short(THIEF)}`]);
 });
 
 test('a site is known a day after the first transaction you signed for it', async () => {
