@@ -17,7 +17,7 @@ import type { Screen } from './App.tsx';
 import { Bar, ErrorLine, Sheet, TabBar } from './common.tsx';
 import { edit, setSettings } from './store.ts';
 
-const REPO = 'https://github.com/Mantistc/otus-wallet';
+const REPO = 'https://github.com/otus-wallet/otus-extension';
 
 export function Settings({ state, keys, go }: { state: State; keys: KeyStatus; go: (to: Screen) => void }) {
     const minutes = state.settings.lockAfter;
