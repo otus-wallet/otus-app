@@ -98,10 +98,9 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
 function AccessMark({ state, go }: { state: State; go: (to: Screen) => void }) {
     const read = useAccess(rpcFor('solana:mainnet', state.settings), current(state).address, state);
     const n = read.data ? others(read.data.grants) : null;
-    const words = n === null ? 'Check who has access' : accessWords(n);
     return (
-        <Tip text={words}>
-            <Button variant="ghost" size="icon" aria-label={words} onClick={() => go('access')} className={cn('-mb-0.5 size-7', n === null ? 'text-ink-3' : n === 0 ? 'text-ok hover:text-ok' : 'text-warn hover:text-warn')}>
+        <Tip text="Check who can move your funds">
+            <Button variant="ghost" size="icon" aria-label={n === null ? 'Check who can move your funds' : accessWords(n)} onClick={() => go('access')} className={cn('mb-1 size-7', n === null ? 'text-ink-3' : n === 0 ? 'text-ok hover:text-ok' : 'text-warn hover:text-warn')}>
                 <Icon name={n ? 'others' : 'only'} size={15} stroke={2.2} />
             </Button>
         </Tip>
