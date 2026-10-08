@@ -3,8 +3,8 @@ import { test } from 'node:test';
 
 import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
-import { read } from '../src/review/changes.ts';
-import type { Review } from '../src/review/review.ts';
+import { read } from '@otus-wallet/sdk/review/changes';
+import type { Review } from '@otus-wallet/sdk/review/review';
 import { decimalsOf } from '../src/shell/transaction.ts';
 import { account, fakeChain, key } from './helpers.ts';
 

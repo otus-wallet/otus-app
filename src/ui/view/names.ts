@@ -3,14 +3,14 @@
 import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 import type { Address } from '@solana/kit';
 
-import { amount, cap, quantity, short, SOL_DECIMALS } from '../../format.ts';
-import { STAKE_PROGRAM, USDC, USDT, WSOL } from '../../programs/addresses.ts';
-import { PROGRAM_NAMES } from '../../programs/known.ts';
-import { SYSVARS } from '../../review/assess.ts';
-import { defaultUnits, lamportsFor, unitLimit, unitPrice } from '../../review/budget.ts';
-import { read } from '../../review/changes.ts';
-import type { Names } from '../../review/effects.ts';
-import type { Review } from '../../review/review.ts';
+import { amount, cap, quantity, short, SOL_DECIMALS } from '@otus-wallet/sdk/format';
+import { STAKE_PROGRAM, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
+import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
+import { SYSVARS } from '@otus-wallet/sdk/review/assess';
+import { defaultUnits, lamportsFor, unitLimit, unitPrice } from '@otus-wallet/sdk/review/budget';
+import { read } from '@otus-wallet/sdk/review/changes';
+import type { Names } from '@otus-wallet/sdk/review/effects';
+import type { Review } from '@otus-wallet/sdk/review/review';
 import type { Known } from '../view.ts';
 
 const SYMBOLS: Record<string, string> = { [USDC]: 'USDC', [USDT]: 'USDT' };

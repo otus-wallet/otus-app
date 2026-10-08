@@ -4,11 +4,11 @@
 import type { Address } from '@solana/kit';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { NoHistory } from '../../activity/history.ts';
-import type { Activity } from '../../activity/summary.ts';
-import { short } from '../../format.ts';
-import { USDC, USDT, WSOL } from '../../programs/addresses.ts';
-import { PROGRAM_NAMES } from '../../programs/known.ts';
+import { NoHistory } from '@otus-wallet/sdk/activity/history';
+import type { Activity } from '@otus-wallet/sdk/activity/summary';
+import { short } from '@otus-wallet/sdk/format';
+import { USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
+import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
 import { explorerOf, rpcFor } from '../../settings.ts';
 import type { State } from '../../shell/state.ts';
 import { cachedToken } from '../../tokens.ts';

@@ -5,9 +5,9 @@ import { getAddressDecoder, getBase64Decoder, getBase64Encoder, isAddress, isOff
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 
-import { cap } from '../../format.ts';
-import { isTokenProgram, TOKEN_2022_PROGRAM_ADDRESS } from '../../programs/addresses.ts';
-import { rpcAt } from '../../rpc.ts';
+import { cap } from '@otus-wallet/sdk/format';
+import { isTokenProgram, TOKEN_2022_PROGRAM_ADDRESS } from '@otus-wallet/sdk/programs/addresses';
+import { rpcAt } from '@otus-wallet/sdk/rpc';
 import { SIGN_WITHIN } from '../../send/lifetime.ts';
 import { feeOn, transfer, unplain, units as unitsOf, type Asset, type Lifetime, type Recipient } from '../../send/transfer.ts';
 import { explorerOf, rpcFor, type Settings } from '../../settings.ts';

@@ -26,10 +26,10 @@ import {
     type Instruction,
 } from '@solana/kit';
 
-import { exactJson, NoHistory, readPage, type Landed } from '../src/activity/history.ts';
-import { summarize, type Activity } from '../src/activity/summary.ts';
-import { short } from '../src/format.ts';
-import { SQUADS_V4 } from '../src/programs/squads.ts';
+import { exactJson, NoHistory, readPage, type Landed } from '@otus-wallet/sdk/activity/history';
+import { summarize, type Activity } from '@otus-wallet/sdk/activity/summary';
+import { short } from '@otus-wallet/sdk/format';
+import { SQUADS_V4 } from '@otus-wallet/sdk/programs/squads';
 import { apart, rows, text, type Naming } from '../src/ui/view/activity.ts';
 import { key, MINT } from './helpers.ts';
 
@@ -94,92 +94,6 @@ async function landed(...items: unknown[]): Promise<Landed[]> {
 const send = (from: Address, to: Address, sol: bigint) => getTransferSolInstruction({ source: createNoopSigner(from), destination: to, amount: lamports(sol) });
 const sendTokens = (source: Address, destination: Address, authority: Address, units: bigint, mint = MINT) => getTransferCheckedInstruction({ source, mint, destination, authority: createNoopSigner(authority), amount: units, decimals: 6 });
 
-test('a page: each transaction whole, its signature and accounts, exact lamports past 2^53, where the next starts', async () => {
-    const big = 2n ** 60n + 1n;
-    const text = JSON.stringify({ result: { data: [item([send(WALLET, FRIEND, 1n)], WALLET)], paginationToken: '449187227:567' } }).replace(/"postBalances":\[(\d+)/, `"postBalances":[${big}`);
-    const page = await readPage(exactJson(text));
-    const [t] = page.items as Landed[];
-    assert.equal(t.signature, getBase58Decoder().decode(SIGNATURE));
-    assert.deepEqual(t.accounts.slice(0, 2), [WALLET, FRIEND]);
-    assert.equal(t.lamports.after[0], big);
-    assert.equal(t.fee, 5000n);
-    assert.equal(t.time, 1_791_236_675);
-    assert.equal(page.next, '449187227:567');
-    assert.equal((await readPage({ result: { data: [], paginationToken: '1:2' } })).next, null); // nothing after the last
-    assert.deepEqual(exactJson('{"a":1e20,"b":12345678901234567890.0,"c":9007199254740993}'), { a: 1e20, b: 12345678901234567000, c: 9007199254740993n }); // only whole digits become exact
-    assert.equal((await readPage({ result: { data: [item([send(WALLET, FRIEND, 1n)], WALLET)], paginationToken: 'x' } })).next, null);
-});
-
-test('an RPC without the method says so; what does not hold is unreadable, the rest read', async () => {
-    await assert.rejects(readPage({ error: { code: -32601, message: 'Method not found' } }), NoHistory);
-    await assert.rejects(readPage({ error: { code: -32005, message: 'rate limited' } }), /rate limited/);
-    const good = item([send(WALLET, FRIEND, 1n)], WALLET);
-    const short = { ...good, meta: { ...good.meta, postBalances: good.meta.postBalances.slice(1) } };
-    const outOfRange = { ...good, meta: { ...good.meta, preTokenBalances: [{ accountIndex: 99, mint: MINT, owner: WALLET, uiTokenAmount: { amount: '1', decimals: 6 } }] } };
-    const tables = { ...good, meta: { ...good.meta, loadedAddresses: { writable: [FRIEND], readonly: [] } } };
-    const garbled = { ...good, transaction: ['AAAA', 'base64'] };
-    const unsigned = { ...good, transaction: [getBase64Decoder().decode(getTransactionEncoder().encode({ ...compileTransaction(pipe(createTransactionMessage({ version: 0 }), (m) => setTransactionMessageFeePayer(WALLET, m), (m) => setTransactionMessageLifetimeUsingBlockhash({ blockhash: blockhash(key(9)), lastValidBlockHeight: 0n }, m), (m) => appendTransactionMessageInstructions([send(WALLET, FRIEND, 1n)], m))) })), 'base64'] };
-    const page = await readPage({ result: { data: [short, outOfRange, tables, garbled, unsigned, good] } });
-    assert.deepEqual(
-        page.items.map((i) => ('unreadable' in i ? i.unreadable : 'read')),
-        ['balances do not match the accounts', 'bad token account index', 'lookup accounts do not match the message', 'malformed transaction', 'unsigned', 'read'],
-    );
-});
-
-test('SOL sent and received: the other side, and the fee apart from what moved', async () => {
-    const [sent, got, failed] = await landed(
-        item([send(WALLET, FRIEND, 1_000_000n)], WALLET, { lamports: { [WALLET]: [5_000_000n, 3_995_000n], [FRIEND]: [0n, 1_000_000n] } }),
-        item([send(FRIEND, WALLET, 2_000_000n)], FRIEND, { lamports: { [FRIEND]: [5_000_000n, 2_995_000n], [WALLET]: [0n, 2_000_000n] } }),
-        item([send(WALLET, FRIEND, 1_000_000n)], WALLET, { lamports: { [WALLET]: [5_000_000n, 4_995_000n] } }, { err: { InstructionError: [0, { Custom: 1 }] } }),
-    );
-    const s = summarize(sent, WALLET);
-    assert.deepEqual([s.kind, s.other, s.moves, s.fee, s.payer], ['send', FRIEND, [{ mint: null, units: -1_000_000n, decimals: 9 }], 5000n, WALLET]);
-    const g = summarize(got, WALLET);
-    assert.deepEqual([g.kind, g.other, g.moves, g.payer], ['receive', FRIEND, [{ mint: null, units: 2_000_000n, decimals: 9 }], FRIEND]);
-    const f = summarize(failed, WALLET);
-    assert.deepEqual([f.kind, f.error, f.moves], ['other', 'instruction 1: error 1', []]);
-});
-
-test('tokens sent, opening their account: the rent set apart, the owner on the other side', async () => {
-    const open = getCreateAssociatedTokenIdempotentInstruction({ payer: createNoopSigner(WALLET), ata: THEIR_TOKENS, owner: FRIEND, mint: MINT });
-    const [t] = await landed(
-        item([open, sendTokens(MY_TOKENS, THEIR_TOKENS, WALLET, 12_000_000n)], WALLET, {
-            lamports: { [WALLET]: [10_000_000n, 7_955_720n], [THEIR_TOKENS]: [0n, 2_039_280n] },
-            tokens: [
-                { address: MY_TOKENS, mint: MINT, owner: WALLET, before: 50_000_000n, after: 38_000_000n },
-                { address: THEIR_TOKENS, mint: MINT, owner: FRIEND, before: null, after: 12_000_000n },
-            ],
-        }),
-    );
-    const s = summarize(t, WALLET);
-    assert.deepEqual([s.kind, s.other, s.moves, s.rent], ['send', FRIEND, [{ mint: MINT, units: -12_000_000n, decimals: 6 }], { yours: 0n, theirs: 2_039_280n }]); // their account, paid for
-});
-
-test('a swap through a program; an account of yours closed, its rent back; Squads steps; a memo', async () => {
-    const swap = { programAddress: JUPITER, accounts: [{ address: WALLET, role: AccountRole.WRITABLE_SIGNER }, { address: MY_TOKENS, role: AccountRole.WRITABLE }], data: new Uint8Array([1]) };
-    const close = getCloseAccountInstruction({ account: MY_TOKENS, destination: WALLET, owner: createNoopSigner(WALLET) });
-    const discriminator = createHash('sha256').update('global:proposal_approve').digest().subarray(0, 8);
-    const approve = { programAddress: SQUADS_V4, accounts: [{ address: key(40), role: AccountRole.READONLY }, { address: WALLET, role: AccountRole.WRITABLE_SIGNER }, { address: key(41), role: AccountRole.WRITABLE }], data: new Uint8Array([...discriminator, 0]) };
-    const note = { programAddress: 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr' as Address, accounts: [], data: new TextEncoder().encode('rent for June') };
-    const [swapped, closed, voted] = await landed(
-        item([swap], WALLET, {
-            lamports: { [WALLET]: [3_000_000_000n, 1_997_955_720n], [MY_TOKENS]: [0n, 2_039_280n] },
-            tokens: [{ address: MY_TOKENS, mint: OTHER_MINT, owner: WALLET, before: null, after: 150_000_000n }],
-        }),
-        item([close], WALLET, {
-            lamports: { [WALLET]: [1_000_000n, 3_034_280n], [MY_TOKENS]: [2_039_280n, 0n] },
-            tokens: [{ address: MY_TOKENS, mint: MINT, owner: WALLET, before: 0n, after: null }],
-        }),
-        item([approve, note], WALLET),
-    );
-    const s = summarize(swapped, WALLET);
-    assert.deepEqual([s.kind, s.main, s.rent, s.moves], ['swap', JUPITER, { yours: 2_039_280n, theirs: 0n }, [{ mint: null, units: -1_000_000_000n, decimals: 9 }, { mint: OTHER_MINT, units: 150_000_000n, decimals: 6 }]]);
-    const c = summarize(closed, WALLET);
-    assert.deepEqual([c.kind, c.rent, c.moves], ['other', { yours: -2_039_280n, theirs: 0n }, []]);
-    const v = summarize(voted, WALLET);
-    assert.deepEqual([v.kind, v.squads, v.main, v.memo], ['other', ['approve'], SQUADS_V4, 'rent for June']);
-});
-
 test('address poisoning: dust from a copy is caught against an address you know, or one that paid you on the page', async () => {
     // A copy: the real address's first and last four characters around another's middle, as poisoners grind them.
     const real = key(60);
@@ -233,57 +147,6 @@ test('rows: each in a line, opened for all it told; a copy of an address you sen
     assert.equal(dust.address?.copy, true);
     assert.deepEqual([failed.icon, failed.tone, text(failed.title), failed.details[0].text], ['cross', 'danger', 'Failed · Jupiter v6', 'Failed: instruction 2: error 6001']);
     assert.deepEqual([text(unread.title), unread.signature], ["Otus couldn't read this one", null]);
-});
-
-test("rent stays the wallet's own: wrapping SOL, closing while sending, rent sent elsewhere, rent others pay", async () => {
-    const [MY_WSOL, ELSEWHERE, RELAYER] = [key(42), key(43), key(44)];
-    const WSOL = 'So11111111111111111111111111111111111111112' as Address;
-    const RENT = 2_039_280n;
-    const open = (ata: Address, owner: Address, mint: Address, payer = WALLET) => getCreateAssociatedTokenIdempotentInstruction({ payer: createNoopSigner(payer), ata, owner, mint });
-    const close = (to: Address) => getCloseAccountInstruction({ account: MY_TOKENS, destination: to, owner: createNoopSigner(WALLET) });
-    const [wrap, closeAndSend, closedAway, relayed, opened] = await landed(
-        // 1 SOL wrapped into a wSOL account the wallet opens
-        item([open(MY_WSOL, WALLET, WSOL), send(WALLET, MY_WSOL, 1_000_000_000n)], WALLET, {
-            lamports: { [WALLET]: [3_000_000_000n, 3_000_000_000n - 1_000_000_000n - RENT - 5000n], [MY_WSOL]: [0n, 1_000_000_000n + RENT] },
-            tokens: [{ address: MY_WSOL, mint: WSOL, owner: WALLET, before: null, after: 1_000_000_000n, decimals: 9 }],
-        }),
-        // an empty account closed, its rent back, and 0.1 SOL sent
-        item([close(WALLET), send(WALLET, FRIEND, 100_000_000n)], WALLET, {
-            lamports: { [WALLET]: [1_000_000_000n, 1_000_000_000n + RENT - 100_000_000n - 5000n], [MY_TOKENS]: [RENT, 0n], [FRIEND]: [0n, 100_000_000n] },
-            tokens: [{ address: MY_TOKENS, mint: MINT, owner: WALLET, before: 0n, after: null }],
-        }),
-        // closed, its rent sent to another address
-        item([close(ELSEWHERE)], WALLET, {
-            lamports: { [WALLET]: [1_000_000_000n, 1_000_000_000n - 5000n], [MY_TOKENS]: [RENT, 0n], [ELSEWHERE]: [0n, RENT] },
-            tokens: [{ address: MY_TOKENS, mint: MINT, owner: WALLET, before: 0n, after: null }],
-        }),
-        // a relayer pays the fee; the wallet opens its friend's account and sends 12
-        item([open(THEIR_TOKENS, FRIEND, MINT), sendTokens(MY_TOKENS, THEIR_TOKENS, WALLET, 12_000_000n)], RELAYER, {
-            lamports: { [RELAYER]: [1_000_000_000n, 1_000_000_000n - 5000n], [WALLET]: [1_000_000_000n, 1_000_000_000n - RENT], [THEIR_TOKENS]: [0n, RENT] },
-            tokens: [
-                { address: MY_TOKENS, mint: MINT, owner: WALLET, before: 50_000_000n, after: 38_000_000n },
-                { address: THEIR_TOKENS, mint: MINT, owner: FRIEND, before: null, after: 12_000_000n },
-            ],
-        }),
-        // someone sends the wallet 12, opening its account themselves
-        item([open(MY_TOKENS, WALLET, MINT, FRIEND), sendTokens(THEIR_TOKENS, MY_TOKENS, FRIEND, 12_000_000n)], FRIEND, {
-            lamports: { [FRIEND]: [1_000_000_000n, 1_000_000_000n - RENT - 5000n], [MY_TOKENS]: [0n, RENT] },
-            tokens: [
-                { address: THEIR_TOKENS, mint: MINT, owner: FRIEND, before: 50_000_000n, after: 38_000_000n },
-                { address: MY_TOKENS, mint: MINT, owner: WALLET, before: null, after: 12_000_000n },
-            ],
-        }),
-    );
-    const sum = (t: Landed) => {
-        const s = summarize(t, WALLET);
-        return [s.kind, s.moves.map((m) => `${m.mint === null ? 'SOL' : m.mint === WSOL ? 'wSOL' : 'token'} ${m.units}`), s.rent.yours, s.rent.theirs];
-    };
-    assert.deepEqual(sum(wrap), ['swap', ['SOL -1000000000', 'wSOL 1000000000'], RENT, 0n]);
-    assert.deepEqual(sum(closeAndSend), ['send', ['SOL -100000000'], -RENT, 0n]);
-    assert.deepEqual(sum(closedAway), ['send', ['SOL -2039280'], -RENT, 0n]);
-    assert.equal(summarize(closedAway, WALLET).other, ELSEWHERE);
-    assert.deepEqual(sum(relayed), ['send', ['token -12000000'], 0n, RENT]);
-    assert.deepEqual(sum(opened), ['receive', ['token 12000000'], RENT, 0n]);
 });
 
 test('what left the wallet unsigned, a delegate moved: told apart, and never taken as an address you know', async () => {

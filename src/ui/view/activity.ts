@@ -4,10 +4,10 @@
 // kind dust is sent from, is told as one.
 import type { Address } from '@solana/kit';
 
-import type { Activity, Move } from '../../activity/summary.ts';
+import type { Activity, Move } from '@otus-wallet/sdk/activity/summary';
 import { alike } from '../../shell/state.ts';
-import { amount, short, sol } from '../../format.ts';
-import type { Step } from '../../programs/squads.ts';
+import { amount, short, sol } from '@otus-wallet/sdk/format';
+import type { Step } from '@otus-wallet/sdk/programs/squads';
 
 export type RowIcon = 'send' | 'receive' | 'swap' | 'shield' | 'box' | 'cross' | 'bang';
 export type RowTone = 'plain' | 'warn' | 'danger';

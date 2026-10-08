@@ -23,7 +23,7 @@ import {
 
 import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
-import type { Chain, Simulation } from '../src/chain.ts';
+import type { Chain, Simulation } from '@otus-wallet/sdk/chain';
 
 /** A valid address made of one repeated byte. */
 export const key = (n: number): Address => getAddressDecoder().decode(new Uint8Array(32).fill(n));

@@ -4,14 +4,14 @@ import { getBase58Decoder, getBase64Decoder, getPublicKeyFromAddress, isAddress,
 
 import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
-import type { Chain } from '../chain.ts';
+import type { Chain } from '@otus-wallet/sdk/chain';
 import { gate } from '../gate.ts';
 import { intake, type Request } from '../intake.ts';
 import { NO_KEY, Refused, type Reply } from '../protocol.ts';
-import { decode } from '../review/decode.ts';
-import type { Prepared } from '../send/prepare.ts';
-import type { Review } from '../review/review.ts';
-import { timedOut } from '../rpc.ts';
+import { decode } from '@otus-wallet/sdk/review/decode';
+import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
+import type { Review } from '@otus-wallet/sdk/review/review';
+import { timedOut } from '@otus-wallet/sdk/rpc';
 import type { Sent } from '../send/send.ts';
 import { rpcFor } from '../settings.ts';
 import { signInFields, signInText } from '../siws.ts';

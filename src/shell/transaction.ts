@@ -22,18 +22,18 @@ import {
 
 import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 
-import type { Chain } from '../chain.ts';
-import { toldByIdl, type IdlInstruction } from '../idl/idl.ts';
+import type { Chain } from '@otus-wallet/sdk/chain';
+import { toldByIdl, type IdlInstruction } from '@otus-wallet/sdk/idl/idl';
 import type { Cluster } from '../intake.ts';
 import { Refused } from '../protocol.ts';
-import { LIGHTHOUSE } from '../programs/addresses.ts';
-import { isMint, type Context } from '../review/assess.ts';
-import { read, type State } from '../review/changes.ts';
-import { decode, durable, encode, type Message } from '../review/decode.ts';
-import { review, type Review } from '../review/review.ts';
-import { notice, squadsTold, type Inside, type ProposalTold } from '../review/squads.ts';
-import { SQUADS_V4 } from '../programs/squads.ts';
-import { prepare, type Prepared } from '../send/prepare.ts';
+import { LIGHTHOUSE } from '@otus-wallet/sdk/programs/addresses';
+import { isMint, type Context } from '@otus-wallet/sdk/review/assess';
+import { read, type State } from '@otus-wallet/sdk/review/changes';
+import { decode, durable, encode, type Message } from '@otus-wallet/sdk/review/decode';
+import { review, type Review } from '@otus-wallet/sdk/review/review';
+import { notice, squadsTold, type Inside, type ProposalTold } from '@otus-wallet/sdk/review/squads';
+import { SQUADS_V4 } from '@otus-wallet/sdk/programs/squads';
+import { prepare, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Sent } from '../send/send.ts';
 import { rpcFor, type Settings } from '../settings.ts';
 import { accountView, describe, LEDGER_CLEAR, type Known, type Life, type Signer, type SiteView, type TransactionView } from '../ui/view.ts';

@@ -3,15 +3,15 @@
 import { COMPUTE_BUDGET_PROGRAM_ADDRESS } from '@solana-program/compute-budget';
 import type { Address } from '@solana/kit';
 
-import { cap, short, told } from '../../format.ts';
-import { CORE_PROGRAMS } from '../../programs/core.ts';
-import { PROGRAM_NAMES } from '../../programs/known.ts';
-import type { Finding, Level, ProgramUse, Verdict } from '../../review/assess.ts';
-import { story, type Names } from '../../review/effects.ts';
-import type { Explained } from '../../review/explain.ts';
-import type { IdlInstruction } from '../../idl/idl.ts';
-import type { Deployment } from '../../review/programs.ts';
-import type { Review } from '../../review/review.ts';
+import { cap, short, told } from '@otus-wallet/sdk/format';
+import { CORE_PROGRAMS } from '@otus-wallet/sdk/programs/core';
+import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
+import type { Finding, Level, ProgramUse, Verdict } from '@otus-wallet/sdk/review/assess';
+import { story, type Names } from '@otus-wallet/sdk/review/effects';
+import type { Explained } from '@otus-wallet/sdk/review/explain';
+import type { IdlInstruction } from '@otus-wallet/sdk/idl/idl';
+import type { Deployment } from '@otus-wallet/sdk/review/programs';
+import type { Review } from '@otus-wallet/sdk/review/review';
 import type { InstructionView, ProgramView } from '../view.ts';
 
 // The programs, in the order the transaction first calls them, each with its instructions; those no plugin reads as

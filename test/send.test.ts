@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { getAdvanceNonceAccountInstruction } from '@solana-program/system';
 import { createNoopSigner, getBase58Decoder, SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, SolanaError, type TransactionError } from '@solana/kit';
 
-import type { Chain, Status } from '../src/chain.ts';
+import type { Chain, Status } from '@otus-wallet/sdk/chain';
 import { send } from '../src/send/send.ts';
 import { fakeChain, key, PAYER, transaction, transfer } from './helpers.ts';
 

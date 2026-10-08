@@ -22,6 +22,6 @@ export type PageMessage =
     | { channel: typeof CHANNEL; kind: 'accounts'; accounts: string[]; v1: boolean }; // the site's accounts changed in Otus; v1: whether they can sign v1
 
 /** A call refused before review: malformed, too large or not allowed. */
-export class Refused extends Error {}
+export { Refused } from '@otus-wallet/sdk/errors';
 
 export const NO_KEY = 'Otus holds no key for this account';

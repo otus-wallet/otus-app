@@ -21,7 +21,7 @@ import {
     type ReadonlyUint8Array,
 } from '@solana/kit';
 
-import { MAX_ROOM } from '../review/budget.ts';
+import { MAX_ROOM } from '@otus-wallet/sdk/review/budget';
 
 /** What is sent: SOL, or a token from one of your token accounts. */
 export type Asset = { kind: 'sol' } | { kind: 'token'; mint: Address; program: Address; source: Address; decimals: number };

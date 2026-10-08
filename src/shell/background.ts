@@ -3,8 +3,8 @@
 import { getBase64Encoder, type Signature } from '@solana/kit';
 
 import { BUILD } from '../build.ts';
-import { rpcChain, type Chain } from '../chain.ts';
-import { rpcAt } from '../rpc.ts';
+import { rpcChain, type Chain } from '@otus-wallet/sdk/chain';
+import { rpcAt } from '@otus-wallet/sdk/rpc';
 import { send } from '../send/send.ts';
 import { lockMinutes, rpcFor } from '../settings.ts';
 import { tokens } from '../tokens.ts';

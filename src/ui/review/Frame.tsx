@@ -8,7 +8,7 @@ import { flushSync } from 'react-dom';
 import { Button } from '../components/ui/button.tsx';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.tsx';
 import { Icon } from '../components/icons.tsx';
-import { plural } from '../../format.ts';
+import { plural } from '@otus-wallet/sdk/format';
 import { short } from '../dom.ts';
 import { cn } from '../lib/cn.ts';
 import type { AccountView, SiteView, Tone } from '../view.ts';

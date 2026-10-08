@@ -4,12 +4,12 @@
 import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import type { Address } from '@solana/kit';
 
-import { amount, plural, short, sol } from '../../format.ts';
-import type { ConfigAction, Step } from '../../programs/squads.ts';
-import type { Tone } from '../../review/assess.ts';
-import { story, type Names } from '../../review/effects.ts';
-import type { Explained } from '../../review/explain.ts';
-import type { Inside, ProposalTold, Unread } from '../../review/squads.ts';
+import { amount, plural, short, sol } from '@otus-wallet/sdk/format';
+import type { ConfigAction, Step } from '@otus-wallet/sdk/programs/squads';
+import type { Tone } from '@otus-wallet/sdk/review/assess';
+import { story, type Names } from '@otus-wallet/sdk/review/effects';
+import type { Explained } from '@otus-wallet/sdk/review/explain';
+import type { Inside, ProposalTold, Unread } from '@otus-wallet/sdk/review/squads';
 import { YOU } from './names.ts';
 
 /** A proposal as the window shows it: which, what you do to it, what it does, then how its votes stand. */

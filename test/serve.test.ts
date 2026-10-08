@@ -31,15 +31,15 @@ import {
     type SignatureBytes,
 } from '@solana/kit';
 
-import { LIGHTHOUSE } from '../src/programs/addresses.ts';
+import { LIGHTHOUSE } from '@otus-wallet/sdk/programs/addresses';
 import { Refused, type Reply } from '../src/protocol.ts';
-import { decode } from '../src/review/decode.ts';
+import { decode } from '@otus-wallet/sdk/review/decode';
 import { transfer as sendTransfer } from '../src/send/transfer.ts';
 import { send } from '../src/send/send.ts';
 import { DEFAULT_SETTINGS } from '../src/settings.ts';
 import type { Answer } from '../src/shell/approvals.ts';
 import { own, serve, type Shell } from '../src/shell/serve.ts';
-import type { Chain } from '../src/chain.ts';
+import type { Chain } from '@otus-wallet/sdk/chain';
 import type { State } from '../src/shell/state.ts';
 import type { Approval } from '../src/ui/view.ts';
 import { account, fakeChain, key, SYSTEM, tokenAccountData } from './helpers.ts';

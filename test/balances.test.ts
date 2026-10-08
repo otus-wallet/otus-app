@@ -5,9 +5,9 @@ import { getTransferSolInstruction } from '@solana-program/system';
 import { getCloseAccountInstruction, getSyncNativeInstruction, getTransferCheckedInstruction, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { AccountRole, address, createNoopSigner, getAddressEncoder, getProgramDerivedAddress, getU32Encoder, getU64Encoder, type Address, type Instruction, type MaybeEncodedAccount } from '@solana/kit';
 
-import { TOKEN_2022_PROGRAM_ADDRESS } from '../src/programs/core.ts';
-import { review } from '../src/review/review.ts';
-import { prepare } from '../src/send/prepare.ts';
+import { TOKEN_2022_PROGRAM_ADDRESS } from '@otus-wallet/sdk/programs/core';
+import { review } from '@otus-wallet/sdk/review/review';
+import { prepare } from '@otus-wallet/sdk/prepare/prepare';
 import type { TokenInfo } from '../src/tokens.ts';
 import { describe, siteView } from '../src/ui/view.ts';
 import { golden } from './golden.ts';

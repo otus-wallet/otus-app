@@ -1,8 +1,8 @@
 // What a wallet holds: SOL and its token accounts from the RPC, names, icons and prices from Jupiter.
 import { address, type Address } from '@solana/kit';
 
-import { TOKEN_PROGRAMS, USDC, USDT, WSOL } from '../programs/addresses.ts';
-import { rpcAt } from '../rpc.ts';
+import { TOKEN_PROGRAMS, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
+import { rpcAt } from '@otus-wallet/sdk/rpc';
 import { tokens } from '../tokens.ts';
 
 /** One asset of the wallet. `usd` is null when Jupiter has no price for it; `native`: SOL itself, not wrapped. */

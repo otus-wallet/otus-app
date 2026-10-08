@@ -1,6 +1,6 @@
 // Token names, logos and prices from Jupiter's token API, for the popup's balances and the review's lines. Jupiter
 // learns which tokens are looked up; each is asked once while the page or worker lives.
-import { latin } from './review/sites.ts';
+import { latin } from '@otus-wallet/sdk/review/sites';
 
 export type TokenInfo = { id: string; name: string; symbol: string; icon: string | null; verified: boolean; usdPrice: number | null; change24h: number | null; decimals: number | null }; // change24h: percent
 

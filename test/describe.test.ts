@@ -5,10 +5,10 @@ import { createNoopSigner, type MaybeEncodedAccount } from '@solana/kit';
 
 import assert from 'node:assert/strict';
 
-import type { Simulation } from '../src/chain.ts';
+import type { Simulation } from '@otus-wallet/sdk/chain';
 import type { Cluster } from '../src/intake.ts';
-import { review } from '../src/review/review.ts';
-import { prepare } from '../src/send/prepare.ts';
+import { review } from '@otus-wallet/sdk/review/review';
+import { prepare } from '@otus-wallet/sdk/prepare/prepare';
 import { describe, siteView, type Signer } from '../src/ui/view.ts';
 import { golden } from './golden.ts';
 import { account, DRAIN, DRAIN_AFTER, DRAIN_BEFORE, fakeChain, key, PAYER, RECIPIENT, SYSTEM, transaction, transferV1 } from './helpers.ts';

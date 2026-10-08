@@ -2,15 +2,15 @@
 // that moves it, saying where it goes or comes from.
 import { isOffCurveAddress, type Address } from '@solana/kit';
 
-import { amount, cap, quantity, SOL_DECIMALS } from '../../format.ts';
-import { LIGHTHOUSE, TOKEN_PROGRAMS, USDC, USDT, WSOL } from '../../programs/addresses.ts';
-import { CORE_PROGRAMS } from '../../programs/core.ts';
-import { PROGRAM_NAMES } from '../../programs/known.ts';
-import { HIGH_FEE, type Tone, type Verdict } from '../../review/assess.ts';
-import { plain, units as unitsIn, type Change } from '../../review/changes.ts';
-import type { Names } from '../../review/effects.ts';
-import type { Review } from '../../review/review.ts';
-import type { Prepared } from '../../send/prepare.ts';
+import { amount, cap, quantity, SOL_DECIMALS } from '@otus-wallet/sdk/format';
+import { LIGHTHOUSE, TOKEN_PROGRAMS, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
+import { CORE_PROGRAMS } from '@otus-wallet/sdk/programs/core';
+import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
+import { HIGH_FEE, type Tone, type Verdict } from '@otus-wallet/sdk/review/assess';
+import { plain, units as unitsIn, type Change } from '@otus-wallet/sdk/review/changes';
+import type { Names } from '@otus-wallet/sdk/review/effects';
+import type { Review } from '@otus-wallet/sdk/review/review';
+import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { AssetChange, Logo } from '../view.ts';
 
 const LOGOS: Record<string, Logo> = { [WSOL]: 'sol', [USDC]: 'usdc', [USDT]: 'usdt' };

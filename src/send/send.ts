@@ -1,7 +1,7 @@
 import { getSignatureFromTransaction, getTransactionDecoder, isSolanaError, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, type Signature, type TransactionError } from '@solana/kit';
 
-import type { Chain, Status } from '../chain.ts';
-import { decode, durable } from '../review/decode.ts';
+import type { Chain, Status } from '@otus-wallet/sdk/chain';
+import { decode, durable } from '@otus-wallet/sdk/review/decode';
 
 /** What became of a sent transaction. `unknown`: a durable one not seen yet, which may still land. */
 export type Sent = { signature: Signature; outcome: 'confirmed' | 'failed' | 'expired' | 'unknown'; error: TransactionError | null };

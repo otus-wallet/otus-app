@@ -2,15 +2,15 @@
 // renders it and decides nothing.
 import type { Address } from '@solana/kit';
 
-import { plural, sol } from '../format.ts';
-import type { IdlInstruction } from '../idl/idl.ts';
+import { plural, sol } from '@otus-wallet/sdk/format';
+import type { IdlInstruction } from '@otus-wallet/sdk/idl/idl';
 import type { Cluster } from '../intake.ts';
-import { described, ranked, type Finding, type Level, type Tone, type Verdict } from '../review/assess.ts';
-import type { Effect } from '../review/effects.ts';
-import type { Review } from '../review/review.ts';
-import { lookalike } from '../review/sites.ts';
-import type { Prepared } from '../send/prepare.ts';
-import type { ProposalTold } from '../review/squads.ts';
+import { described, ranked, type Finding, type Level, type Tone, type Verdict } from '@otus-wallet/sdk/review/assess';
+import type { Effect } from '@otus-wallet/sdk/review/effects';
+import type { Review } from '@otus-wallet/sdk/review/review';
+import { lookalike } from '@otus-wallet/sdk/review/sites';
+import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
+import type { ProposalTold } from '@otus-wallet/sdk/review/squads';
 import type { Account, Site } from '../shell/state.ts';
 import type { TokenInfo } from '../tokens.ts';
 import { balances } from './view/balances.ts';

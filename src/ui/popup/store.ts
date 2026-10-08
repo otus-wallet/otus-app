@@ -5,9 +5,9 @@ import { isSolanaError, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, type Address } 
 import { useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
-import { historyPage, NoHistory } from '../../activity/history.ts';
-import { summarize, type Activity } from '../../activity/summary.ts';
-import { timedOut } from '../../rpc.ts';
+import { historyPage, NoHistory } from '@otus-wallet/sdk/activity/history';
+import { summarize, type Activity } from '@otus-wallet/sdk/activity/summary';
+import { timedOut } from '@otus-wallet/sdk/rpc';
 import type { KeyStatus } from '../../shell/keys.ts';
 import { load, save, type Edit, type State } from '../../shell/state.ts';
 import { ask } from '../ask.ts';

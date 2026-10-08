@@ -2,12 +2,12 @@
 // simulation's reason included.
 import type { Address } from '@solana/kit';
 
-import { cap, quantity, short, sol, SOL_DECIMALS, told } from '../../format.ts';
-import type { Finding, Flow } from '../../review/assess.ts';
-import type { Names } from '../../review/effects.ts';
-import type { Review } from '../../review/review.ts';
-import type { Prepared } from '../../send/prepare.ts';
-import { latin } from '../../review/sites.ts';
+import { cap, quantity, short, sol, SOL_DECIMALS, told } from '@otus-wallet/sdk/format';
+import type { Finding, Flow } from '@otus-wallet/sdk/review/assess';
+import type { Names } from '@otus-wallet/sdk/review/effects';
+import type { Review } from '@otus-wallet/sdk/review/review';
+import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
+import { latin } from '@otus-wallet/sdk/review/sites';
 import type { TokenInfo } from '../../tokens.ts';
 
 // Symbols scams like to give their own tokens: one of these on a token that is not verified gets a warning.

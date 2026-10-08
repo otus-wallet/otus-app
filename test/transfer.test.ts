@@ -4,9 +4,9 @@ import { test } from 'node:test';
 import { findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { blockhash, type Address } from '@solana/kit';
 
-import { CORE_PLUGINS } from '../src/programs/core.ts';
-import { decode } from '../src/review/decode.ts';
-import { explain } from '../src/review/explain.ts';
+import { CORE_PLUGINS } from '@otus-wallet/sdk/programs/core';
+import { decode } from '@otus-wallet/sdk/review/decode';
+import { explain } from '@otus-wallet/sdk/review/explain';
 import { feeOn, transfer, units, unplain } from '../src/send/transfer.ts';
 import { key, PAYER, RECIPIENT } from './helpers.ts';
 
