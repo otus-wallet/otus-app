@@ -88,6 +88,17 @@ export type TransactionView = {
     preparing?: true; // shown as reviewed while Otus still adds its guards and fees: no verdict, no hash, no signing yet
 };
 
+/** How a site's transaction went once approved, for its window: on its way (Otus sends it, or the site does and Otus
+ *  watches for it), signed for the site to send when Otus can't follow it (another account pays, unsigned yet), then
+ *  how it ended: landed (worked or failed), not seen landing (`expired`: its blockhash ran out first), or refused. */
+export type Outcome =
+    | { phase: 'sending' }
+    | { phase: 'waiting'; host: string }
+    | { phase: 'signed'; host: string }
+    | { phase: 'landed'; failed: boolean; link: string }
+    | { phase: 'unseen'; expired: boolean; link: string }
+    | { phase: 'refused'; error: string };
+
 /** How long a transaction's blockhash lives, as the network tells while the user decides: until about when (ms since
  *  1970), or gone. */
 export type Life = { until: number } | { expired: true };

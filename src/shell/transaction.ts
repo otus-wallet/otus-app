@@ -17,6 +17,7 @@ import {
     SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_FEE,
     SOLANA_ERROR__TRANSACTION_ERROR__INSUFFICIENT_FUNDS_FOR_RENT,
     type Address,
+    type Signature,
     type SignatureBytes,
 } from '@solana/kit';
 
@@ -36,7 +37,7 @@ import { SQUADS_V4 } from '@otus-wallet/sdk/programs/squads';
 import { prepare, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Sent } from '../send/send.ts';
 import { networkOf, rpcFor, type Settings } from '../settings.ts';
-import { accountView, describe, LEDGER_CLEAR, type Known, type Life, type Signer, type SiteView, type TransactionView } from '../ui/view.ts';
+import { accountView, describe, LEDGER_CLEAR, type Known, type Life, type Outcome, type Signer, type SiteView, type TransactionView } from '../ui/view.ts';
 import type { Answer } from './approvals.ts';
 import type { Shell } from './serve.ts';
 import type { Account } from './state.ts';
@@ -100,7 +101,7 @@ export type Way = { cluster: Cluster; chain: Chain; site: SiteView; recipient?: 
  * prepared, the only form that can be approved; its blockhash watched meanwhile. Throws Rejected when the user says
  * no, or what went wrong preparing it.
  */
-export async function approved(bytes: Uint8Array, account: Account, way: Way, shell: Shell, checks: (r: Review) => void | Promise<void>): Promise<{ r: Review; p: Prepared; signature?: SignatureBytes }> {
+export async function approved(bytes: Uint8Array, account: Account, way: Way, shell: Shell, checks: (r: Review) => void | Promise<void>, after?: (tell: (outcome: Outcome) => void) => void): Promise<{ r: Review; p: Prepared; signature?: SignatureBytes }> {
     // A Ledger's Solana app misreads v1: shown all the same, so the user hears why it cannot be signed.
     const unsignable = account.ledger !== undefined && (await decode(bytes)).message.version === 1;
     // Yours, and the addresses you keep: what lands with them is not someone else's.
@@ -135,7 +136,7 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     const watch = durable(r.message) ? null : watched(r.message.lifetimeToken, way.chain, shell.now);
     let answer: Answer;
     try {
-        answer = await shell.approve({ ...describe(r, null, shown), ...(blocked && { blocked }) }, watch?.follow, later);
+        answer = await shell.approve({ ...describe(r, null, shown), ...(blocked && { blocked }) }, watch?.follow, later, after);
     } finally {
         watch?.stop();
     }
@@ -206,6 +207,37 @@ function plainTransfer(r: Review): boolean {
     const [ix, ...rest] = r.message.instructions;
     if (!ix || rest.length > 0 || r.accounts[ix.programAddressIndex].address !== SYSTEM_PROGRAM_ADDRESS) return false;
     return ix.data.length === 12 && ix.data[0] === 2 && ix.data[1] === 0 && ix.data[2] === 0 && ix.data[3] === 0;
+}
+
+/** What one side tells and another follows from whenever it starts: the last thing said at once, then each new one. */
+export function channel<T>(): { tell: (value: T) => void; follow: (listener: (value: T) => void) => void } {
+    let last: { value: T } | null = null;
+    let listener: ((value: T) => void) | null = null;
+    return {
+        tell: (value) => ((last = { value }), listener?.(value)),
+        follow: (l) => ((listener = l), last && l(last.value)),
+    };
+}
+
+const FOLLOW_EVERY = 2_000; // ms between asking the network about a transaction someone else sends
+const FOLLOW_DURABLE = 180_000; // ms one on a durable nonce is followed, as it can be sent at any time
+
+/** A signed transaction someone else sends, followed by its id until it lands, or can no longer: its blockhash expired
+ *  without it, or, on a durable nonce, a few minutes went by. */
+export async function followed(id: Signature, r: Review, chain: Chain): Promise<{ failed: boolean } | { expired: boolean }> {
+    const lasting = durable(r.message);
+    const until = Date.now() + FOLLOW_DURABLE;
+    const seen = async () => {
+        const s = await chain.status(id).catch(() => null);
+        return s?.confirmed ? { failed: s.error !== null } : null;
+    };
+    for (;;) {
+        const landed = await seen();
+        if (landed) return landed;
+        if (!lasting && !(await chain.valid(r.message.lifetimeToken).catch(() => true))) return (await seen()) ?? { expired: true };
+        if (lasting && Date.now() > until) return { expired: false };
+        await new Promise((done) => setTimeout(done, FOLLOW_EVERY));
+    }
 }
 
 /** Refuses a transaction no block can take any more: one read for longer than its blockhash lives would not land. */

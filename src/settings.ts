@@ -53,12 +53,11 @@ export const EXPLORERS = {
 } as const;
 export type Explorer = keyof typeof EXPLORERS;
 
-/** The explorer chosen (the default when what is stored is not one), its pages on the network the wallet shows: a
- *  local one by its endpoint. */
-export function explorerOf(settings: Settings) {
+/** The explorer chosen (the default when what is stored is not one), its pages on a network: the one the wallet shows
+ *  unless said; a local one by its endpoint. */
+export function explorerOf(settings: Settings, cluster = networkOf(settings)) {
     const chosen = EXPLORERS[Object.hasOwn(EXPLORERS, settings.explorer) ? settings.explorer : DEFAULT_SETTINGS.explorer];
-    const cluster = networkOf(settings);
-    const on = cluster === 'solana:mainnet' ? '' : cluster === 'solana:localnet' ? `?cluster=custom&customUrl=${encodeURIComponent(settings.rpc ?? '')}` : `?cluster=${cluster.slice('solana:'.length)}`;
+    const on = cluster === 'solana:mainnet' ? '' : cluster === 'solana:localnet' ? `?cluster=custom&customUrl=${encodeURIComponent(rpcFor(cluster, settings))}` : `?cluster=${cluster.slice('solana:'.length)}`;
     return { name: chosen.name, tx: (signature: string) => `${chosen.tx(signature)}${on}` };
 }
 

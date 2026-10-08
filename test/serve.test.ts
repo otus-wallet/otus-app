@@ -42,7 +42,7 @@ import { fix } from '../src/send/fix.ts';
 import { own, serve, takeBack, type Shell } from '../src/shell/serve.ts';
 import type { Chain } from '@otus-wallet/sdk/chain';
 import type { State } from '../src/shell/state.ts';
-import type { Approval } from '../src/ui/view.ts';
+import type { Approval, Outcome } from '../src/ui/view.ts';
 import { account, fakeChain, key, SYSTEM, tokenAccountData } from './helpers.ts';
 
 const ORIGIN = 'https://jup.ag';
@@ -84,17 +84,20 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
         ? (Object.fromEntries(Object.entries(quick).map(([k, f]) => [k, async (...args: unknown[]) => (await new Promise((r) => setTimeout(r, o.slow)), (f as (...a: unknown[]) => unknown)(...args))])) as Chain)
         : quick;
     const looked: string[][] = []; // the mints Jupiter was asked about
+    const outcomes: Outcome[] = []; // what approved windows heard
     const shell: Shell = {
         load: async () => box.state,
         update: async (change) => void (box.state = { ...box.state, ...(change(box.state) ?? {}) }),
         // As the window: the first form shown, the final one (when it comes) the only one answered.
-        approve: async (a, _follow, later) => {
+        approve: async (a, _follow, later, after) => {
             firsts.push(a);
             shownAt.first.push(performance.now());
             const final = later ? await later : a;
             shownAt.final.push(performance.now());
             approvals.push(final);
-            return o.answer ? o.answer(final, box) : true;
+            const answer = o.answer ? await o.answer(final, box) : true;
+            if (answer !== false) after?.((outcome) => outcomes.push(outcome)); // the window stays, and hears how it goes
+            return answer;
         },
         sign: async (_account, data): Promise<SignatureBytes> => {
             if (o.locked) throw new Refused('Otus is locked');
@@ -122,7 +125,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
             ),
         );
     const call = (method: string, params: object, origin = ORIGIN) => serve({ method, params }, origin, shell);
-    return { me, pair, box, approvals, firsts, shownAt, sent, looked, transfer, call, shell };
+    return { me, pair, box, approvals, firsts, shownAt, sent, looked, outcomes, transfer, call, shell };
 }
 
 const result = <T>(reply: Reply): T => {
@@ -141,6 +144,26 @@ test('signs the transaction as approved, guards and fees included, with your sig
     assert.equal(w.box.state.sites[ORIGIN].signatures, 1);
     assert.equal(w.box.state.sites[ORIGIN].since, NOW / 1000); // the first transaction: known a day later
     assert.equal(w.sent.length, 0);
+});
+
+test('an approved transaction’s window hears how it goes: sent by Otus, or followed while the site sends it', async () => {
+    const sends = await wallet();
+    result(await sends.call('signAndSendTransaction', { account: sends.me, transactions: [sends.transfer()] }));
+    assert.deepEqual(sends.outcomes.map((o) => o.phase), ['sending', 'landed']);
+    assert.match((sends.outcomes[1] as { link: string }).link, /^https:\/\/solscan\.io\/tx\//);
+    const signs = await wallet();
+    result(await signs.call('signTransaction', { account: signs.me, transactions: [signs.transfer()] }));
+    for (let i = 0; i < 20 && signs.outcomes.length < 2; i++) await new Promise((r) => setTimeout(r, 10));
+    assert.deepEqual(signs.outcomes, [{ phase: 'waiting', host: 'jup.ag' }, { phase: 'landed', failed: false, link: (signs.outcomes[1] as { link: string }).link }]);
+    // Another account pays, and has not signed yet: nothing to follow by.
+    const other = await wallet();
+    result(await other.call('signTransaction', { account: other.me, transactions: [other.transfer(other.me, key(7))] }));
+    assert.deepEqual(other.outcomes, [{ phase: 'signed', host: 'jup.ag' }]);
+    // Refused once approved: said in the window too.
+    let checks = 0;
+    const late = await wallet({ chain: { valid: async () => ++checks <= 1 } });
+    await late.call('signTransaction', { account: late.me, transactions: [late.transfer()] });
+    assert.deepEqual(late.outcomes, [{ phase: 'refused', error: 'It expired before you signed it, so nothing was sent' }]);
 });
 
 test('a transfer made in the popup is not signed once its blockhash is too old, and says when it is signed', async () => {

@@ -1,7 +1,7 @@
 // What the background answers: sites' requests, and the transfers made in Otus's own popup, and what it makes there to
 // take access back. Each is checked, shown to the user and, once approved, signed with state as it is then. A reply
 // never throws.
-import { getBase58Decoder, getBase64Decoder, getPublicKeyFromAddress, isAddress, isSolanaError, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, verifySignature, type Address, type Signature, type SignatureBytes } from '@solana/kit';
+import { getBase58Decoder, getBase64Decoder, getPublicKeyFromAddress, getTransactionDecoder, isAddress, isSolanaError, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, verifySignature, type Address, type Signature, type SignatureBytes } from '@solana/kit';
 
 import { COMPUTE_BUDGET_PROGRAM_ADDRESS } from '@solana-program/compute-budget';
 import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
@@ -9,8 +9,9 @@ import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
 import type { Chain } from '@otus-wallet/sdk/chain';
 import { gate } from '../gate.ts';
-import { intake, type Request } from '../intake.ts';
+import { intake, type Cluster, type Request } from '../intake.ts';
 import { NO_KEY, Refused, type Reply } from '../protocol.ts';
+import { cap } from '@otus-wallet/sdk/format';
 import { decode } from '@otus-wallet/sdk/review/decode';
 import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Review } from '@otus-wallet/sdk/review/review';
@@ -19,20 +20,20 @@ import { delegatesGiven, waitingOn } from '@otus-wallet/sdk/access/access';
 import { isTokenProgram } from '@otus-wallet/sdk/programs/addresses';
 import { timedOut } from '@otus-wallet/sdk/rpc';
 import type { Sent } from '../send/send.ts';
-import { networkOf, rpcFor } from '../settings.ts';
+import { explorerOf, networkOf, rpcFor } from '../settings.ts';
 import { signInFields, signInText } from '../siws.ts';
 import type { TokenInfo } from '../tokens.ts';
-import { accountView, siteView, type Approval, type Life, type SiteView } from '../ui/view.ts';
+import { accountView, siteView, type Approval, type Life, type Outcome, type SiteView } from '../ui/view.ts';
 import type { Answer } from './approvals.ts';
 import { onDevice, sentTo, signs, type Account, type State } from './state.ts';
-import { approved, clusterOf, landed, messageOf, Rejected, signerOf, unexpired, withSignature } from './transaction.ts';
+import { approved, channel, clusterOf, followed, landed, messageOf, Rejected, signerOf, unexpired, withSignature } from './transaction.ts';
 
 /** What serve needs from the extension: its state, the user's answer (behind Otus's lock), the keystore, the network
  *  and the time. Tests pass fakes. */
 export type Shell = {
     load(): Promise<State>;
     update(change: (state: State) => Partial<State> | null): Promise<void>; // one after another, from state as it is then
-    approve(approval: Approval, follow?: (tell: (life: Life) => void) => void, later?: Promise<Approval>): Promise<Answer>; // yes or no (for a Ledger account, yes is its signature; to connect, yes may name another account); `follow`: its blockhash's life, for the window to show; `later`: the approval in its final form, which replaces the first and alone takes a yes (failing, it says no)
+    approve(approval: Approval, follow?: (tell: (life: Life) => void) => void, later?: Promise<Approval>, after?: (tell: (outcome: Outcome) => void) => void): Promise<Answer>; // yes or no (for a Ledger account, yes is its signature; to connect, yes may name another account); `follow`: its blockhash's life, for the window to show; `later`: the approval in its final form, which replaces the first and alone takes a yes (failing, it says no); `after`: approved, the window hears how it goes
     sign(account: Account, data: Uint8Array): Promise<SignatureBytes>; // throws Refused when locked or without the key
     chain(rpc: string): Chain;
     send(signed: Uint8Array, chain: Chain): Promise<Sent>; // sent, then watched until it lands or cannot
@@ -133,23 +134,49 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
     const { origin } = request;
     if (reviewing.has(origin)) throw new Refused('Otus is already asking you about a request from this site');
     reviewing.add(origin);
-    let decided: { r: Review; p: Prepared; signature?: SignatureBytes; chain: Chain };
+    let decided: { r: Review; p: Prepared; signature?: SignatureBytes; chain: Chain; cluster: Cluster };
+    const outcome = channel<Outcome>(); // approved, the window stays and says how it goes
     try {
         const { cluster, chain } = await clusterOf(bytes, request.chain, state.settings, shell);
         const way = { cluster, chain, site: siteView(origin, site), later: !request.send, context: { signedBefore: site.since ?? null, programsBefore: site.programs, host: new URL(origin).host } };
-        decided = { ...(await approved(bytes, account, way, shell, () => {})), chain };
+        decided = { ...(await approved(bytes, account, way, shell, () => {}, outcome.follow)), chain, cluster };
     } finally {
         reviewing.delete(origin);
     }
-    const { r, p, signature, chain } = decided;
-    // Signed on a Ledger right as its blockhash ran out, it goes to the network all the same:
-    // it may still land, and if not the network says so. Otus's own key doesn't sign what can no longer land.
-    if (!signature) await unexpired(r, chain);
+    const { r, p, signature, chain, cluster } = decided;
     const host = new URL(origin).host;
-    const mine = await signFor(account, messageOf(p.bytes), shell, { origin, programs: programsCalled(r.message) }, signature);
-    await shell.update((s) => usable(s, r, account.address, host, shell.now())).catch(() => {}); // keeping them never changes the signing
-    const signed = withSignature(p.bytes, account.address, mine);
-    return request.send ? { signatures: [(await landed(signed, chain, shell)).signature] } : { transactions: [base64(signed)] };
+    const link = (id: string) => explorerOf(state.settings, cluster).tx(id);
+    try {
+        // Signed on a Ledger right as its blockhash ran out, it goes to the network all the same:
+        // it may still land, and if not the network says so. Otus's own key doesn't sign what can no longer land.
+        if (!signature) await unexpired(r, chain);
+        const mine = await signFor(account, messageOf(p.bytes), shell, { origin, programs: programsCalled(r.message) }, signature);
+        await shell.update((s) => usable(s, r, account.address, host, shell.now())).catch(() => {}); // keeping them never changes the signing
+        const signed = withSignature(p.bytes, account.address, mine);
+        if (request.send) {
+            outcome.tell({ phase: 'sending' });
+            const sent = await landed(signed, chain, shell);
+            outcome.tell(sent.outcome === 'confirmed' || sent.outcome === 'failed' ? { phase: 'landed', failed: sent.outcome === 'failed', link: link(sent.signature) } : { phase: 'unseen', expired: false, link: link(sent.signature) });
+            return { signatures: [sent.signature] };
+        }
+        // The site sends it: Otus follows it by its signature, the fee payer's, when it has one already.
+        const id = idOf(signed, r.signers[0]);
+        if (!id) outcome.tell({ phase: 'signed', host });
+        else {
+            outcome.tell({ phase: 'waiting', host });
+            void followed(id, r, chain).then((f) => outcome.tell('failed' in f ? { phase: 'landed', failed: f.failed, link: link(id) } : { phase: 'unseen', expired: f.expired, link: link(id) }));
+        }
+        return { transactions: [base64(signed)] };
+    } catch (e) {
+        outcome.tell({ phase: 'refused', error: e instanceof Refused ? cap(e.message) : 'Otus could not finish it' });
+        throw e;
+    }
+}
+
+// A transaction's id: its fee payer's signature, once there; null while that account has not signed yet.
+function idOf(signed: Uint8Array, payer: Address): Signature | null {
+    const signature = getTransactionDecoder().decode(signed).signatures[payer];
+    return signature ? (getBase58Decoder().decode(signature) as Signature) : null;
 }
 
 /** A transfer the popup made for one of your accounts to the address typed → reviewed and approved like a site's,

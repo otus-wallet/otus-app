@@ -1,7 +1,7 @@
 import { getBase64Encoder, isAddress, type Address, type SignatureBytes } from '@solana/kit';
 
 import { Refused } from '../protocol.ts';
-import type { Approval, Life } from '../ui/view.ts';
+import type { Approval, Life, Outcome } from '../ui/view.ts';
 import { shielded } from './keys.ts';
 
 const PAGE = 'approve.html';
@@ -9,8 +9,9 @@ const [WIDTH, HEIGHT] = [400, 680];
 /** An answer: no, yes, yes with the signature a Ledger made, or, to connect, yes with the account chosen. */
 export type Answer = boolean | SignatureBytes | { account: Address };
 
-// `ready`: the approval is in its final form, the only one a yes counts for; `told`: the window, to hear it.
-type Pending = { approval: Approval; ready: boolean; told?: (approval: Approval) => void; follow?: (tell: (life: Life) => void) => void; decide: (answer: Answer) => void };
+// `ready`: the approval is in its final form, the only one a yes counts for; `told`: the window, to hear it; `port`: the
+// window's own, to tell it how an approved transaction goes.
+type Pending = { approval: Approval; ready: boolean; told?: (approval: Approval) => void; follow?: (tell: (life: Life) => void) => void; decide: (answer: Answer) => void; port?: chrome.runtime.Port };
 const pending = new Map<string, Pending>();
 const windows = new Map<number, string>(); // approval windows, to the request they ask about
 
@@ -18,17 +19,21 @@ const windows = new Map<number, string>(); // approval windows, to the request t
  *  from the device on approval (serve checks it), or, to connect, the account they chose there (serve checks it is
  *  theirs). Closing the window says no. One at a time per site. `follow`: the window hears its blockhash's life.
  *  `later`: the approval in its final form; the window shows it in place of the first, and only then does a yes
- *  count. Failing, it says no. */
-export async function approve(approval: Approval, follow?: (tell: (life: Life) => void) => void, later?: Promise<Approval>): Promise<Answer> {
+ *  count. Failing, it says no. `after`: approved, the window stays and hears how the transaction goes, until the user
+ *  closes it; without it, or on no, it closes. */
+export async function approve(approval: Approval, follow?: (tell: (life: Life) => void) => void, later?: Promise<Approval>, after?: (tell: (outcome: Outcome) => void) => void): Promise<Answer> {
     if ([...pending.values()].some((p) => p.approval.site.origin === approval.site.origin)) throw new Refused('Otus is already asking you about a request from this site');
     const id = crypto.randomUUID();
+    let asked: Pending | undefined;
+    let answer: Answer = false;
     const decided = new Promise<Answer>((decide) => {
-        const asked: Pending = { approval, ready: !later, follow, decide };
-        pending.set(id, asked);
+        asked = { approval, ready: !later, follow, decide };
+        const it = asked;
+        pending.set(id, it);
         later?.then(
             (final) => {
-                Object.assign(asked, { approval: final, ready: true });
-                asked.told?.(final);
+                Object.assign(it, { approval: final, ready: true });
+                it.told?.(final);
             },
             () => decide(false),
         );
@@ -42,12 +47,15 @@ export async function approve(approval: Approval, follow?: (tell: (life: Life) =
         opened = await open(corner).catch(() => open({}));
         if (opened?.id === undefined) throw new Error('the approval window did not open');
         windows.set(opened.id, id);
-        return await decided;
+        answer = await decided;
+        return answer;
     } finally {
         pending.delete(id);
+        const port = asked?.port;
         if (opened?.id !== undefined) {
             windows.delete(opened.id);
-            chrome.windows.remove(opened.id).catch(() => {});
+            if (answer !== false && after && port) after((outcome) => void tellPort(port, { outcome }));
+            else chrome.windows.remove(opened.id).catch(() => {});
         }
     }
 }
@@ -59,6 +67,7 @@ chrome.runtime.onConnect.addListener((port) => {
     const asked = pending.get(port.name.slice('approve:'.length));
     const fromPage = port.sender?.id === chrome.runtime.id && port.sender.url?.split('#')[0] === chrome.runtime.getURL(PAGE);
     if (!asked || !fromPage) return port.disconnect();
+    asked.port = port;
     port.postMessage(asked.approval);
     asked.told = (final) => {
         try {
@@ -78,6 +87,13 @@ chrome.runtime.onConnect.addListener((port) => {
     });
     port.onDisconnect.addListener(() => asked.decide(false));
 });
+
+// A message for a window that may have gone meanwhile.
+function tellPort(port: chrome.runtime.Port, message: object) {
+    try {
+        port.postMessage(message);
+    } catch {} // the window went meanwhile
+}
 
 // A window closed before its page connected says no as well.
 chrome.windows.onRemoved.addListener((window) => {
