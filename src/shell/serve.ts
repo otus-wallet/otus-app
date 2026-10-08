@@ -12,6 +12,7 @@ import { decode } from '@otus-wallet/sdk/review/decode';
 import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Review } from '@otus-wallet/sdk/review/review';
 import { programsCalled } from '@otus-wallet/sdk/review/sites';
+import { delegatesGiven, waitingOn } from '@otus-wallet/sdk/access/access';
 import { timedOut } from '@otus-wallet/sdk/rpc';
 import type { Sent } from '../send/send.ts';
 import { rpcFor } from '../settings.ts';
@@ -139,7 +140,10 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
     // Signed on a Ledger right as its blockhash ran out, it goes to the network all the same:
     // it may still land, and if not the network says so. Otus's own key doesn't sign what can no longer land.
     if (!signature) await unexpired(r, chain);
-    const signed = withSignature(p.bytes, account.address, await signFor(account, messageOf(p.bytes), shell, { origin, programs: programsCalled(r.message) }, signature));
+    const host = new URL(origin).host;
+    const mine = await signFor(account, messageOf(p.bytes), shell, { origin, programs: programsCalled(r.message) }, signature);
+    await shell.update((s) => usable(s, r, account.address, host, shell.now())).catch(() => {}); // keeping them never changes the signing
+    const signed = withSignature(p.bytes, account.address, mine);
     return request.send ? { signatures: [(await landed(signed, chain, shell)).signature] } : { transactions: [base64(signed)] };
 }
 
@@ -249,6 +253,21 @@ function signedFor(sites: State['sites'], { origin, connects = false, programs }
     const kept = same ? site.programs : undefined;
     const called = programs ? [...new Set([...(kept ?? []), ...programs])].slice(-MAX_SITE_PROGRAMS) : kept;
     return { sites: { ...sites, [origin]: { account: address, signatures: same ? site.signatures + 1 : 1, ...(since !== undefined && { since }), ...(called && { programs: called }) } } };
+}
+
+const MAX_USABLE = 32; // transactions waiting, and delegates given, kept: the latest
+
+// What a site can use once signed for, besides the transaction: the transaction itself, while it waits on a durable
+// nonce; and the delegates it gives on token accounts of yours. Kept with the site, for Access to say who.
+export function usable(s: State, r: Review, wallet: Address, host: string, now: number): Partial<State> | null {
+    const at = Math.floor(now / 1000);
+    const waits = waitingOn(r.message);
+    const given = delegatesGiven(r.assessment.yours);
+    if (!waits && given.length === 0) return null;
+    return {
+        ...(waits && { waiting: [...s.waiting.filter((w) => w.account !== waits.account || w.nonce !== waits.nonce), { wallet, ...waits, host, at }].slice(-MAX_USABLE) }),
+        ...(given.length > 0 && { given: [...s.given.filter((g) => !given.some((x) => x.account === g.account)), ...given.map((g) => ({ ...g, host, at }))].slice(-MAX_USABLE) }),
+    };
 }
 
 const base64 = (bytes: Uint8Array) => getBase64Decoder().decode(bytes);

@@ -31,11 +31,13 @@ import history from '../../assets/icons/ui/history.svg';
 import github from '../../assets/icons/ui/github.svg';
 import ledger from '../../assets/icons/ui/ledger.svg';
 import box from '../../assets/icons/ui/box.svg';
+import only from '../../assets/icons/ui/user-round-check.svg';
+import others from '../../assets/icons/ui/users-round.svg';
 
 // Otus's line icons, from the SVG files in assets/icons/ui (Lucide, ISC), for the pages to draw; and short addresses.
 export { short } from '@otus-wallet/sdk/format';
 
-const ICONS = { bang, book, box, caps, check, home, history, cross, down, up, left, right, copy, external, eye, hidden, fingerprint, grip, key, lock, pencil, plus, refresh, gear, server, shield, trash, wallet, receive, send, swap, github, ledger };
+const ICONS = { bang, book, box, caps, check, home, history, cross, down, up, left, right, copy, external, eye, hidden, fingerprint, grip, key, lock, pencil, plus, refresh, gear, server, shield, trash, wallet, receive, send, swap, github, ledger, only, others };
 export type IconName = keyof typeof ICONS;
 
 /** One of Otus's line icons (assets/icons/ui), drawn in the current text colour. */

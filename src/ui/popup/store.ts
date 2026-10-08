@@ -7,12 +7,13 @@ import { useEffect, useState } from 'react';
 
 import { historyPage, NoHistory } from '@otus-wallet/sdk/activity/history';
 import { summarize, type Activity } from '@otus-wallet/sdk/activity/summary';
-import { timedOut } from '@otus-wallet/sdk/rpc';
+import { access } from '@otus-wallet/sdk/access/access';
+import { rpcAt, timedOut } from '@otus-wallet/sdk/rpc';
 import type { KeyStatus } from '../../shell/keys.ts';
 import { load, save, type Edit, type State } from '../../shell/state.ts';
 import { ask } from '../ask.ts';
 import { holdings, type Holdings } from '../holdings.ts';
-import { activityKey, forgetActivity, holdingsKey, queries, type ActivityPages } from './query.ts';
+import { accessKey, activityKey, forgetActivity, holdingsKey, queries, type ActivityPages } from './query.ts';
 
 export type Otus = { state: State; keys: KeyStatus };
 
@@ -92,6 +93,22 @@ export function useActivity(rpc: string, address: Address) {
             });
     }, [rpc, address]);
     return read;
+}
+
+const ACCESS_FRESH = 5 * 60_000; // ms who else has access is taken as current: it changes only when you sign
+
+/** Who besides the wallet can move, burn, freeze or close what it holds, and the site behind each when Otus knows it:
+ *  read when shown, at most every five minutes, and again once a site is signed for something it can still use. Three
+ *  requests: its token accounts of each token program, then their mints with the nonce accounts it waits on. */
+export function useAccess(rpc: string, address: Address, state: State) {
+    const waiting = state.waiting.filter((w) => w.wallet === address);
+    const stamp = Math.max(0, ...waiting.map((w) => w.at), ...state.given.map((g) => g.at));
+    return useQuery({
+        queryKey: accessKey(rpc, address, stamp),
+        queryFn: () => access(rpcAt(rpc), address, waiting.map(({ account, nonce }) => ({ account, nonce }))),
+        staleTime: ACCESS_FRESH,
+        refetchOnReconnect: false,
+    });
 }
 
 /** What a wallet held when last read, without reading it: names for its tokens. */

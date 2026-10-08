@@ -17,13 +17,14 @@ import { Icon } from '../components/icons.tsx';
 import { Tagged } from '../components/you.tsx';
 import { YOU } from '../view/names.ts';
 import { cn } from '../lib/cn.ts';
+import { accessWords, others } from '../view/access.ts';
 import { rows, type Naming, type Part, type Row } from '../view/activity.ts';
 import type { Screen } from './App.tsx';
-import { TabBar } from './common.tsx';
+import { TabBar, Tip } from './common.tsx';
 import { WalletBar } from './Lobby.tsx';
-import { current, said, useActivity, useHeldNow } from './store.ts';
+import { current, said, useAccess, useActivity, useHeldNow } from './store.ts';
 
-const KNOWN_SYMBOLS: Record<string, string> = { [USDC]: 'USDC', [USDT]: 'USDT', [WSOL]: 'wSOL' };
+export const KNOWN_SYMBOLS: Record<string, string> = { [USDC]: 'USDC', [USDT]: 'USDT', [WSOL]: 'wSOL' };
 
 export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) => void }) {
     const account = current(state);
@@ -56,15 +57,20 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
         return () => watch.disconnect();
     }, [hasNextPage, isFetching, isFetchNextPageError, fetchNextPage, list.length]);
 
+    const mark = <AccessMark state={state} go={go} />;
     return (
         <main className="flex h-full flex-col">
             <WalletBar state={state} go={go} />
             <section className="scroll flex min-h-0 flex-1 flex-col px-4 pt-1.5 pb-3.5">
+                {list.length === 0 && <div className="flex justify-end pt-2.5">{mark}</div>}
                 {!read.data && read.error && <Unread error={read.error} retry={() => void read.refetch()} settings={() => go('settings')} />}
                 {read.data && list.length === 0 && <p className="pt-6 text-center text-[11px] text-ink-3">No transactions yet</p>}
-                {days(list).map(([day, items]) => (
+                {days(list).map(([day, items], d) => (
                     <div key={day} className="day">
-                        <h2 className="pixel pt-4 pb-1.5 text-[10px] text-ink-2">{day}</h2>
+                        <div className="flex items-end justify-between">
+                            <h2 className="pixel pt-4 pb-1.5 text-[10px] text-ink-2">{day}</h2>
+                            {d === 0 && mark}
+                        </div>
                         <ul>
                             {items.map((row, i) => {
                                 const id = row.signature ?? `${day}#${i}`;
@@ -85,6 +91,20 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
             </section>
             <TabBar at="activity" go={go} />
         </main>
+    );
+}
+
+// Who else has access, as a mark: green while only you can move your funds, amber once others can; Access on a click.
+function AccessMark({ state, go }: { state: State; go: (to: Screen) => void }) {
+    const read = useAccess(rpcFor('solana:mainnet', state.settings), current(state).address, state);
+    const n = read.data ? others(read.data.grants) : null;
+    const words = n === null ? 'Check who has access' : accessWords(n);
+    return (
+        <Tip text={words}>
+            <Button variant="ghost" size="icon" aria-label={words} onClick={() => go('access')} className={cn('-mb-0.5 size-7', n === null ? 'text-ink-3' : n === 0 ? 'text-ok hover:text-ok' : 'text-warn hover:text-warn')}>
+                <Icon name={n ? 'others' : 'only'} size={15} stroke={2.2} />
+            </Button>
+        </Tip>
     );
 }
 

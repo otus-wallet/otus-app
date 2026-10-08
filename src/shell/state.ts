@@ -24,15 +24,23 @@ export const onDevice = (a: Account) => Boolean(a.ledger);
  *  did; none kept for a site signed for before Otus kept them. */
 export type Site = { account: Address; signatures: number; since?: number; programs?: Address[] };
 
+/** A transaction signed for a site on a durable nonce, which can run until that nonce moves on: the account that signed
+ *  it, the nonce account and nonce it waits on, the site, and when (seconds since 1970). */
+export type Signed = { wallet: Address; account: Address; nonce: string; host: string; at: number };
+
+/** A delegate a site's transaction gave on a token account of yours: to whom, which site asked, and when (seconds). */
+export type Given = { account: Address; to: Address; host: string; at: number };
+
 /** An address you know, by the name you gave it: one to send to. */
 export type Contact = { address: Address; label: string };
 
 /** What the extension keeps in chrome.storage.local, one key each, so a write never clobbers another part. `sent`: how
  *  many transfers made in Otus landed at each address; `removed`: accounts on a phrase that you removed, which New
- *  account never brings back. */
-export type State = { accounts: Account[]; active: Address | null; sites: Record<string, Site>; contacts: Contact[]; sent: Record<string, number>; removed: Address[]; settings: Settings };
+ *  account never brings back; `waiting` and `given`: what sites were signed for that others can still use, the latest
+ *  last. */
+export type State = { accounts: Account[]; active: Address | null; sites: Record<string, Site>; contacts: Contact[]; sent: Record<string, number>; removed: Address[]; waiting: Signed[]; given: Given[]; settings: Settings };
 
-const DEFAULTS: State = { accounts: [], active: null, sites: {}, contacts: [], sent: {}, removed: [], settings: DEFAULT_SETTINGS };
+const DEFAULTS: State = { accounts: [], active: null, sites: {}, contacts: [], sent: {}, removed: [], waiting: [], given: [], settings: DEFAULT_SETTINGS };
 const MAX_CONTACTS = 200;
 
 export async function load(): Promise<State> {

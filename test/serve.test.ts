@@ -64,6 +64,8 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
             contacts: [],
             sent: {},
             removed: [],
+            waiting: [],
+            given: [],
             settings: DEFAULT_SETTINGS,
         } as State,
     };

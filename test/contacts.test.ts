@@ -13,6 +13,8 @@ const state = (part: Partial<State> = {}): State => ({
     contacts: [],
     sent: {},
     removed: [],
+    waiting: [],
+    given: [],
     settings: DEFAULT_SETTINGS,
     ...part,
 });

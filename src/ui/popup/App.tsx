@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from 'react';
 
 import { BUILD } from '../../build.ts';
 import { Shield } from '../components/shield.tsx';
+import { Access } from './Access.tsx';
 import { ActivityScreen } from './Activity.tsx';
 import { Empty, Stale } from './Gate.tsx';
 import { Lobby } from './Lobby.tsx';
@@ -16,7 +17,7 @@ import { useOtus } from './store.ts';
 import { WalletScreen } from './WalletScreen.tsx';
 import { Wallets } from './Wallets.tsx';
 
-export type Screen = 'lobby' | 'activity' | 'wallet' | 'wallets' | 'settings' | 'receive' | 'send';
+export type Screen = 'lobby' | 'activity' | 'access' | 'wallet' | 'wallets' | 'settings' | 'receive' | 'send';
 
 // The setup tab, for a new wallet or one to import: the one already open, if any, rather than another.
 async function setUp(hash = '') {
@@ -74,6 +75,8 @@ function shown(screen: Screen, state: State, keys: KeyStatus, go: (to: Screen) =
             return <Wallets state={state} keys={keys} go={go} setUp={(hash) => void setUp(hash)} />;
         case 'activity':
             return <ActivityScreen state={state} go={go} />;
+        case 'access':
+            return <Access state={state} go={go} />;
         case 'settings':
             return <Settings state={state} keys={keys} go={go} />;
         case 'receive':

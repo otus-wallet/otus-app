@@ -1,7 +1,7 @@
-// The popup's reads from the network, cached and kept fresh by TanStack Query: what each wallet holds, its activity, and
-// the account at an address typed. A read that fails is tried again a little later, as a public RPC turns away bursts.
-// What each wallet holds, and the first page of its activity, are also kept for the browser session, so the popup opens
-// with them and reads them again.
+// The popup's reads from the network, cached and kept fresh by TanStack Query: what each wallet holds, its activity, who
+// else has access to it, and the account at an address typed. A read that fails is tried again a little later, as a
+// public RPC turns away bursts. What each wallet holds, the first page of its activity and its access are also kept for
+// the browser session, so the popup opens with them and reads them again.
 import { QueryClient, type InfiniteData } from '@tanstack/react-query';
 
 import type { Holdings } from '../holdings.ts';
@@ -13,12 +13,14 @@ export const queries = new QueryClient({
 
 export const holdingsKey = (rpc: string, address: string) => ['holdings', rpc, address] as const;
 export const activityKey = (rpc: string, address: string) => ['activity', rpc, address] as const;
+/** `stamp`: when a site was last signed for something it can still use, so that signing anew reads it again. */
+export const accessKey = (rpc: string, address: string, stamp: number) => ['access', rpc, address, stamp] as const;
 
 /** A wallet's activity as read, a page at a time. */
 export type ActivityPages = InfiniteData<ActivityPage, string | null>;
 
 const KEPT = 'held'; // chrome.storage.session: in memory only, gone with the browser, out of content scripts' reach
-const KEEP = 16; // queries: holdings and activity of the last few wallets
+const KEEP = 24; // queries: holdings, activity and access of the last few wallets
 type Kept = Record<string, { at: number; packed: string }>; // by query key; bigints as strings, as storage takes JSON
 
 const pack = (v: unknown) => JSON.stringify(v, (_, x: unknown) => (typeof x === 'bigint' ? { bigint: x.toString() } : x));
@@ -47,7 +49,7 @@ export async function restore() {
     }
     // Each read that works is kept, for the last few wallets: of their activity, the first page.
     queries.getQueryCache().subscribe((event) => {
-        if (event.type !== 'updated' || event.action.type !== 'success' || !['holdings', 'activity'].includes(event.query.queryKey[0] as string)) return;
+        if (event.type !== 'updated' || event.action.type !== 'success' || !['holdings', 'activity', 'access'].includes(event.query.queryKey[0] as string)) return;
         const first = event.query.queryKey[0] === 'activity' ? (event.query.state.data as ActivityPages).pages[0] : null;
         kept[JSON.stringify(event.query.queryKey)] = first ? { at: first.at, packed: pack(first) } : { at: event.query.state.dataUpdatedAt, packed: pack(event.query.state.data) };
         kept = Object.fromEntries(Object.entries(kept).toSorted(([, a], [, b]) => b.at - a.at).slice(0, KEEP));
