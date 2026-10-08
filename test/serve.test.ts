@@ -430,7 +430,35 @@ test('the day a site is known from stays the day of its first transaction', asyn
     const w = await wallet();
     w.box.state = { ...w.box.state, sites: { [ORIGIN]: { account: w.me, signatures: 3, since: 5 } } };
     result(await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] }));
-    assert.deepEqual(w.box.state.sites[ORIGIN], { account: w.me, signatures: 4, since: 5 });
+    assert.deepEqual(w.box.state.sites[ORIGIN], { account: w.me, signatures: 4, since: 5, programs: [] });
+});
+
+test('a site keeps the programs its transactions call, and one it never called is a notice', async () => {
+    const w = await wallet();
+    const other = key(50);
+    w.box.state = { ...w.box.state, sites: { [ORIGIN]: { account: w.me, signatures: 3, since: 5, programs: [] } } };
+    // The transfer, and a call to a program that is not Solana's own.
+    const call = base64(
+        new Uint8Array(
+            getTransactionEncoder().encode(
+                compileTransaction(
+                    pipe(
+                        createTransactionMessage({ version: 0 }),
+                        (m) => setTransactionMessageFeePayer(w.me, m),
+                        (m) => setTransactionMessageLifetimeUsingBlockhash({ blockhash: blockhash(key(9)), lastValidBlockHeight: 0n }, m),
+                        (m) => appendTransactionMessageInstruction(getTransferSolInstruction({ source: createNoopSigner(w.me), destination: key(2), amount: lamports(1_000_000n) }), m),
+                        (m) => appendTransactionMessageInstruction({ programAddress: other, accounts: [], data: new Uint8Array() }, m),
+                    ),
+                ),
+            ),
+        ),
+    );
+    const isNew = (a: Approval) => a.kind === 'transaction' && a.findings.some((f) => f.title === 'New program for this site');
+    result(await w.call('signTransaction', { account: w.me, transactions: [call] }));
+    assert.ok(isNew(w.approvals[0]));
+    assert.deepEqual(w.box.state.sites[ORIGIN].programs, [other]);
+    result(await w.call('signTransaction', { account: w.me, transactions: [call] }));
+    assert.ok(!isNew(w.approvals[1])); // kept: no longer new
 });
 
 test('a site\u2019s transaction whose blockhash runs out while the user decides is not signed', async () => {

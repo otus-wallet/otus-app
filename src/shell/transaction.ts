@@ -90,7 +90,7 @@ async function landsOn(m: Message, chain: Chain): Promise<boolean> {
  *  the review needs to know of who asks, and whether the site sends it later itself. */
 /** `blockhash`: for a transaction Otus built without one, the blockhash it gets, read while it is reviewed (a
  *  simulation takes any). */
-export type Way = { cluster: Cluster; chain: Chain; site: SiteView; recipient?: Address; later?: boolean; blockhash?: Promise<string>; context: Pick<Context, 'signedBefore' | 'host' | 'own' | 'to'> };
+export type Way = { cluster: Cluster; chain: Chain; site: SiteView; recipient?: Address; later?: boolean; blockhash?: Promise<string>; context: Pick<Context, 'signedBefore' | 'programsBefore' | 'host' | 'own' | 'to'> };
 
 /**
  * A transaction for this account → reviewed; refused by `checks` when whoever asked says so; shown as reviewed at once,

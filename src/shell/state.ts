@@ -19,9 +19,10 @@ export const signs = (a: Account) => Boolean(a.key || a.ledger);
 /** Whether the account signs on a device, in the approval window: a Ledger. */
 export const onDevice = (a: Account) => Boolean(a.ledger);
 
-/** A site the user connected, the account it sees, how many requests the user signed for it, and when the first
- *  transaction (seconds since 1970). */
-export type Site = { account: Address; signatures: number; since?: number };
+/** A site the user connected, the account it sees, how many requests the user signed for it, when the first
+ *  transaction (seconds since 1970), and the programs its transactions called (Solana's own aside), to tell one it never
+ *  did; none kept for a site signed for before Otus kept them. */
+export type Site = { account: Address; signatures: number; since?: number; programs?: Address[] };
 
 /** An address you know, by the name you gave it: one to send to. */
 export type Contact = { address: Address; label: string };

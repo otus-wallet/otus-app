@@ -11,6 +11,7 @@ import { NO_KEY, Refused, type Reply } from '../protocol.ts';
 import { decode } from '@otus-wallet/sdk/review/decode';
 import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Review } from '@otus-wallet/sdk/review/review';
+import { programsCalled } from '@otus-wallet/sdk/review/sites';
 import { timedOut } from '@otus-wallet/sdk/rpc';
 import type { Sent } from '../send/send.ts';
 import { rpcFor } from '../settings.ts';
@@ -129,7 +130,7 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
     let decided: { r: Review; p: Prepared; signature?: SignatureBytes; chain: Chain };
     try {
         const { cluster, chain } = await clusterOf(bytes, request.chain, state.settings, shell);
-        const way = { cluster, chain, site: siteView(origin, site), later: !request.send, context: { signedBefore: site.since ?? null, host: new URL(origin).host } };
+        const way = { cluster, chain, site: siteView(origin, site), later: !request.send, context: { signedBefore: site.since ?? null, programsBefore: site.programs, host: new URL(origin).host } };
         decided = { ...(await approved(bytes, account, way, shell, () => {})), chain };
     } finally {
         reviewing.delete(origin);
@@ -138,7 +139,7 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
     // Signed on a Ledger right as its blockhash ran out, it goes to the network all the same:
     // it may still land, and if not the network says so. Otus's own key doesn't sign what can no longer land.
     if (!signature) await unexpired(r, chain);
-    const signed = withSignature(p.bytes, account.address, await signFor(account, messageOf(p.bytes), shell, { origin, transaction: true }, signature));
+    const signed = withSignature(p.bytes, account.address, await signFor(account, messageOf(p.bytes), shell, { origin, programs: programsCalled(r.message) }, signature));
     return request.send ? { signatures: [(await landed(signed, chain, shell)).signature] } : { transactions: [base64(signed)] };
 }
 
@@ -209,7 +210,8 @@ function connected(state: State, origin: string, address: Address) {
     return { site, account: need(accountOf(state, address), NOT_CONNECTED) };
 }
 
-type Asker = { origin: string; connects?: boolean; transaction?: boolean };
+/** `programs`: for a transaction, those it calls (programsCalled). */
+type Asker = { origin: string; connects?: boolean; programs?: Address[] };
 
 // Once the user says yes, from state as it is now: the site may have been disconnected, or the account removed,
 // while they decided. The account counts the signature; so does the site that asked, if any (null: your own transfer).
@@ -235,13 +237,18 @@ async function deviceSigned(account: Account, data: Uint8Array, signature: Signa
     return signature;
 }
 
-// A site once it got a signature: counted, connected by a sign-in, and known from the day after its first transaction.
-function signedFor(sites: State['sites'], { origin, connects = false, transaction = false }: Asker, address: Address, now: number): Pick<State, 'sites'> | null {
+const MAX_SITE_PROGRAMS = 32; // kept for a site, the latest last
+
+// A site once it got a signature: counted, connected by a sign-in, known from the day after its first transaction, and
+// the programs its transactions call kept.
+function signedFor(sites: State['sites'], { origin, connects = false, programs }: Asker, address: Address, now: number): Pick<State, 'sites'> | null {
     const site = sites[origin];
     const same = site?.account === address;
     if (!connects && !same) return null;
-    const since = (same ? site.since : undefined) ?? (transaction ? Math.floor(now / 1000) : undefined);
-    return { sites: { ...sites, [origin]: { account: address, signatures: same ? site.signatures + 1 : 1, ...(since !== undefined && { since }) } } };
+    const since = (same ? site.since : undefined) ?? (programs ? Math.floor(now / 1000) : undefined);
+    const kept = same ? site.programs : undefined;
+    const called = programs ? [...new Set([...(kept ?? []), ...programs])].slice(-MAX_SITE_PROGRAMS) : kept;
+    return { sites: { ...sites, [origin]: { account: address, signatures: same ? site.signatures + 1 : 1, ...(since !== undefined && { since }), ...(called && { programs: called }) } } };
 }
 
 const base64 = (bytes: Uint8Array) => getBase64Decoder().decode(bytes);
