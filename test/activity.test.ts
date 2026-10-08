@@ -189,7 +189,7 @@ test('what moved no balance: told by the review\'s decoders and words; never nam
     assert.deepEqual([text(closer.title), text(closer.sub)], ['Changed an authority', 'Right to close → Fio']);
     assert.deepEqual([cancelled.icon, text(cancelled.title)], ['refresh', 'Moved a nonce on']);
     assert.equal(cancelled.details[0].text, `Moves the nonce of ${short(key(71))} on: what was signed on it can no longer run`); // not first: no durable nonce
-    assert.deepEqual([text(nonceAccount.title), nonceAccount.details[1].text], ['Opened a nonce account', `Makes ${short(key(71))} a durable nonce account, answering to ${short(WALLET)}`]);
+    assert.deepEqual([text(nonceAccount.title), nonceAccount.details[1].text], ['Opened a nonce account', `Turns ${short(key(71))} into a nonce account that only ${short(WALLET)} can use`]);
 });
 
 test('what left the wallet unsigned, a delegate moved: told apart, and never taken as an address you know', async () => {
