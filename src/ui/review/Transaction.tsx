@@ -329,15 +329,8 @@ function Step({ ix, open, flip }: { ix: InstructionView; open: boolean; flip: ()
                     ))}
                     {ix.effects.length > 0 && <span className="label pixel mt-1.5 text-[9px] text-ink-3">Effect</span>}
                     {ix.effects.map((e, i) => (
-                        <span key={i} className="effect flex flex-col gap-[3px]">
-                            <span className={cn('text-[11px] font-bold', e.tone === 'plain' ? 'text-ink' : text(e.tone))}>
-                                <Tagged text={e.text} />
-                            </span>
-                            {e.more?.map((m) => (
-                                <span key={m} className="pl-3 text-[10.5px] text-ink-2">
-                                    <Tagged text={m} />
-                                </span>
-                            ))}
+                        <span key={i} className={cn('effect text-[11px] font-bold', e.tone === 'plain' ? 'text-ink' : text(e.tone))}>
+                            <Tagged text={e.text} />
                         </span>
                     ))}
                 </div>

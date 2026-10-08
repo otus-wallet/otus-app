@@ -137,13 +137,13 @@ test('rows: each in a line, opened for all it told; a copy of an address you sen
     assert.deepEqual([swap.icon, text(swap.title), text(swap.sub)], ['swap', 'Swap 1 SOL → 120.58 USDC', 'Jupiter v6']);
     assert.deepEqual(swap.title.filter((p) => p.way), [{ text: '1 SOL', way: 'out' }, { text: '120.58 USDC', way: 'in' }]); // coloured apart
     assert.deepEqual([text(sent.title), text(sent.sub), sent.address], ['Sent 12 USDC', `to ${apart(real, copy)}`, { label: 'To', address: real, name: null, copy: false }]); // its copy on the page
-    assert.deepEqual(sent.details.map((d) => d.text), ['−12 USDC', '0.00203928 SOL to open their token account', 'Fee 0.000005 SOL', `Paid by ${short(WALLET)} (you)`]); // your address, tagged
+    assert.deepEqual(sent.details.map((d) => d.text), ['−12 USDC', '0.00203928 SOL to open their token account', `Fee 0.000005 SOL, paid by ${short(WALLET)} (you)`]); // your address, tagged
     const [it, was] = [apart(copy, real), apart(real, copy)];
     assert.notEqual(it, was); // where short() gives both the same
     assert.equal(short(copy), short(real));
     assert.deepEqual([dust.tone, text(dust.title), text(dust.sub)], ['warn', 'Received 0.0001 USDC', `from ${it} · copies ${was}`]);
     assert.equal(dust.details[1].text, `Dust from ${it}, made to look like ${was}: never send to it`);
-    assert.equal(dust.details.find((d) => d.text.startsWith('Paid by'))?.text, `Paid by ${it}`);
+    assert.equal(dust.details.find((d) => d.text.startsWith('Fee'))?.text, `Fee 0.000005 SOL, paid by ${it}`);
     assert.equal(dust.address?.copy, true);
     assert.deepEqual([failed.icon, failed.tone, text(failed.title), failed.details[0].text], ['cross', 'danger', 'Failed · Jupiter v6', 'Failed: instruction 2: error 6001']);
     assert.deepEqual([text(unread.title), unread.signature], ["Otus couldn't read this one", null]);
@@ -184,12 +184,12 @@ test('what moved no balance: told by the review\'s decoders and words; never nam
         ],
         naming,
     );
-    assert.deepEqual([approved.icon, text(approved.title), text(approved.sub)], ['key', 'Approved a delegate', 'Fio · up to 100 USDC']);
+    assert.deepEqual([approved.icon, text(approved.title), text(approved.sub)], ['key', 'Approved a delegate', 'Fio, up to 100 USDC']);
     assert.equal(approved.details[0].text, 'Fio may move up to 100 USDC from your USDC account'); // the review's own words
     assert.deepEqual([text(closer.title), text(closer.sub)], ['Changed an authority', 'Right to close → Fio']);
     assert.deepEqual([cancelled.icon, text(cancelled.title)], ['refresh', 'Moved a nonce on']);
-    assert.deepEqual(cancelled.details.slice(0, 2), [{ text: `Moves the nonce of ${short(key(71))} on` }, { text: 'What was signed on it can no longer run', more: true }]); // not first: no durable nonce
-    assert.deepEqual([text(nonceAccount.title), ...nonceAccount.details.slice(0, 5).map((d) => d.text)], ['Opened a nonce account', `Opens ${short(key(71))}`, `0.00144768 SOL from ${short(WALLET)}`, `Owned by ${short(SYSTEM)}`, `Turns ${short(key(71))} into a nonce account`, `Only ${short(WALLET)} can use it`]); // a fact a line
+    assert.equal(cancelled.details[0].text, `Moves the nonce of ${short(key(71))} on: what was signed on it can no longer run`); // not first: no durable nonce
+    assert.deepEqual([text(nonceAccount.title), text(nonceAccount.sub), nonceAccount.details[0].text, nonceAccount.details[1].text], ['Opened a nonce account', `Nonce ${short(key(71))}, used by ${short(WALLET)}`, `Nonce ${short(key(71))} owned by ${short(SYSTEM)}`, `Only ${short(WALLET)} can use it`]);
 });
 
 test('what left the wallet unsigned, a delegate moved: told apart, and never taken as an address you know', async () => {

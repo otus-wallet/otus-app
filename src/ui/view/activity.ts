@@ -16,8 +16,7 @@ import type { Step } from '@otus-wallet/sdk/programs/squads';
 
 export type RowIcon = 'send' | 'receive' | 'swap' | 'plus' | 'trash' | 'key' | 'refresh' | 'shield' | 'box' | 'cross' | 'bang';
 export type RowTone = 'plain' | 'warn' | 'danger';
-/** A line of what a transaction told; `more`: a fact under the line before it. */
-export type Detail = { text: string; tone?: 'ok' | 'warn' | 'danger' | 'dim'; more?: true };
+export type Detail = { text: string; tone?: 'ok' | 'warn' | 'danger' | 'dim' };
 /** Words of a line, an amount among them marked as what came in or went out. */
 export type Part = { text: string; way?: 'in' | 'out' };
 
@@ -183,14 +182,16 @@ const TITLES: Record<string, string> = {
 const titleOf = (name: string) => TITLES[name] ?? cap(name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase());
 const iconOf = (name: string): RowIcon => (/Approve|Revoke|Authority/.test(name) ? 'key' : /Nonce/.test(name) ? 'refresh' : /^Assign/.test(name) ? 'bang' : 'box');
 
-// What the review's words need, from what the transaction listed: your token accounts by their token, the rest by name.
+// What the review's words need, from what the transaction listed: your token accounts by their token, a nonce account
+// it sets up as one, the rest by name.
 function namesFor(a: Activity, n: Naming): Names {
     const held = new Map(a.held.map((h) => [h.address, h]));
     const decimals = new Map(a.held.map((h) => [h.mint, h.decimals]));
     const yours = (x: Address) => held.get(x)?.owner === n.wallet;
+    const nonces = new Set(a.instructions.flatMap((t) => (t.name === 'InitializeNonceAccount' ? t.accounts.filter((x) => x.role === 'nonceAccount').map((x) => x.address) : [])));
     return {
         wallet: n.wallet,
-        who: (x) => (yours(x) ? `your ${n.symbol(held.get(x)!.mint)} account` : n.who(x)),
+        who: (x) => (yours(x) ? `your ${n.symbol(held.get(x)!.mint)} account` : nonces.has(x) ? `nonce ${n.who(x)}` : n.who(x)),
         mine: (x) => x === n.wallet || yours(x),
         existed: () => true,
         mintOf: (x) => held.get(x)?.mint ?? null,
@@ -231,10 +232,7 @@ function details(a: Activity, n: Naming, copies: Address | null): Detail[] {
         const names = namesFor(a, n);
         a.instructions.forEach((told, index) => {
             if (told.source !== 'plugin' || BACKGROUND.has(told.program)) return;
-            for (const e of story({ ...told, data: new Uint8Array() }, names, false, index === 0).effects) {
-                out.push({ text: e.text, ...(e.tone === 'danger' || e.tone === 'warn' ? { tone: e.tone } : {}) });
-                for (const m of e.more ?? []) out.push({ text: m, more: true });
-            }
+            for (const e of story({ ...told, data: new Uint8Array() }, names, false, index === 0).effects) out.push({ text: e.text, ...(e.tone === 'danger' || e.tone === 'warn' ? { tone: e.tone } : {}) });
         });
     }
     if (!a.signed && a.moves.some((m) => m.units < 0n)) out.push({ text: "You didn't sign it: a delegate of your tokens moved them", tone: 'warn' });
@@ -243,7 +241,7 @@ function details(a: Activity, n: Naming, copies: Address | null): Detail[] {
     if (a.rent.yours < 0n) out.push({ text: `${sol(-a.rent.yours)} SOL of rent freed from a token account of yours, closed`, tone: 'dim' });
     if (a.rent.theirs > 0n) out.push({ text: `${sol(a.rent.theirs)} SOL to open their token account`, tone: 'dim' });
     if (a.rent.opened > 0n) out.push({ text: `${sol(a.rent.opened)} SOL of rent in the accounts it opened`, tone: 'dim' });
-    out.push({ text: `Fee ${sol(a.fee)} SOL`, tone: 'dim' }, { text: `Paid by ${n.who(a.payer)}`, tone: 'dim', more: true });
+    out.push({ text: `Fee ${sol(a.fee)} SOL, paid by ${n.who(a.payer)}`, tone: 'dim' });
     if (a.memo) out.push({ text: `Memo “${a.memo}”`, tone: 'dim' });
     if (a.programs.length) out.push({ text: a.programs.map((p) => n.program(p)).join(' · '), tone: 'dim' });
     return out;
