@@ -48,7 +48,7 @@ export function accessRows(grants: Grant[], n: AccessNaming): AccessRow[] {
             }
             case 'closer':
                 if (g.sol > 0n) return [{ grant: g, title: `${n.who(g.to)} can close your wrapped SOL account`, sub: `And take the ${sol(g.sol)} SOL in it, at any time`, fix: null }];
-                return [{ grant: g, title: `${n.who(g.to)} can close your ${n.symbol(g.mint)} account`, sub: 'Only once it holds 0 tokens: they keep its rent, about 0.002 SOL', fix: null }];
+                return [{ grant: g, title: `${n.who(g.to)} can close your ${n.symbol(g.mint)} account`, sub: 'They keep its rent', fix: null }];
             case 'freeze':
                 return [];
         }

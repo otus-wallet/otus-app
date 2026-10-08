@@ -59,7 +59,7 @@ test('a wallet a program took over comes first; wrapped SOL a stranger can close
     const [wrapped] = accessRows([{ kind: 'closer', account: key(30), mint: key(21), to: key(31), sol: 5_000_000_000n }], naming());
     assert.deepEqual([wrapped.title, wrapped.sub], [`who ${key(31).slice(0, 4)} can close your wrapped SOL account`, 'And take the 5 SOL in it, at any time']);
     const [empty] = accessRows([{ kind: 'closer', account: key(30), mint: key(20), to: key(31), sol: 0n }], naming());
-    assert.equal(empty.sub, 'Only once it holds 0 tokens: they keep its rent, about 0.002 SOL');
+    assert.equal(empty.sub, 'They keep its rent');
     assert.equal(accessWords(0, 3), 'No one else, among what Otus could check');
 });
 
