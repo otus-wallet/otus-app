@@ -126,14 +126,16 @@ function headline(a: Activity, n: Naming, outs: Move[], ins: Move[], by: string)
             return { icon: 'receive', title: [{ text: 'Received ' }, ...what(lead(ins), ins)], sub: words(a.other ? `from ${n.who(a.other)}` : by) };
         case 'mint': {
             const token = lead(ins);
-            return { icon: 'plus', title: [{ text: 'Minted ' }, ...what(token, ins)], sub: words(token.mint && a.created.includes(token.mint) ? 'New token' : by) };
+            // What it cost, when something went for it: an NFT, a pool or stake token paid for.
+            const paid = outs.length ? [{ text: 'for ' }, ...what(outs[0], outs)] : [];
+            return { icon: 'plus', title: [{ text: 'Minted ' }, ...what(token, ins)], sub: paid.length ? paid : words(token.mint && a.created.includes(token.mint) ? 'New token' : by) };
         }
         case 'burn':
             return { icon: 'trash', title: [{ text: 'Burned ' }, ...what(lead(outs), outs)], sub: words(by) };
     }
     const about = subjectOf(a);
     if (about) {
-        const told = story({ ...about.told, data: new Uint8Array() }, namesFor(a, n), false, about.index === 0);
+        const told = story({ ...about.told, data: new Uint8Array() }, namesFor(a, n));
         return { icon: iconOf(about.told.name), title: words(titleOf(about.told.name)), sub: words(told.args ? cap(told.args) : ''), danger: told.effects.some((e) => e.tone === 'danger') };
     }
     if (a.rent.yours < 0n) return { icon: 'box', title: words('Closed a token account'), sub: words(`${sol(-a.rent.yours)} SOL of rent freed`) };
@@ -193,7 +195,7 @@ function namesFor(a: Activity, n: Naming): Names {
         wallet: n.wallet,
         who: (x) => (yours(x) ? `your ${n.symbol(held.get(x)!.mint)} account` : nonces.has(x) ? `nonce ${n.who(x)}` : n.who(x)),
         mine: (x) => x === n.wallet || yours(x),
-        existed: () => true,
+        existed: (x) => !a.fresh.includes(x),
         mintOf: (x) => held.get(x)?.mint ?? null,
         token: (mint) => ({ symbol: mint ? n.symbol(mint) : 'tokens', decimals: mint ? (decimals.get(mint) ?? null) : null, verified: false }),
         program: (x) => n.program(x),
@@ -230,9 +232,9 @@ function details(a: Activity, n: Naming, copies: Address | null): Detail[] {
     // What moved no balance, as the review words each instruction of Solana's own.
     if (a.kind === 'other') {
         const names = namesFor(a, n);
-        a.instructions.forEach((told, index) => {
+        a.instructions.forEach((told) => {
             if (told.source !== 'plugin' || BACKGROUND.has(told.program)) return;
-            for (const e of story({ ...told, data: new Uint8Array() }, names, false, index === 0).effects) out.push({ text: e.text, ...(e.tone === 'danger' || e.tone === 'warn' ? { tone: e.tone } : {}) });
+            for (const e of story({ ...told, data: new Uint8Array() }, names).effects) out.push({ text: e.text, ...(e.tone === 'danger' || e.tone === 'warn' ? { tone: e.tone } : {}) });
         });
     }
     if (!a.signed && a.moves.some((m) => m.units < 0n)) out.push({ text: "You didn't sign it: a delegate of your tokens moved them", tone: 'warn' });

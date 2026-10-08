@@ -17,12 +17,21 @@ export type Settings = {
 
 export const DEFAULT_SETTINGS: Settings = { signAll: false, network: 'mainnet', rpc: null, custom: null, lockAfter: 15, explorer: 'solscan', preflight: true };
 
-/** Settings as stored → as used, defaults for what is missing. Saved before networks, an endpoint of your own was
- *  mainnet's. */
+const NETWORKS: readonly string[] = ['mainnet', 'devnet', 'custom'];
+const CLUSTERS: readonly string[] = ['solana:mainnet', 'solana:devnet', 'solana:testnet', 'solana:localnet'];
+
+/** Settings as stored → as used, defaults for what is missing or is not one of its values. Saved before networks, an
+ *  endpoint of your own was mainnet's. */
 export function settingsOf(stored: Partial<Settings> | undefined): Settings {
     const settings = { ...DEFAULT_SETTINGS, ...stored };
-    if (stored?.network === undefined && stored?.rpc) return { ...settings, network: 'custom', custom: 'solana:mainnet' };
-    return settings;
+    const rpc = typeof settings.rpc === 'string' && URL.canParse(settings.rpc) ? settings.rpc : null;
+    if (stored?.network === undefined && rpc) return { ...settings, network: 'custom', rpc, custom: 'solana:mainnet' };
+    return {
+        ...settings,
+        network: NETWORKS.includes(settings.network) ? settings.network : DEFAULT_SETTINGS.network,
+        rpc,
+        custom: typeof settings.custom === 'string' && CLUSTERS.includes(settings.custom) ? settings.custom : null,
+    };
 }
 
 /** The network the wallet shows: mainnet until an endpoint of your own says it serves another. */
@@ -57,7 +66,10 @@ export type Explorer = keyof typeof EXPLORERS;
  *  unless said; a local one by its endpoint. */
 export function explorerOf(settings: Settings, cluster = networkOf(settings)) {
     const chosen = EXPLORERS[Object.hasOwn(EXPLORERS, settings.explorer) ? settings.explorer : DEFAULT_SETTINGS.explorer];
-    const on = cluster === 'solana:mainnet' ? '' : cluster === 'solana:localnet' ? `?cluster=custom&customUrl=${encodeURIComponent(rpcFor(cluster, settings))}` : `?cluster=${cluster.slice('solana:'.length)}`;
+    // A local validator's address goes along so the explorer can reach it; no other endpoint's, which may hold a key.
+    const local = rpcFor(cluster, settings);
+    const reachable = URL.canParse(local) && ['localhost', '127.0.0.1'].includes(new URL(local).hostname);
+    const on = cluster === 'solana:mainnet' ? '' : cluster === 'solana:localnet' ? `?cluster=custom${reachable ? `&customUrl=${encodeURIComponent(local)}` : ''}` : `?cluster=${cluster.slice('solana:'.length)}`;
     return { name: chosen.name, tx: (signature: string) => `${chosen.tx(signature)}${on}` };
 }
 

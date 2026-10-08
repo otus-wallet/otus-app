@@ -36,7 +36,7 @@ import { Refused, type Reply } from '../src/protocol.ts';
 import { decode } from '@otus-wallet/sdk/review/decode';
 import { transfer as sendTransfer } from '../src/send/transfer.ts';
 import { send } from '../src/send/send.ts';
-import { DEFAULT_SETTINGS } from '../src/settings.ts';
+import { DEFAULT_SETTINGS, OTUS_RPC } from '../src/settings.ts';
 import type { Answer } from '../src/shell/approvals.ts';
 import { fix } from '../src/send/fix.ts';
 import { own, serve, takeBack, type Shell } from '../src/shell/serve.ts';
@@ -219,6 +219,19 @@ test('what the popup makes to take access back is reviewed as Otus’s own, sign
     const theirs = fix(key(5), { kind: 'revoke', account: key(30), program: TOKEN_PROGRAM_ADDRESS }, { blockhash: blockhash(key(9)), lastValidBlockHeight: 0n });
     assert.match(((await takeBack(theirs, w.me, w.shell)) as { error: string }).error, /does not sign this transaction/);
     assert.equal(w.sent.length, 2);
+});
+
+test('an endpoint of your own that says devnet, for a transaction mainnet knows, is not believed', async () => {
+    const MINE = 'https://mine.example/';
+    const lying = await wallet({ validOn: [OTUS_RPC, MINE] });
+    lying.box.state = { ...lying.box.state, settings: { ...DEFAULT_SETTINGS, network: 'custom', rpc: MINE, custom: 'solana:devnet' } };
+    assert.deepEqual(await own(bytes(lying.transfer()), lying.me, key(2), lying.shell), { ok: false, error: 'your RPC says it serves devnet, but this transaction is for mainnet' });
+    assert.equal(lying.sent.length, 0);
+    const honest = await wallet({ validOn: [MINE] });
+    honest.box.state = { ...honest.box.state, settings: { ...DEFAULT_SETTINGS, network: 'custom', rpc: MINE, custom: 'solana:devnet' } };
+    assert.equal(result<{ outcome: string }>(await own(bytes(honest.transfer()), honest.me, key(2), honest.shell)).outcome, 'confirmed');
+    const shown = honest.approvals[0];
+    assert.equal(shown.kind === 'transaction' && shown.network, 'devnet');
 });
 
 test('a transfer made in the popup never opens a token account for an address that is a token account itself', async () => {

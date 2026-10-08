@@ -120,7 +120,7 @@ test('address poisoning: dust from a copy is caught against an address you know,
 });
 
 test('rows: each in a line, opened for all it told; a copy of an address you sent to on the page caught', () => {
-    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], instructions: [] as Told[], held: [], signed: true, programs: [] as Address[], main: null, squads: [], memo: null };
+    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], instructions: [] as Told[], held: [], fresh: [] as Address[], signed: true, programs: [] as Address[], main: null, squads: [], memo: null };
     const naming: Naming = { wallet: WALLET, symbol: (m) => (m === MINT ? 'USDC' : short(m)), who: (a) => (a === WALLET ? `${short(a)} (you)` : a === FRIEND ? 'Fio' : short(a)), program: (a) => (a === JUPITER ? 'Jupiter v6' : short(a)), known: [] };
     const real = key(60);
     const copy = Array.from({ length: 30 }, (_, i) => `${real.slice(0, 4)}${key(61 + i).slice(4, -4)}${real.slice(-4)}`).find((a) => a !== real && isAddress(a)) as Address;
@@ -150,7 +150,7 @@ test('rows: each in a line, opened for all it told; a copy of an address you sen
 });
 
 test('a token made and minted, one burned, an account opened: said as such, rent apart', () => {
-    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], instructions: [] as Told[], held: [], signed: true, programs: [] as Address[], main: null, squads: [], memo: null, other: null };
+    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], instructions: [] as Told[], held: [], fresh: [] as Address[], signed: true, programs: [] as Address[], main: null, squads: [], memo: null, other: null };
     const naming: Naming = { wallet: WALLET, symbol: (m) => (m === MINT ? 'USDC' : 'LAB'), who: (a) => short(a), program: (a) => short(a), known: [] };
     const made = key(62);
     const [minted, burned, opened] = rows(
@@ -173,7 +173,7 @@ test('what moved no balance: told by the review\'s decoders and words; never nam
     const limit = ix(BUDGET, 'SetComputeUnitLimit', {}, { units: '200000' });
     const guard: Told = { program: GUARD, programName: null, source: 'unknown', name: 'Unknown instruction', accounts: [], args: [] };
     const mine = key(70);
-    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], held: [{ address: mine, mint: MINT, decimals: 6, owner: WALLET }], signed: true, programs: [] as Address[], main: null, squads: [], memo: null, other: null, kind: 'other' as const, moves: [] };
+    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], held: [{ address: mine, mint: MINT, decimals: 6, owner: WALLET }], fresh: [] as Address[], signed: true, programs: [] as Address[], main: null, squads: [], memo: null, other: null, kind: 'other' as const, moves: [] };
     const naming: Naming = { wallet: WALLET, symbol: (m) => (m === MINT ? 'USDC' : short(m)), who: (a) => (a === FRIEND ? 'Fio' : short(a)), program: (a) => short(a), known: [] };
     const [approved, closer, cancelled, nonceAccount] = rows(
         [

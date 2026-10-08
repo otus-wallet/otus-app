@@ -113,7 +113,9 @@ export type Known = { tokens: Map<string, TokenInfo | null>; decimals: Map<strin
 /** What the window shows besides the review: for which site and account, whether Otus can sign, on which
  *  cluster, what is known of the tokens, and for a transfer made in Otus the address typed. `later`: the site only
  *  asks for the signature, and sends the transaction when it chooses. */
-export type Shown = { site: SiteView; account: AccountView; signer: Signer; cluster: Cluster; known: Known; expiry?: Expiry | null; recipient?: string; later?: boolean };
+/** `away`: the transaction is for another network than the one the wallet shows, which the window then names, mainnet
+ *  included. */
+export type Shown = { site: SiteView; account: AccountView; signer: Signer; cluster: Cluster; known: Known; expiry?: Expiry | null; recipient?: string; later?: boolean; away?: boolean };
 
 // Findings shown on the first step, before anything else: what you would lose, and a transaction that would fail.
 const FIRST = new Set(['simulation-failed', 'wallet-change', 'owner-change', 'token-owner-change', 'authority-change', 'delegate', 'close-authority', 'program-change']);
@@ -129,7 +131,7 @@ export const accountView = (a: Account): AccountView => ({ label: a.label, addre
 
 /** Review, the transaction as prepared, and what else is shown → what the window shows. `p` null: shown as reviewed
  *  while it is being prepared, with nothing that preparing decides (guards, fee, hash, the verdict). */
-export function describe(r: Review, p: Prepared | null, { site, account, signer, cluster, known, expiry = null, recipient, later = false }: Shown): TransactionView {
+export function describe(r: Review, p: Prepared | null, { site, account, signer, cluster, known, expiry = null, recipient, later = false, away = false }: Shown): TransactionView {
     const wallet = account.address as Address;
     const mainnet = cluster === 'solana:mainnet';
     const told = known.told ?? new Map();
@@ -145,7 +147,7 @@ export function describe(r: Review, p: Prepared | null, { site, account, signer,
         verdict,
         ...summary(verdict, findings),
         signer,
-        network: mainnet ? null : cluster.slice('solana:'.length),
+        network: mainnet && !away ? null : cluster.slice('solana:'.length),
         balances: balances(r, p, wallet, n, verdict),
         proposals: proposalViews(known.squads ?? [], n),
         changes: findings.filter((f) => FIRST.has(f.code) && f.level !== 'ok').map((f) => ({ title: f.text, note: note(f), tone: f.level })),

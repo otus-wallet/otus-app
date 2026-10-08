@@ -16,6 +16,7 @@ const naming = (o: Partial<AccessNaming> = {}): AccessNaming => ({
     symbol: (mint) => (mint === key(20) ? 'USDC' : 'PYUSD'),
     decimals: (mint) => (mint === key(20) ? 6 : null),
     who: (a) => `who ${a.slice(0, 4)}`,
+    program: (a) => `program ${a.slice(0, 4)}`,
     given: [],
     waiting: [],
     ...o,
@@ -49,6 +50,17 @@ test('freezing is said apart, and counts no one', () => {
     assert.deepEqual(freezable([freeze], naming()), ['USDC']);
     assert.equal(others([freeze]), 0);
     assert.equal(accessWords(0), 'Only you can move your funds');
+});
+
+test('a wallet a program took over comes first; wrapped SOL a stranger can close says what it takes; unchecked issuers are never "only you"', () => {
+    const [taken] = accessRows([{ kind: 'taken', program: key(40) }], naming());
+    assert.deepEqual([taken.title, taken.fix], [`Your wallet belongs to program ${key(40).slice(0, 4)}`, null]);
+    assert.equal(others([{ kind: 'taken', program: key(40) }]), 1);
+    const [wrapped] = accessRows([{ kind: 'closer', account: key(30), mint: key(21), to: key(31), sol: 5_000_000_000n }], naming());
+    assert.deepEqual([wrapped.title, wrapped.sub], [`who ${key(31).slice(0, 4)} can close your wrapped SOL account`, 'And take the 5 SOL in it, at any time']);
+    const [empty] = accessRows([{ kind: 'closer', account: key(30), mint: key(20), to: key(31), sol: 0n }], naming());
+    assert.equal(empty.sub, 'Only once it holds 0 tokens: they keep its rent, about 0.002 SOL');
+    assert.equal(accessWords(0, 3), 'No one else, among what Otus could check');
 });
 
 test('others counts each one once', () => {

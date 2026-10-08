@@ -9,7 +9,7 @@ import type { Activity } from '@otus-wallet/sdk/activity/summary';
 import { short } from '@otus-wallet/sdk/format';
 import { USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
-import { explorerOf, walletRpc } from '../../settings.ts';
+import { explorerOf, networkOf, walletRpc } from '../../settings.ts';
 import type { State } from '../../shell/state.ts';
 import { cachedToken } from '../../tokens.ts';
 import { Button } from '../components/ui/button.tsx';
@@ -34,14 +34,16 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
     const naming = useMemo((): Naming => {
         const verified = new Map((held?.assets ?? []).filter((a) => a.verified && a.symbol && !a.native).map((a) => [a.mint, a.symbol]));
         const names = new Map<string, string>([...state.contacts, ...state.accounts].map((k) => [k.address, k.label]));
+        // Names from Jupiter and the tokens everyone knows are mainnet's: elsewhere the same addresses are other tokens.
+        const mainnet = networkOf(state.settings) === 'solana:mainnet';
         return {
             wallet: account.address,
-            symbol: (mint) => KNOWN_SYMBOLS[mint] ?? verified.get(mint) ?? (cachedToken(mint)?.verified ? cachedToken(mint)!.symbol : short(mint)),
+            symbol: (mint) => (!mainnet ? short(mint) : (KNOWN_SYMBOLS[mint] ?? verified.get(mint) ?? (cachedToken(mint)?.verified ? cachedToken(mint)!.symbol : short(mint)))),
             who: (a) => (a === account.address ? `${short(a)}${YOU}` : (names.get(a) ?? PROGRAM_NAMES.get(a) ?? short(a))),
             program: (a) => PROGRAM_NAMES.get(a) ?? short(a),
             known: [...state.accounts.map((k) => k.address), ...state.contacts.map((k) => k.address), ...(Object.keys(state.sent) as Address[])],
         };
-    }, [account.address, held, state.accounts, state.contacts, state.sent]);
+    }, [account.address, held, state.accounts, state.contacts, state.sent, state.settings]);
     const list = useMemo(() => rows(once(read.data?.pages.flatMap((p) => p.rows) ?? []), naming), [read.data, naming]);
     const [open, setOpen] = useState<string | null>(null);
     const explorer = explorerOf(state.settings);
@@ -98,9 +100,10 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
 function AccessMark({ state, go }: { state: State; go: (to: Screen) => void }) {
     const read = useAccess(walletRpc(state.settings), current(state).address, state);
     const n = read.data ? others(read.data.grants) : null;
+    const clean = n === 0 && !read.data?.unchecked; // green only when all was checked and no one else has access
     return (
         <Tip text="Check who can move your funds">
-            <Button variant="ghost" size="icon" aria-label={n === null ? 'Check who can move your funds' : accessWords(n)} onClick={() => go('access')} className={cn('mb-1 size-7', n === null ? 'text-ink-3' : n === 0 ? 'text-ok hover:text-ok' : 'text-warn hover:text-warn')}>
+            <Button variant="ghost" size="icon" aria-label={n === null ? 'Check who can move your funds' : accessWords(n, read.data?.unchecked)} onClick={() => go('access')} className={cn('mb-1 size-7', n === null ? 'text-ink-3' : clean ? 'text-ok hover:text-ok' : 'text-warn hover:text-warn')}>
                 <Icon name={n ? 'others' : 'only'} size={15} stroke={2.2} />
             </Button>
         </Tip>

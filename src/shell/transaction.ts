@@ -105,10 +105,11 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     // A Ledger's Solana app misreads v1: shown all the same, so the user hears why it cannot be signed.
     const unsignable = account.ledger !== undefined && (await decode(bytes)).message.version === 1;
     // Yours, and the addresses you keep: what lands with them is not someone else's.
-    const { accounts, contacts } = await shell.load();
+    const { accounts, contacts, settings } = await shell.load();
     const yours = { wallets: accounts.map((a) => a.address), contacts: new Map(contacts.map((c) => [c.address, c.label])) };
     const [reviewed, blockhash] = await Promise.all([review(bytes, { ...way.context, ...yours, wallet: account.address }, way.chain), way.blockhash]);
     const r = blockhash === undefined ? reviewed : await stamped(reviewed, blockhash);
+    await notMainnet(r, way.cluster, settings, shell);
     await checks(r);
     // A Ledger shows a plain SOL transfer in clear, amount and recipient, where guards would leave it only a hash.
     const clear = way.context.own === true && account.ledger !== undefined && plainTransfer(r);
@@ -120,7 +121,8 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     const known = await squadsIn(r, way.chain).then(async (squads) => ({ ...(await tokenInfo(r, way, shell, mintsInside(squads))), squads }));
     // A site's transaction tells nothing of its blockhash's age, and may come with little of its minute left (a Jupiter
     // order, about half): the network is asked instead, while the user decides.
-    const shown = { site: way.site, account: accountView(account), signer: signerOf(account), cluster: way.cluster, known, expiry: null, recipient: way.recipient, later: way.later };
+    const away = way.cluster !== networkOf(settings); // for another network than the wallet shows: said in the window
+    const shown = { site: way.site, account: accountView(account), signer: signerOf(account), cluster: way.cluster, known, expiry: null, recipient: way.recipient, later: way.later, away };
     const blocked = unsignable ? LEDGER_V1 : undefined;
     const prepared = preparing.then(([p, told]): { p: Prepared; approval: TransactionView } => {
         const view = describe(r, p, { ...shown, known: { ...known, told } });
@@ -238,6 +240,18 @@ export async function followed(id: Signature, r: Review, chain: Chain): Promise<
         if (lasting && Date.now() > until) return { expired: false };
         await new Promise((done) => setTimeout(done, FOLLOW_EVERY));
     }
+}
+
+/** Refuses a transaction for another network than mainnet that would land on mainnet all the same. An endpoint of your
+ *  own says which network it serves, and could say devnet while it passes everything to mainnet: Otus's own mainnet
+ *  RPC is asked whether it knows the transaction's blockhash (or holds its nonce). A real devnet one is unknown there.
+ *  Solana's public endpoints are taken at their word. */
+export async function notMainnet(r: Review, cluster: Cluster, settings: Settings, shell: Shell) {
+    if (cluster === 'solana:mainnet' || rpcFor(cluster, settings) !== settings.rpc) return;
+    const mainnet = shell.chain(rpcFor('solana:mainnet', { ...settings, network: 'mainnet' }));
+    const lands = await landsOn(r.message, mainnet).catch(() => null);
+    if (lands === null) throw new Refused("Otus couldn't check that this transaction is not for mainnet: try again");
+    if (lands) throw new Refused(`your RPC says it serves ${cluster.slice('solana:'.length)}, but this transaction is for mainnet`);
 }
 
 /** Refuses a transaction no block can take any more: one read for longer than its blockhash lives would not land. */

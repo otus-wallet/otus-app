@@ -6,7 +6,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 
 import { short } from '@otus-wallet/sdk/format';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
-import { walletRpc } from '../../settings.ts';
+import { networkOf, walletRpc } from '../../settings.ts';
 import type { Fix } from '../../send/fix.ts';
 import { signs, type State } from '../../shell/state.ts';
 import { cachedToken } from '../../tokens.ts';
@@ -31,18 +31,22 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
     const naming = useMemo((): AccessNaming => {
         const assets = new Map((held?.assets ?? []).filter((a) => !a.native).map((a) => [a.mint, a]));
         const names = new Map<string, string>([...state.contacts, ...state.accounts].map((k) => [k.address, k.label]));
+        // Names from Jupiter and the tokens everyone knows are mainnet's: elsewhere the same addresses are other tokens.
+        const mainnet = networkOf(state.settings) === 'solana:mainnet';
         return {
             wallet: account.address,
+            program: (a) => PROGRAM_NAMES.get(a) ?? short(a),
             symbol: (mint) => {
                 const asset = assets.get(mint);
+                if (!mainnet) return short(mint);
                 return KNOWN_SYMBOLS[mint] ?? (asset?.verified && asset.symbol ? asset.symbol : cachedToken(mint)?.verified ? cachedToken(mint)!.symbol : short(mint));
             },
-            decimals: (mint) => assets.get(mint)?.decimals ?? cachedToken(mint)?.decimals ?? null,
+            decimals: (mint) => assets.get(mint)?.decimals ?? (mainnet ? cachedToken(mint)?.decimals : null) ?? null,
             who: (a: Address) => (a === account.address ? `${short(a)}${YOU}` : (names.get(a) ?? PROGRAM_NAMES.get(a) ?? short(a))),
             given: state.given,
             waiting: state.waiting.filter((w) => w.wallet === account.address),
         };
-    }, [account.address, held, state.accounts, state.contacts, state.given, state.waiting]);
+    }, [account.address, held, state.accounts, state.contacts, state.given, state.waiting, state.settings]);
     const [taking, setTaking] = useState<{ what: Fix; title: string } | null>(null);
     const grants = read.data?.grants ?? [];
     const rows = accessRows(grants, naming);
@@ -68,9 +72,9 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
                 </div>
             )}
             {read.data && (
-                <div className={cn('flex items-center gap-3 rounded-[3px] border border-current p-3.5', filled(n === 0 ? 'ok' : 'warn'))}>
+                <div className={cn('flex items-center gap-3 rounded-[3px] border border-current p-3.5', filled(n === 0 && !read.data.unchecked ? 'ok' : 'warn'))}>
                     <Icon name={n === 0 ? 'only' : 'others'} size={24} stroke={2.2} />
-                    <p className="text-[12.5px] font-bold">{accessWords(n)}</p>
+                    <p className="text-[12.5px] font-bold">{accessWords(n, read.data.unchecked)}</p>
                 </div>
             )}
             {rows.length > 0 && (

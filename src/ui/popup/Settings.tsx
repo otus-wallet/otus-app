@@ -153,25 +153,32 @@ function NetworkChoice({ settings }: { settings: Settings }) {
     const [error, setError] = useState('');
     const [asking, setAsking] = useState(false);
     const saved = settings.rpc !== null && settings.custom !== null;
-    const use = (network: 'mainnet' | 'devnet') => (setPicking(false), setError(''), void setSettings(() => ({ network })));
-    const pick = () => {
-        setPicking(true);
-        if (saved) void setSettings(() => ({ network: 'custom' })); // the endpoint saved before, at once
-    };
-    const keep = async () => {
-        const url = typed.trim();
-        if (!usable(url)) return setError('Use an https address, or http on localhost');
+    // While an endpoint is asked its network, nothing else is chosen: its answer would undo the choice.
+    const use = (network: 'mainnet' | 'devnet') => !asking && (setPicking(false), setError(''), void setSettings(() => ({ network })));
+    // Its network is asked again whenever it is chosen: an endpoint can serve another one since it was saved.
+    const ask = async (url: string) => {
         setAsking(true);
         try {
             const custom = clusterOfGenesis(await rpcAt(url).getGenesisHash().send());
             setError('');
-            setTyped('');
             await setSettings(() => ({ network: 'custom', rpc: url, custom }));
+            return true;
         } catch (e) {
             setError(`It did not answer as a Solana RPC: ${said(e)}`);
+            return false;
         } finally {
             setAsking(false);
         }
+    };
+    const pick = () => {
+        if (asking) return;
+        setPicking(true);
+        if (saved) void ask(settings.rpc!); // the endpoint saved before
+    };
+    const keep = async () => {
+        const url = typed.trim();
+        if (!usable(url)) return setError('Use an https address, or http on localhost');
+        if (await ask(url)) setTyped('');
     };
     return (
         <>
