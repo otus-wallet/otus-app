@@ -38,7 +38,8 @@ import { transfer as sendTransfer } from '../src/send/transfer.ts';
 import { send } from '../src/send/send.ts';
 import { DEFAULT_SETTINGS } from '../src/settings.ts';
 import type { Answer } from '../src/shell/approvals.ts';
-import { own, serve, type Shell } from '../src/shell/serve.ts';
+import { fix } from '../src/send/fix.ts';
+import { own, serve, takeBack, type Shell } from '../src/shell/serve.ts';
 import type { Chain } from '@otus-wallet/sdk/chain';
 import type { State } from '../src/shell/state.ts';
 import type { Approval } from '../src/ui/view.ts';
@@ -177,6 +178,24 @@ test('a transfer made in the popup is reviewed as Otus’s own, signed and sent,
     assert.deepEqual(await own(bytes(rejected.transfer()), rejected.me, key(2), rejected.shell), { ok: false, error: 'You rejected it', rejected: true });
     assert.deepEqual(rejected.box.state.sent, {});
     assert.equal(rejected.sent.length, 0);
+});
+
+test('what the popup makes to take access back is reviewed as Otus’s own, signed and sent; anything more is refused', async () => {
+    const w = await wallet();
+    const revoke = fix(w.me, { kind: 'revoke', account: key(30), program: TOKEN_PROGRAM_ADDRESS }, { blockhash: blockhash(key(9)), lastValidBlockHeight: 0n });
+    const { outcome } = result<{ signature: string; outcome: string }>(await takeBack(revoke, w.me, w.shell));
+    assert.equal(outcome, 'confirmed');
+    assert.equal(w.sent.length, 1);
+    const shown = w.approvals[0];
+    assert.ok(shown.kind === 'transaction');
+    assert.deepEqual([shown.site.host, shown.site.note], ['Otus', 'Taking access back']);
+    const cancel = fix(w.me, { kind: 'cancel', nonce: key(32) }, { blockhash: blockhash(key(9)), lastValidBlockHeight: 0n });
+    assert.equal(result<{ outcome: string }>(await takeBack(cancel, w.me, w.shell)).outcome, 'confirmed');
+    // A transfer is no taking back, nor is a revoke another account signs.
+    assert.match(((await takeBack(bytes(w.transfer()), w.me, w.shell)) as { error: string }).error, /does more than take access back/);
+    const theirs = fix(key(5), { kind: 'revoke', account: key(30), program: TOKEN_PROGRAM_ADDRESS }, { blockhash: blockhash(key(9)), lastValidBlockHeight: 0n });
+    assert.match(((await takeBack(theirs, w.me, w.shell)) as { error: string }).error, /does not sign this transaction/);
+    assert.equal(w.sent.length, 2);
 });
 
 test('a transfer made in the popup never opens a token account for an address that is a token account itself', async () => {

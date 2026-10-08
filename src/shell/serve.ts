@@ -1,7 +1,10 @@
-// What the background answers: sites' requests, and the transfers made in Otus's own popup. Each is checked, shown
-// to the user and, once approved, signed with state as it is then. A reply never throws.
+// What the background answers: sites' requests, and the transfers made in Otus's own popup, and what it makes there to
+// take access back. Each is checked, shown to the user and, once approved, signed with state as it is then. A reply
+// never throws.
 import { getBase58Decoder, getBase64Decoder, getPublicKeyFromAddress, isAddress, isSolanaError, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, verifySignature, type Address, type Signature, type SignatureBytes } from '@solana/kit';
 
+import { COMPUTE_BUDGET_PROGRAM_ADDRESS } from '@solana-program/compute-budget';
+import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
 import type { Chain } from '@otus-wallet/sdk/chain';
@@ -13,6 +16,7 @@ import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Review } from '@otus-wallet/sdk/review/review';
 import { programsCalled } from '@otus-wallet/sdk/review/sites';
 import { delegatesGiven, waitingOn } from '@otus-wallet/sdk/access/access';
+import { isTokenProgram } from '@otus-wallet/sdk/programs/addresses';
 import { timedOut } from '@otus-wallet/sdk/rpc';
 import type { Sent } from '../send/send.ts';
 import { rpcFor } from '../settings.ts';
@@ -42,6 +46,7 @@ const NO_ACCOUNT = 'there is no account in Otus yet';
 const NO_SIGNER = 'no account in Otus can sign: a watched one cannot connect';
 // A transfer made in the popup has no site: this stands for one in its review.
 const OWN_SITE: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Your own transfer', tone: 'plain' };
+const TAKING_BACK: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Taking access back', tone: 'plain' };
 
 /** A site's call and the origin the browser gave → the reply for the site. */
 export function serve(call: unknown, origin: string, shell: Shell): Promise<Reply> {
@@ -179,6 +184,44 @@ export function own(bytes: Uint8Array, address: string, to: string, shell: Shell
         },
         { rejected: 'You rejected it', failed: 'Otus could not send it' },
     );
+}
+
+/** What the popup made to take access back (a delegate revoked, a nonce moved on) → reviewed and approved like a site's
+ *  transaction, then signed and sent on mainnet; `signed` hears the signature before it is sent. It is that account's
+ *  alone to sign, and does nothing else. The reply says whether it landed or failed onchain. */
+export function takeBack(bytes: Uint8Array, address: string, shell: Shell, signed?: (signature: Signature) => Promise<unknown>): Promise<Reply> {
+    return reply(
+        async () => {
+            const state = await shell.load();
+            const account = accountOf(state, address);
+            if (!account || !signs(account)) throw new Refused(NO_KEY);
+            const cluster = 'solana:mainnet';
+            const chain = shell.chain(rpcFor(cluster, state.settings));
+            const way = { cluster, chain, site: TAKING_BACK, blockhash: chain.latest(), context: { signedBefore: null, own: true } } as const;
+            const { r, p, signature: signedOnDevice } = await approved(bytes, account, way, shell, (r) => {
+                if (r.signers.some((s) => s !== account.address)) throw new Refused('another account would have to sign it');
+                if (!takesBack(r, account.address)) throw new Refused('it does more than take access back');
+            });
+            if (!signedOnDevice) await unexpired(r, chain);
+            const signature = await signFor(account, messageOf(p.bytes), shell, null, signedOnDevice);
+            await signed?.(getBase58Decoder().decode(signature) as Signature);
+            return landed(withSignature(p.bytes, account.address, signature), chain, shell);
+        },
+        { rejected: 'You rejected it', failed: 'Otus could not send it' },
+    );
+}
+
+// Its Compute Budget limit, then only what takes access back: a token program's Revoke (5) of an account this owner
+// signs for, or the System Program's AdvanceNonceAccount (4) of a nonce whose authority it is.
+function takesBack(r: Review, owner: Address): boolean {
+    const [limit, ...rest] = r.message.instructions;
+    const program = (ix: Review['message']['instructions'][number]) => r.accounts[ix.programAddressIndex].address;
+    if (!limit || program(limit) !== COMPUTE_BUDGET_PROGRAM_ADDRESS || rest.length === 0) return false;
+    return rest.every((ix) => {
+        const at = (i: number) => r.accounts[ix.accountIndices[i]]?.address;
+        if (isTokenProgram(program(ix))) return ix.data.length === 1 && ix.data[0] === 5 && at(1) === owner;
+        return program(ix) === SYSTEM_PROGRAM_ADDRESS && ix.data.length === 4 && [4, 0, 0, 0].every((b, i) => ix.data[i] === b) && at(2) === owner;
+    });
 }
 
 // A request's outcome as the reply its caller gets: what it returned, or why not, in words.

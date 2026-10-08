@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { COMPUTE_BUDGET_PROGRAM_ADDRESS } from '@solana-program/compute-budget';
 import { findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { blockhash, type Address } from '@solana/kit';
 
 import { CORE_PLUGINS } from '@otus-wallet/sdk/programs/core';
-import { decode } from '@otus-wallet/sdk/review/decode';
+import { decode, durable } from '@otus-wallet/sdk/review/decode';
 import { explain } from '@otus-wallet/sdk/review/explain';
+import { fix } from '../src/send/fix.ts';
 import { feeOn, transfer, units, unplain } from '../src/send/transfer.ts';
 import { key, PAYER, RECIPIENT } from './helpers.ts';
 
@@ -93,4 +95,19 @@ test('what a Token-2022 transfer fee keeps: basis points rounded up, up to its m
     assert.equal(feeOn(fee([5n, 5_000], [5n, 5_000]), 1_000n), 5n); // half, but at most 5
     assert.equal(feeOn(fee([10_000n, 50], [10_000n, 5_000]), 1_000n), 500n); // the next fee, higher, counts
     assert.equal(feeOn(new Uint8Array(82), 1_000n), 0n);
+});
+
+test('taking access back: its Compute Budget limit first, then a Revoke, or a nonce moved on', async () => {
+    const lifetime = { blockhash: blockhash(key(9)), lastValidBlockHeight: 0n };
+    const { message } = await decode(fix(key(1), { kind: 'revoke', account: key(30), program: TOKEN_PROGRAM_ADDRESS }, lifetime));
+    const program = (i: number) => message.staticAccounts[message.instructions[i].programAddressIndex];
+    assert.equal(message.version, 0);
+    assert.equal(program(0), COMPUTE_BUDGET_PROGRAM_ADDRESS);
+    assert.equal(program(1), TOKEN_PROGRAM_ADDRESS);
+    assert.deepEqual([...message.instructions[1].data], [5]);
+    assert.deepEqual(message.instructions[1].accountIndices.map((i) => message.staticAccounts[i]), [key(30), key(1)]);
+    const cancel = (await decode(fix(key(1), { kind: 'cancel', nonce: key(32) }, lifetime))).message;
+    assert.equal(durable(cancel), false); // its advance is not first: it lives by its blockhash
+    assert.deepEqual([...cancel.instructions[1].data], [4, 0, 0, 0]);
+    assert.equal(cancel.staticAccounts[cancel.instructions[1].accountIndices[2]], key(1));
 });

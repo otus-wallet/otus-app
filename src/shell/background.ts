@@ -11,7 +11,7 @@ import { tokens } from '../tokens.ts';
 import type { Approval, Life } from '../ui/view.ts';
 import { answerOf, approve, type Answer } from './approvals.ts';
 import { keysCall, lock, LOCK_ALARM, locked, prune, shielded, sign, type KeysCall, type KeysReply } from './keys.ts';
-import { own, serve } from './serve.ts';
+import { own, serve, takeBack } from './serve.ts';
 import { edited, load, update, type Edit, type State } from './state.ts';
 
 const shell = { load, update, approve, sign, chain: (rpc: string) => rpcChain(rpcAt(rpc)), send: async (signed: Uint8Array, chain: Chain) => send(signed, chain, undefined, (await load()).settings.preflight !== false), tokens, now: Date.now };
@@ -113,7 +113,8 @@ async function settle(restart = true) {
 // A transfer made in the popup, reviewed there as a site's is in its window: the popup sends it on a port of its own,
 // gets the review back, and answers on it; then it hears how it went. A popup closed before answering says no. Once
 // approved, how it goes is kept for the lobby too, as the popup may close while it lands: on its way, then signed (with
-// its signature, so a worker that stops can still tell), then the outcome.
+// its signature, so a worker that stops can still tell), then the outcome. What the popup makes to take access back
+// (`fix`) goes the same way, and only Access hears how it went.
 chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== 'own' || !ours(port.sender) || port.sender?.tab) return; // the toolbar popup's alone
     let started = false;
@@ -126,7 +127,7 @@ chrome.runtime.onConnect.addListener((port) => {
         done();
         asked?.decide(false);
     });
-    port.onMessage.addListener((m: { own?: unknown; account?: unknown; to?: unknown; approve?: unknown; signature?: unknown }) => {
+    port.onMessage.addListener((m: { own?: unknown; account?: unknown; to?: unknown; fix?: unknown; approve?: unknown; signature?: unknown }) => {
         // A yes counts only while Otus is unlocked, as in an approval window: a Ledger's needs no keystore to sign.
         if (asked && 'approve' in m) {
             const { decide, approval, ready } = asked;
@@ -137,12 +138,13 @@ chrome.runtime.onConnect.addListener((port) => {
             return void shielded().then((shut) => decide(!shut && answer), () => decide(false));
         }
         const { own: bytes, account, to } = m;
-        if (started || typeof bytes !== 'string' || typeof account !== 'string' || typeof to !== 'string') return;
+        const fixing = m.fix === true;
+        if (started || typeof bytes !== 'string' || typeof account !== 'string' || (typeof to !== 'string' && !fixing)) return;
         started = true;
         if (reviewing && reviewing !== port) return tell({ done: { ok: false, error: 'Another transfer of yours is being reviewed' } });
         reviewing = port;
         let told = null as Promise<void> | null; // once approved: what the lobby is told, in order
-        const record = (last: object) => (told = (told ?? Promise.resolve()).then(() => chrome.storage.session.set({ lastTransfer: { ...last, at: Date.now() } })));
+        const record = (last: object) => (fixing ? Promise.resolve() : (told = (told ?? Promise.resolve()).then(() => chrome.storage.session.set({ lastTransfer: { ...last, at: Date.now() } }))));
         const approve = (approval: Approval, follow?: (tell: (life: Life) => void) => void, later?: Promise<Approval>) =>
             new Promise<Answer>((decide) => {
                 follow?.((life) => tell({ life }));
@@ -180,7 +182,8 @@ chrome.runtime.onConnect.addListener((port) => {
                 }
                 return record({ pending: true, signature });
             };
-            const reply = await own(new Uint8Array(getBase64Encoder().encode(bytes)), account, to, { ...shell, approve }, signed);
+            const wire = new Uint8Array(getBase64Encoder().encode(bytes));
+            const reply = typeof to === 'string' ? await own(wire, account, to, { ...shell, approve }, signed) : await takeBack(wire, account, { ...shell, approve }, signed);
             if (told) await record(reply);
             return reply;
         })().finally(done);

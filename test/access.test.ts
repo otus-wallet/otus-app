@@ -20,7 +20,7 @@ const naming = (o: Partial<AccessNaming> = {}): AccessNaming => ({
     waiting: [],
     ...o,
 });
-const delegate: Grant = { kind: 'delegate', account: key(30), mint: key(20), to: key(31), allowance: 100_000_000n, all: false };
+const delegate: Grant = { kind: 'delegate', account: key(30), program: key(5), mint: key(20), to: key(31), allowance: 100_000_000n, all: false };
 const nonce: Grant = { kind: 'nonce', account: key(32), nonce: 'N1', authority: ME };
 
 test('each grant in words, with the site behind it when Otus kept that', () => {

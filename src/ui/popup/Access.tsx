@@ -2,23 +2,26 @@
 // and the transactions it signed that can still run, each with the site behind it when Otus kept that. Opened from
 // Activity.
 import type { Address } from '@solana/kit';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 import { short } from '@otus-wallet/sdk/format';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
 import { rpcFor } from '../../settings.ts';
-import type { State } from '../../shell/state.ts';
+import type { Fix } from '../../send/fix.ts';
+import { signs, type State } from '../../shell/state.ts';
 import { cachedToken } from '../../tokens.ts';
 import { Button } from '../components/ui/button.tsx';
 import { Icon } from '../components/icons.tsx';
 import { cn } from '../lib/cn.ts';
 import { filled } from '../review/tone.ts';
 import { YOU } from '../view/names.ts';
-import { accessRows, accessWords, freezable, others, type AccessNaming } from '../view/access.ts';
+import { accessRows, accessWords, freezable, others, type AccessNaming, type AccessRow } from '../view/access.ts';
 import { KNOWN_SYMBOLS } from './Activity.tsx';
 import type { Screen } from './App.tsx';
 import { Bar, Heading, Sheet } from './common.tsx';
+import { queries } from './query.ts';
 import { current, said, useAccess, useHeldNow } from './store.ts';
+import { TakeBack } from './TakeBack.tsx';
 
 export function Access({ state, go }: { state: State; go: (to: Screen) => void }) {
     const account = current(state);
@@ -40,10 +43,19 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
             waiting: state.waiting.filter((w) => w.wallet === account.address),
         };
     }, [account.address, held, state.accounts, state.contacts, state.given, state.waiting]);
+    const [taking, setTaking] = useState<{ what: Fix; title: string } | null>(null);
     const grants = read.data?.grants ?? [];
     const rows = accessRows(grants, naming);
     const frozen = freezable(grants, naming);
     const n = others(grants);
+    if (taking) {
+        const done = (landed: boolean) => {
+            setTaking(null);
+            if (landed) void queries.invalidateQueries({ queryKey: ['access'] });
+        };
+        return <TakeBack account={account} what={taking.what} title={taking.title} settings={state.settings} done={done} />;
+    }
+    const take = signs(account) ? (row: AccessRow) => setTaking({ what: fixOf(row), title: row.title }) : null; // a watched account signs nothing
     return (
         <Sheet bar={<Bar title="Access" back={() => go('activity')} />}>
             {!read.data && !read.error && <p className="pt-6 text-center text-[11px] text-ink-3">Checking who has access</p>}
@@ -65,9 +77,16 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
                 <Part title="Can move or close">
                     <ul>
                         {rows.map((row, i) => (
-                            <li key={i} className="flex flex-col gap-[3px] border-t border-dashed border-rule-2 py-2.5">
-                                <span className={cn('text-[12px] font-bold [overflow-wrap:anywhere]', row.grant.kind === 'closer' ? 'text-ink' : 'text-warn')}>{row.title}</span>
-                                <span className="text-[10.5px] text-ink-3 [overflow-wrap:anywhere]">{row.sub}</span>
+                            <li key={i} className="flex items-center gap-3 border-t border-dashed border-rule-2 py-2.5">
+                                <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
+                                    <span className={cn('text-[12px] font-bold [overflow-wrap:anywhere]', row.grant.kind === 'closer' ? 'text-ink' : 'text-warn')}>{row.title}</span>
+                                    <span className="text-[10.5px] text-ink-3 [overflow-wrap:anywhere]">{row.sub}</span>
+                                </span>
+                                {row.fix && take && (
+                                    <Button size="sm" className="shrink-0" onClick={() => take(row)}>
+                                        {row.fix === 'revoke' ? 'Revoke' : 'Cancel'}
+                                    </Button>
+                                )}
                             </li>
                         ))}
                     </ul>
@@ -87,6 +106,13 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
             )}
         </Sheet>
     );
+}
+
+// What a row's fix takes back: its delegate, or its nonce.
+function fixOf({ grant }: AccessRow): Fix {
+    if (grant.kind === 'delegate') return { kind: 'revoke', account: grant.account, program: grant.program };
+    if (grant.kind === 'nonce') return { kind: 'cancel', nonce: grant.account };
+    throw new Error('nothing to take back');
 }
 
 const Part = ({ title, children }: { title: string; children: ReactNode }) => (
