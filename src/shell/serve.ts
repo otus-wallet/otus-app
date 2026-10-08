@@ -149,7 +149,7 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
     try {
         // Signed on a Ledger right as its blockhash ran out, it goes to the network all the same:
         // it may still land, and if not the network says so. Otus's own key doesn't sign what can no longer land.
-        if (!signature) await unexpired(r, chain);
+        if (!(signature && onDevice(account))) await unexpired(r, chain);
         const mine = await signFor(account, messageOf(p.bytes), shell, { origin, programs: programsCalled(r.message) }, signature);
         await shell.update((s) => usable(s, r, account.address, host, shell.now())).catch(() => {}); // keeping them never changes the signing
         const signed = withSignature(p.bytes, account.address, mine);
@@ -159,11 +159,12 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
             outcome.tell(sent.outcome === 'confirmed' || sent.outcome === 'failed' ? { phase: 'landed', failed: sent.outcome === 'failed', link: link(sent.signature) } : { phase: 'unseen', expired: false, link: link(sent.signature) });
             return { signatures: [sent.signature] };
         }
-        // The site sends it: Otus follows it by its signature, the fee payer's, when it has one already.
-        const id = idOf(signed, r.signers[0]);
+        // The site sends it: Otus follows it by its id, the fee payer's signature, only when that is this account's
+        // own. Another payer's, the site's to give, could be any bytes while the transaction lands under the real one.
+        const id = r.signers[0] === account.address ? idOf(signed, account.address) : null;
         if (!id) outcome.tell({ phase: 'signed', host });
         else {
-            outcome.tell({ phase: 'waiting', host });
+            outcome.tell({ phase: 'waiting', host, link: link(id) });
             void followed(id, r, chain).then((f) => outcome.tell('failed' in f ? { phase: 'landed', failed: f.failed, link: link(id) } : { phase: 'unseen', expired: f.expired, link: link(id) }));
         }
         return { transactions: [base64(signed)] };
@@ -200,7 +201,7 @@ export function own(bytes: Uint8Array, address: string, to: string, shell: Shell
                 const kind = r.assessment.kinds.get(to as Address);
                 if ((kind === 'tokens' || kind === 'mints') && opensFor(r, to)) throw new Refused('that address is a token account or a mint, not a wallet');
             });
-            if (!signedOnDevice) await unexpired(r, chain); // signed on a device: sent all the same (as for a site's)
+            if (!(signedOnDevice && onDevice(account))) await unexpired(r, chain); // signed on a device: sent all the same (as for a site's)
             const signature = await signFor(account, messageOf(p.bytes), shell, null, signedOnDevice);
             await signed?.(getBase58Decoder().decode(signature) as Signature);
             const { signature: sent, outcome } = await landed(withSignature(p.bytes, account.address, signature), chain, shell);
@@ -224,12 +225,12 @@ export function takeBack(bytes: Uint8Array, address: string, shell: Shell, signe
             if (!account || !signs(account)) throw new Refused(NO_KEY);
             const cluster = networkOf(state.settings); // the network the wallet shows
             const chain = shell.chain(rpcFor(cluster, state.settings));
-            const way = { cluster, chain, site: TAKING_BACK, blockhash: chain.latest(), context: { signedBefore: null, own: true } } as const;
+            const way = { cluster, chain, site: TAKING_BACK, blockhash: chain.latest(), bare: 'it only takes access back', context: { signedBefore: null, own: true } } as const;
             const { r, p, signature: signedOnDevice } = await approved(bytes, account, way, shell, (r) => {
                 if (r.signers.some((s) => s !== account.address)) throw new Refused('another account would have to sign it');
                 if (!takesBack(r, account.address)) throw new Refused('it does more than take access back');
             });
-            if (!signedOnDevice) await unexpired(r, chain);
+            if (!(signedOnDevice && onDevice(account))) await unexpired(r, chain);
             const signature = await signFor(account, messageOf(p.bytes), shell, null, signedOnDevice);
             await signed?.(getBase58Decoder().decode(signature) as Signature);
             return landed(withSignature(p.bytes, account.address, signature), chain, shell);
@@ -238,12 +239,13 @@ export function takeBack(bytes: Uint8Array, address: string, shell: Shell, signe
     );
 }
 
-// Its Compute Budget limit, then only what takes access back: a token program's Revoke (5) of an account this owner
-// signs for, or the System Program's AdvanceNonceAccount (4) of a nonce whose authority it is.
+// A legacy or v0 message (v1's limits and fee live in its config) with Compute Budget's SetComputeUnitLimit (2) first,
+// then only what takes access back: a token program's Revoke (5) of an account this owner signs for, or the System
+// Program's AdvanceNonceAccount (4) of a nonce whose authority it is.
 function takesBack(r: Review, owner: Address): boolean {
     const [limit, ...rest] = r.message.instructions;
     const program = (ix: Review['message']['instructions'][number]) => r.accounts[ix.programAddressIndex].address;
-    if (!limit || program(limit) !== COMPUTE_BUDGET_PROGRAM_ADDRESS || rest.length === 0) return false;
+    if (r.message.version === 1 || !limit || program(limit) !== COMPUTE_BUDGET_PROGRAM_ADDRESS || limit.data.length !== 5 || limit.data[0] !== 2 || rest.length === 0) return false;
     return rest.every((ix) => {
         const at = (i: number) => r.accounts[ix.accountIndices[i]]?.address;
         if (isTokenProgram(program(ix))) return ix.data.length === 1 && ix.data[0] === 5 && at(1) === owner;
@@ -321,7 +323,7 @@ function signedFor(sites: State['sites'], { origin, connects = false, programs }
     if (!connects && !same) return null;
     const since = (same ? site.since : undefined) ?? (programs ? Math.floor(now / 1000) : undefined);
     const kept = same ? site.programs : undefined;
-    const called = programs ? [...new Set([...(kept ?? []), ...programs])].slice(-MAX_SITE_PROGRAMS) : kept;
+    const called = programs ? [...(kept ?? []).filter((p) => !programs.includes(p)), ...programs].slice(-MAX_SITE_PROGRAMS) : kept; // the latest used last
     return { sites: { ...sites, [origin]: { account: address, signatures: same ? site.signatures + 1 : 1, ...(since !== undefined && { since }), ...(called && { programs: called }) } } };
 }
 

@@ -79,7 +79,8 @@ chrome.runtime.onConnect.addListener((port) => {
             port.postMessage({ life });
         } catch {} // the window went meanwhile
     });
-    port.onMessage.addListener((m: { approve?: unknown; signature?: unknown; account?: unknown }) => {
+    port.onMessage.addListener((m: { approve?: unknown; signature?: unknown; account?: unknown; beat?: unknown }) => {
+        if (m.beat === true) return; // an approved window, still following its transaction: it only keeps Otus awake
         const answer = answerOf(m, asked.approval.kind);
         if (!answer) return asked.decide(false);
         if (!asked.ready) return; // a yes before the final form counts for nothing

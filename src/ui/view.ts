@@ -93,7 +93,7 @@ export type TransactionView = {
  *  how it ended: landed (worked or failed), not seen landing (`expired`: its blockhash ran out first), or refused. */
 export type Outcome =
     | { phase: 'sending' }
-    | { phase: 'waiting'; host: string }
+    | { phase: 'waiting'; host: string; link: string }
     | { phase: 'signed'; host: string }
     | { phase: 'landed'; failed: boolean; link: string }
     | { phase: 'unseen'; expired: boolean; link: string }

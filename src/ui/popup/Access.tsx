@@ -53,9 +53,10 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
     const frozen = freezable(grants, naming);
     const n = others(grants);
     if (taking) {
-        const done = (landed: boolean) => {
+        // Read again whatever happened: a take-back that is still on its way may land, and its row must not stay.
+        const done = () => {
             setTaking(null);
-            if (landed) void queries.invalidateQueries({ queryKey: ['access'] });
+            void queries.invalidateQueries({ queryKey: ['access'] });
         };
         return <TakeBack account={account} what={taking.what} title={taking.title} settings={state.settings} done={done} />;
     }

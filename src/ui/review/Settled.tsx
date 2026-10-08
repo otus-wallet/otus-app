@@ -9,14 +9,15 @@ export function Settled({ site, account, outcome }: { site: SiteView; account: A
     const [tone, title, words] = told(outcome);
     const link = outcome && 'link' in outcome ? outcome.link : null;
     const going = !outcome || outcome.phase === 'sending' || outcome.phase === 'waiting';
+    const heard = outcome !== null; // until the background's first word, only the yes was said
     return (
-        <Frame site={site} account={account} network={null} actions={<Answer variant={going ? 'outline' : 'default'} onClick={going ? () => window.close() : activity}>{going ? 'Close' : 'Done'}</Answer>}>
+        <Frame site={site} account={account} network={null} actions={<Answer variant={going ? 'outline' : 'default'} onClick={going ? () => window.close() : () => void activity()}>{going ? 'Close' : 'Done'}</Answer>}>
             <div role="status" className={`outcome mt-3 flex items-center gap-3 rounded-[3px] border p-3.5 ${tone === 'plain' ? 'border-rule text-ink' : `border-current ${filled(tone)}`}`}>
                 <Icon name={going ? 'refresh' : MARK[tone]} size={28} stroke={2.5} />
                 <div className="flex min-w-0 flex-col gap-1">
                     <p className="title pixel text-[22px] leading-[1.1]">{title}</p>
                     <p className="font-bold">{words}</p>
-                    {link && (
+                    {link && link.length > 0 && (
                         <a href={link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-[3px] text-[11px] font-bold text-inherit">
                             View in the explorer
                             <Icon name="external" size={11} stroke={2.5} />
@@ -24,17 +25,28 @@ export function Settled({ site, account, outcome }: { site: SiteView; account: A
                     )}
                 </div>
             </div>
-            {going && <p className="text-[10.5px] text-ink-3">You can close this window: it changes nothing.</p>}
+            {going && heard && <p className="text-[10.5px] text-ink-3">You can close this window: it changes nothing.</p>}
         </Frame>
     );
 }
 
-// Done: the window becomes Otus's own, on Activity, where the transaction now shows.
-const activity = () => location.replace(chrome.runtime.getURL('home.html#activity'));
+// Done: Otus's own popup opens on Activity, where the transaction now shows, and this window closes. Where the browser
+// cannot open it, the window just closes.
+async function activity() {
+    try {
+        await chrome.storage.session.set({ openOn: 'activity' });
+        const browser = await chrome.windows.getLastFocused({ windowTypes: ['normal'] });
+        await chrome.action.openPopup(browser.id === undefined ? {} : { windowId: browser.id });
+    } catch {
+        await chrome.storage.session.remove('openOn').catch(() => {});
+    }
+    window.close();
+}
 
 // What an outcome says: its tone, its title and its words.
 function told(outcome: Outcome | null): [Tone, string, string] {
-    if (!outcome || outcome.phase === 'sending') return ['plain', 'Sending', 'Signed. The network confirms it in a few seconds.'];
+    if (!outcome) return ['plain', 'Approved', 'Otus signs it now.'];
+    if (outcome.phase === 'sending') return ['plain', 'Sending', 'Signed. The network confirms it in a few seconds.'];
     switch (outcome.phase) {
         case 'waiting':
             return ['plain', 'Signed', `${outcome.host} sends it now: Otus watches it land.`];

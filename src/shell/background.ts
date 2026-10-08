@@ -139,7 +139,8 @@ chrome.runtime.onConnect.addListener((port) => {
         }
         const { own: bytes, account, to } = m;
         const fixing = m.fix === true;
-        if (started || typeof bytes !== 'string' || typeof account !== 'string' || (typeof to !== 'string' && !fixing)) return;
+        // A transfer names whom it pays; taking access back names no one: one or the other, never both.
+        if (started || typeof bytes !== 'string' || typeof account !== 'string' || (typeof to === 'string') === fixing) return;
         started = true;
         if (reviewing && reviewing !== port) return tell({ done: { ok: false, error: 'Another transfer of yours is being reviewed' } });
         reviewing = port;
@@ -183,10 +184,17 @@ chrome.runtime.onConnect.addListener((port) => {
                 return record({ pending: true, signature });
             };
             const wire = new Uint8Array(getBase64Encoder().encode(bytes));
-            const reply = typeof to === 'string' ? await own(wire, account, to, { ...shell, approve }, signed) : await takeBack(wire, account, { ...shell, approve }, signed);
+            const reply = fixing ? await takeBack(wire, account, { ...shell, approve }, signed) : await own(wire, account, to as string, { ...shell, approve }, signed);
             if (told) await record(reply);
             return reply;
-        })().finally(done);
+        })().finally(() => {
+            done();
+            // Approved and never signed (refused before it, or failed): what held Otus open for it lets go.
+            if (holding) {
+                holding = grace = false;
+                void settle(false);
+            }
+        });
         busy(transfer).then(
             (reply) => tell({ done: reply }),
             () => tell({ done: { ok: false, error: 'Otus could not send it' } }),

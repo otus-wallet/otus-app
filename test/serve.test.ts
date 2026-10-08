@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { getTransferSolInstruction } from '@solana-program/system';
-import { getCreateAssociatedTokenIdempotentInstruction, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
+import { getCreateAssociatedTokenIdempotentInstruction, getRevokeInstruction, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import {
     AccountRole,
     appendTransactionMessageInstruction,
@@ -40,6 +40,10 @@ import { DEFAULT_SETTINGS, OTUS_RPC } from '../src/settings.ts';
 import type { Answer } from '../src/shell/approvals.ts';
 import { fix } from '../src/send/fix.ts';
 import { own, serve, takeBack, type Shell } from '../src/shell/serve.ts';
+import { followed } from '../src/shell/transaction.ts';
+import type { Review } from '@otus-wallet/sdk/review/review';
+import type { Status } from '@otus-wallet/sdk/chain';
+import { getSetComputeUnitPriceInstruction } from '@solana-program/compute-budget';
 import type { Chain } from '@otus-wallet/sdk/chain';
 import type { State } from '../src/shell/state.ts';
 import type { Approval, Outcome } from '../src/ui/view.ts';
@@ -154,7 +158,8 @@ test('an approved transaction’s window hears how it goes: sent by Otus, or fol
     const signs = await wallet();
     result(await signs.call('signTransaction', { account: signs.me, transactions: [signs.transfer()] }));
     for (let i = 0; i < 20 && signs.outcomes.length < 2; i++) await new Promise((r) => setTimeout(r, 10));
-    assert.deepEqual(signs.outcomes, [{ phase: 'waiting', host: 'jup.ag' }, { phase: 'landed', failed: false, link: (signs.outcomes[1] as { link: string }).link }]);
+    const link = (signs.outcomes[1] as { link: string }).link;
+    assert.deepEqual(signs.outcomes, [{ phase: 'waiting', host: 'jup.ag', link }, { phase: 'landed', failed: false, link }]);
     // Another account pays, and has not signed yet: nothing to follow by.
     const other = await wallet();
     result(await other.call('signTransaction', { account: other.me, transactions: [other.transfer(other.me, key(7))] }));
@@ -164,6 +169,36 @@ test('an approved transaction’s window hears how it goes: sent by Otus, or fol
     const late = await wallet({ chain: { valid: async () => ++checks <= 1 } });
     await late.call('signTransaction', { account: late.me, transactions: [late.transfer()] });
     assert.deepEqual(late.outcomes, [{ phase: 'refused', error: 'It expired before you signed it, so nothing was sent' }]);
+});
+
+test('only what Otus builds to take access back is signed that way; a payer signature a site wrote is not followed', async () => {
+    const w = await wallet();
+    // A Compute Budget price first, where only a compute limit belongs: a fee slipped in.
+    const priced = base64(new Uint8Array(getTransactionEncoder().encode(compileTransaction(pipe(
+        createTransactionMessage({ version: 0 }),
+        (m) => setTransactionMessageFeePayer(w.me, m),
+        (m) => setTransactionMessageLifetimeUsingBlockhash({ blockhash: blockhash(key(9)), lastValidBlockHeight: 0n }, m),
+        (m) => appendTransactionMessageInstruction(getSetComputeUnitPriceInstruction({ microLamports: 10_000_000_000n }), m),
+        (m) => appendTransactionMessageInstruction(getRevokeInstruction({ source: key(30), owner: createNoopSigner(w.me) }), m),
+    )))));
+    assert.match(((await takeBack(bytes(priced), w.me, w.shell)) as { error: string }).error, /does more than take access back/);
+    // The site pays, and wrote some bytes as its signature: Otus does not follow them.
+    const site = await wallet();
+    const tx = getTransactionDecoder().decode(bytes(site.transfer(site.me, key(7))));
+    const written = base64(new Uint8Array(getTransactionEncoder().encode({ ...tx, signatures: { ...tx.signatures, [key(7)]: new Uint8Array(64).fill(1) as SignatureBytes } })));
+    result(await site.call('signTransaction', { account: site.me, transactions: [written] }));
+    assert.deepEqual(site.outcomes, [{ phase: 'signed', host: 'jup.ag' }]);
+});
+
+test('following a transaction says expired only when the network said so', async () => {
+    const r = { message: { instructions: [], staticAccounts: [], lifetimeToken: key(9) } } as unknown as Review;
+    const seen = (statuses: (Status | 'fails')[]) => {
+        let i = 0;
+        return { status: async () => { const s = statuses[Math.min(i++, statuses.length - 1)]; if (s === 'fails') throw new Error('no answer'); return s; }, valid: async () => false } as unknown as Chain;
+    };
+    assert.deepEqual(await followed(key(10) as never, r, seen([null, null])), { expired: true });
+    assert.deepEqual(await followed(key(10) as never, r, seen([null, 'fails'])), { expired: false }); // its last read failed: nothing proven
+    assert.deepEqual(await followed(key(10) as never, r, seen([{ error: null, confirmed: true }])), { failed: false });
 });
 
 test('a transfer made in the popup is not signed once its blockhash is too old, and says when it is signed', async () => {

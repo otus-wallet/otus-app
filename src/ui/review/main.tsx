@@ -27,7 +27,19 @@ const listeners = new Set<() => void>();
 const hear = (change: Partial<Heard>) => ((heard = { ...heard, ...change }), listeners.forEach((l) => l()));
 // The request, then its blockhash's life as the network tells it; approved, how it goes.
 port.onMessage.addListener((m: Approval | { life: Life } | { outcome: Outcome }) => hear('life' in m ? { life: m.life } : 'outcome' in m ? { outcome: m.outcome } : { approval: m }));
-port.onDisconnect.addListener(() => answered || hear({ gone: true }));
+// Gone while it was still on its way, Otus stopped following it: that is said, with where to look.
+const going = (o: Outcome | undefined) => !o || o.phase === 'sending' || o.phase === 'waiting';
+port.onDisconnect.addListener(() => {
+    if (!answered) return hear({ gone: true });
+    if (heard.approved && going(heard.outcome)) hear({ outcome: { phase: 'unseen', expired: false, link: heard.outcome && 'link' in heard.outcome ? heard.outcome.link : '' } });
+});
+// While it is on its way, a beat keeps the background awake to follow it.
+setInterval(() => {
+    if (!heard.approved || !going(heard.outcome)) return;
+    try {
+        port.postMessage({ beat: true });
+    } catch {} // the background went
+}, 20_000);
 
 function Window() {
     const now = useSyncExternalStore((l) => (listeners.add(l), () => listeners.delete(l)), () => heard);

@@ -93,7 +93,8 @@ async function landsOn(m: Message, chain: Chain): Promise<boolean> {
  *  the review needs to know of who asks, and whether the site sends it later itself. */
 /** `blockhash`: for a transaction Otus built without one, the blockhash it gets, read while it is reviewed (a
  *  simulation takes any). */
-export type Way = { cluster: Cluster; chain: Chain; site: SiteView; recipient?: Address; later?: boolean; blockhash?: Promise<string>; context: Pick<Context, 'signedBefore' | 'programsBefore' | 'host' | 'own' | 'to'> };
+/** `bare`: why Otus adds no guards, for what needs none (a transaction of its own that only takes access back). */
+export type Way = { cluster: Cluster; chain: Chain; site: SiteView; recipient?: Address; later?: boolean; blockhash?: Promise<string>; bare?: string; context: Pick<Context, 'signedBefore' | 'programsBefore' | 'host' | 'own' | 'to'> };
 
 /**
  * A transaction for this account → reviewed; refused by `checks` when whoever asked says so; shown as reviewed at once,
@@ -113,7 +114,7 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     await checks(r);
     // A Ledger shows a plain SOL transfer in clear, amount and recipient, where guards would leave it only a hash.
     const clear = way.context.own === true && account.ledger !== undefined && plainTransfer(r);
-    const bare = clear ? LEDGER_CLEAR : undefined;
+    const bare = clear ? LEDGER_CLEAR : way.bare;
     // Prepared and its IDLs read while it is shown as reviewed. Squads proposals first: their tokens are named with
     // the transaction's.
     const preparing = Promise.all([prepare(r, account.address, way.chain, way.context.own === true, bare), idlTold(r, way.chain)]);
@@ -222,22 +223,25 @@ export function channel<T>(): { tell: (value: T) => void; follow: (listener: (va
 }
 
 const FOLLOW_EVERY = 2_000; // ms between asking the network about a transaction someone else sends
+const FOLLOW_MOST = 120_000; // ms it is followed at most: past its blockhash's life
 const FOLLOW_DURABLE = 180_000; // ms one on a durable nonce is followed, as it can be sent at any time
 
 /** A signed transaction someone else sends, followed by its id until it lands, or can no longer: its blockhash expired
- *  without it, or, on a durable nonce, a few minutes went by. */
+ *  without it, as the network said with its last answers; or, after a while (longer on a durable nonce), not seen. A
+ *  read that fails proves nothing: it never says expired. */
 export async function followed(id: Signature, r: Review, chain: Chain): Promise<{ failed: boolean } | { expired: boolean }> {
     const lasting = durable(r.message);
-    const until = Date.now() + FOLLOW_DURABLE;
-    const seen = async () => {
-        const s = await chain.status(id).catch(() => null);
-        return s?.confirmed ? { failed: s.error !== null } : null;
-    };
+    const until = Date.now() + (lasting ? FOLLOW_DURABLE : FOLLOW_MOST);
+    const status = () => chain.status(id).catch(() => undefined); // undefined: no answer
     for (;;) {
-        const landed = await seen();
-        if (landed) return landed;
-        if (!lasting && !(await chain.valid(r.message.lifetimeToken).catch(() => true))) return (await seen()) ?? { expired: true };
-        if (lasting && Date.now() > until) return { expired: false };
+        const s = await status();
+        if (s?.confirmed) return { failed: s.error !== null };
+        if (!lasting && s !== undefined && (await chain.valid(r.message.lifetimeToken).catch(() => true)) === false) {
+            const last = await status();
+            if (last?.confirmed) return { failed: last.error !== null };
+            return { expired: last === null };
+        }
+        if (Date.now() > until) return { expired: false };
         await new Promise((done) => setTimeout(done, FOLLOW_EVERY));
     }
 }
