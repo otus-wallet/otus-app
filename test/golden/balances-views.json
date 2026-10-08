@@ -1153,18 +1153,28 @@
     "network": null,
     "balances": [
       {
-        "asset": "SOL",
+        "asset": "Staked SOL",
         "logo": "sol",
         "icon": null,
         "verified": true,
-        "amount": "−50.000005",
+        "amount": "−50",
         "tone": "danger",
         "lines": [
           {
             "note": "To HAgk…Kpqk · Your stake account 3uWi…8KsQ",
             "amount": "−50",
             "tone": "danger"
-          },
+          }
+        ]
+      },
+      {
+        "asset": "SOL",
+        "logo": "sol",
+        "icon": null,
+        "verified": true,
+        "amount": "−0.000005",
+        "tone": "danger",
+        "lines": [
           {
             "note": "Network fee",
             "amount": "−0.000005",
@@ -1317,18 +1327,28 @@
     "network": null,
     "balances": [
       {
-        "asset": "SOL",
+        "asset": "Staked SOL",
         "logo": "sol",
         "icon": null,
         "verified": true,
-        "amount": "−50.000005",
+        "amount": "−50",
         "tone": "plain",
         "lines": [
           {
             "note": "To HAgk…Kpqk · Your stake account 3uWi…8KsQ",
             "amount": "−50",
             "tone": "plain"
-          },
+          }
+        ]
+      },
+      {
+        "asset": "SOL",
+        "logo": "sol",
+        "icon": null,
+        "verified": true,
+        "amount": "−0.000005",
+        "tone": "plain",
+        "lines": [
           {
             "note": "Network fee",
             "amount": "−0.000005",

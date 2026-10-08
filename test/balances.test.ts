@@ -189,7 +189,7 @@ test('your stake’s SOL to a wallet: critical through a program Otus can’t re
     // The stake program's own Withdraw, read in words: where it goes is said, as a transfer's is.
     const { codes, rows, view } = await shown([withdraw], before, after);
     assert.ok(!codes.includes('danger:An asset of yours goes to someone else'), codes.join());
-    assert.match(rows[0], /^SOL −50 To HAgk…Kpqk · Your stake account /);
+    assert.match(rows[0], /^Staked SOL −50 To HAgk…Kpqk · Your stake account /);
     const effect = view.programs.find((p) => p.address === STAKE)?.instructions[0];
     assert.deepEqual([effect?.name, effect?.effects[0].text], ['Withdraw', `50 SOL from your stake account ${short(stake)} to ${short(THIEF)}`]);
 });

@@ -3,7 +3,7 @@
 import { isOffCurveAddress, type Address } from '@solana/kit';
 
 import { amount, cap, quantity, SOL_DECIMALS } from '@otus-wallet/sdk/format';
-import { LIGHTHOUSE, TOKEN_PROGRAMS, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
+import { LIGHTHOUSE, STAKE_PROGRAM, TOKEN_PROGRAMS, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { CORE_PROGRAMS } from '@otus-wallet/sdk/programs/core';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
 import { HIGH_FEE, type Tone, type Verdict } from '@otus-wallet/sdk/review/assess';
@@ -19,7 +19,7 @@ const LOGOS: Record<string, Logo> = { [WSOL]: 'sol', [USDC]: 'usdc', [USDT]: 'us
 type Moved = { key: string; asset: string; logo: Logo; icon: string | null; verified: boolean; note: string; units: bigint; places: number | null; tone?: Tone };
 
 // Your balances: your wallet's SOL, with the network fee and the rent of the token accounts it opens or closes on lines
-// of their own; each token account of yours; your other accounts. Each line says where its asset goes or comes from,
+// of their own; each token account of yours; your stake accounts' SOL, as staked SOL; your other accounts. Each line says where its asset goes or comes from,
 // by its own direction: a wallet that is not yours first, as that is where a drainer sends, then program accounts by
 // the program the transaction gives them to, then your own. A trade out to a program reads "Via". The lines are then
 // put under their asset, which says what they come to.
@@ -81,8 +81,11 @@ export function balances(r: Review, p: Prepared | null, wallet: Address, n: Name
         const t = c.after?.token ?? c.before?.token;
         const moved = lamports(c);
         if (!t) {
-            // SOL leaving an account of yours other than the wallet, as a stake account: which one is said too.
-            solRow([toward('SOL', c.address, moved), cap(n.who(c.address))].filter(Boolean).join(' · '), moved);
+            // SOL moving in an account of yours other than the wallet: which one is said too. In a stake account it is
+            // staked SOL, an asset apart from the wallet's, so staking shows what it moves without opening the lines.
+            const note = [toward('SOL', c.address, moved), cap(n.who(c.address))].filter(Boolean).join(' · ');
+            if ((c.after ?? c.before)?.program === STAKE_PROGRAM) row('staked', 'Staked SOL', 'sol', note, moved, SOL_DECIMALS, true);
+            else solRow(note, moved);
             continue;
         }
         if (t.native) {
