@@ -1,4 +1,4 @@
-// A wallet's transactions as Activity shows them: each in a line ("Swap 1 SOL → 120.58 USDC", "Sent 12 USDT", to
+// A wallet's transactions as Activity shows them: each in a line ("Swap 1 SOL → 120.58 USDC", "Minted 1,000 BONK", to
 // whom, when), what came in and what went out told apart; opened, everything its transaction told: every balance it
 // moved, the rent and the fee apart, the other side whole, its programs, memo and failure. A copy of an address, the
 // kind dust is sent from, is told as one.
@@ -9,7 +9,7 @@ import { alike } from '../../shell/state.ts';
 import { amount, short, sol } from '@otus-wallet/sdk/format';
 import type { Step } from '@otus-wallet/sdk/programs/squads';
 
-export type RowIcon = 'send' | 'receive' | 'swap' | 'shield' | 'box' | 'cross' | 'bang';
+export type RowIcon = 'send' | 'receive' | 'swap' | 'plus' | 'trash' | 'shield' | 'box' | 'cross' | 'bang';
 export type RowTone = 'plain' | 'warn' | 'danger';
 export type Detail = { text: string; tone?: 'ok' | 'warn' | 'danger' | 'dim' };
 /** Words of a line, an amount among them marked as what came in or went out. */
@@ -119,9 +119,16 @@ function headline(a: Activity, n: Naming, outs: Move[], ins: Move[], by: string)
             return { icon: 'send', title: [{ text: a.signed ? 'Sent ' : 'Moved ' }, ...what(lead(outs), outs)], sub: words(a.other ? `to ${n.who(a.other)}` : by) };
         case 'receive':
             return { icon: 'receive', title: [{ text: 'Received ' }, ...what(lead(ins), ins)], sub: words(a.other ? `from ${n.who(a.other)}` : by) };
+        case 'mint': {
+            const token = lead(ins);
+            return { icon: 'plus', title: [{ text: 'Minted ' }, ...what(token, ins)], sub: words(token.mint && a.created.includes(token.mint) ? 'New token' : by) };
+        }
+        case 'burn':
+            return { icon: 'trash', title: [{ text: 'Burned ' }, ...what(lead(outs), outs)], sub: words(by) };
     }
     if (a.rent.yours < 0n) return { icon: 'box', title: words('Closed a token account'), sub: words(`${sol(-a.rent.yours)} SOL of rent freed`) };
     if (a.rent.yours > 0n) return { icon: 'box', title: words('Opened a token account'), sub: words(by) };
+    if (a.rent.opened > 0n) return { icon: 'box', title: words('Opened an account'), sub: words(`${sol(a.rent.opened)} SOL of rent`) };
     const programs = a.programs.map((p) => n.program(p));
     return { icon: 'box', title: words(by || programs[programs.length - 1] || 'Transaction'), sub: words(by ? '' : programs.slice(0, -1).join(', ')) };
 }
@@ -155,6 +162,7 @@ function details(a: Activity, n: Naming, copies: Address | null): Detail[] {
     if (a.rent.yours > 0n) out.push({ text: `${sol(a.rent.yours)} SOL of rent in a token account of yours: back when it closes`, tone: 'dim' });
     if (a.rent.yours < 0n) out.push({ text: `${sol(-a.rent.yours)} SOL of rent freed from a token account of yours, closed`, tone: 'dim' });
     if (a.rent.theirs > 0n) out.push({ text: `${sol(a.rent.theirs)} SOL to open their token account`, tone: 'dim' });
+    if (a.rent.opened > 0n) out.push({ text: `${sol(a.rent.opened)} SOL of rent in the accounts it opened`, tone: 'dim' });
     out.push({ text: `Fee ${sol(a.fee)} SOL, paid by ${n.who(a.payer)}`, tone: 'dim' });
     if (a.memo) out.push({ text: `Memo “${a.memo}”`, tone: 'dim' });
     if (a.programs.length) out.push({ text: a.programs.map((p) => n.program(p)).join(' · '), tone: 'dim' });

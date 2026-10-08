@@ -120,14 +120,14 @@ test('address poisoning: dust from a copy is caught against an address you know,
 });
 
 test('rows: each in a line, opened for all it told; a copy of an address you sent to on the page caught', () => {
-    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n }, signed: true, programs: [] as Address[], main: null, squads: [], memo: null };
+    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], signed: true, programs: [] as Address[], main: null, squads: [], memo: null };
     const naming: Naming = { wallet: WALLET, symbol: (m) => (m === MINT ? 'USDC' : short(m)), who: (a) => (a === WALLET ? `${short(a)} (you)` : a === FRIEND ? 'Fio' : short(a)), program: (a) => (a === JUPITER ? 'Jupiter v6' : short(a)), known: [] };
     const real = key(60);
     const copy = Array.from({ length: 30 }, (_, i) => `${real.slice(0, 4)}${key(61 + i).slice(4, -4)}${real.slice(-4)}`).find((a) => a !== real && isAddress(a)) as Address;
     const [swap, sent, dust, failed, unread] = rows(
         [
             { ...base, signature: 's1', kind: 'swap', other: null, main: JUPITER, programs: [JUPITER], moves: [{ mint: null, units: -1_000_000_000n, decimals: 9 }, { mint: MINT, units: 120_580_000n, decimals: 6 }] },
-            { ...base, signature: 's2', kind: 'send', other: real, moves: [{ mint: MINT, units: -12_000_000n, decimals: 6 }], rent: { yours: 0n, theirs: 2_039_280n } },
+            { ...base, signature: 's2', kind: 'send', other: real, moves: [{ mint: MINT, units: -12_000_000n, decimals: 6 }], rent: { yours: 0n, theirs: 2_039_280n, opened: 0n } },
             { ...base, signature: 's3', kind: 'receive', other: copy, payer: copy, moves: [{ mint: MINT, units: 100n, decimals: 6 }] },
             { ...base, signature: 's4', kind: 'other', error: 'instruction 2: error 6001', main: JUPITER, programs: [JUPITER], other: null, moves: [] },
             { unreadable: 'no meta' },
@@ -147,6 +147,24 @@ test('rows: each in a line, opened for all it told; a copy of an address you sen
     assert.equal(dust.address?.copy, true);
     assert.deepEqual([failed.icon, failed.tone, text(failed.title), failed.details[0].text], ['cross', 'danger', 'Failed · Jupiter v6', 'Failed: instruction 2: error 6001']);
     assert.deepEqual([text(unread.title), unread.signature], ["Otus couldn't read this one", null]);
+});
+
+test('a token made and minted, one burned, an account opened: said as such, rent apart', () => {
+    const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], signed: true, programs: [] as Address[], main: null, squads: [], memo: null, other: null };
+    const naming: Naming = { wallet: WALLET, symbol: (m) => (m === MINT ? 'USDC' : 'LAB'), who: (a) => short(a), program: (a) => short(a), known: [] };
+    const made = key(62);
+    const [minted, burned, opened] = rows(
+        [
+            { ...base, signature: 'm1', kind: 'mint', created: [made], moves: [{ mint: made, units: 1_000_000_000n, decimals: 6 }], rent: { yours: 2_039_280n, theirs: 0n, opened: 1_461_600n } },
+            { ...base, signature: 'm2', kind: 'burn', moves: [{ mint: MINT, units: -30_000_000n, decimals: 6 }] },
+            { ...base, signature: 'm3', kind: 'other', moves: [], rent: { yours: 0n, theirs: 0n, opened: 1_447_680n } },
+        ],
+        naming,
+    );
+    assert.deepEqual([minted.icon, text(minted.title), text(minted.sub)], ['plus', 'Minted 1,000 LAB', 'New token']);
+    assert.ok(minted.details.some((d) => d.text === '0.0014616 SOL of rent in the accounts it opened'));
+    assert.deepEqual([burned.icon, text(burned.title)], ['trash', 'Burned 30 USDC']);
+    assert.deepEqual([text(opened.title), text(opened.sub)], ['Opened an account', '0.00144768 SOL of rent']);
 });
 
 test('what left the wallet unsigned, a delegate moved: told apart, and never taken as an address you know', async () => {
