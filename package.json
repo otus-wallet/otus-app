@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "description": "Otus's browser wallet: a Chrome extension that reviews every transaction before you sign, on @solana/kit",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=22.18"
   },
