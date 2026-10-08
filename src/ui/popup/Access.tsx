@@ -95,7 +95,7 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
             {frozen.length > 0 && (
                 <Part title="Issuers can freeze">
                     <p className="text-[11px] font-bold">{frozen.join(', ')}</p>
-                    <p className="text-[10.5px] text-ink-3">Each issuer can freeze your account of its token, which moves nothing. Most stablecoins come with this.</p>
+                    <p className="text-[10.5px] text-ink-3">{`${frozen.length === 1 ? `Its issuer can freeze your ${frozen[0]} account` : 'Their issuers can freeze your accounts of them'}. That moves nothing, and most stablecoins come with it.`}</p>
                 </Part>
             )}
             {read.data && (
