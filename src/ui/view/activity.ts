@@ -4,12 +4,15 @@
 // kind dust is sent from, is told as one.
 import type { Address } from '@solana/kit';
 
-import type { Activity, Move } from '@otus-wallet/sdk/activity/summary';
+import { COMPUTE_BUDGET_PROGRAM_ADDRESS } from '@solana-program/compute-budget';
+
+import type { Act, Activity, Move } from '@otus-wallet/sdk/activity/summary';
+import { LIGHTHOUSE } from '@otus-wallet/sdk/programs/addresses';
 import { alike } from '../../shell/state.ts';
 import { amount, short, sol } from '@otus-wallet/sdk/format';
 import type { Step } from '@otus-wallet/sdk/programs/squads';
 
-export type RowIcon = 'send' | 'receive' | 'swap' | 'plus' | 'trash' | 'shield' | 'box' | 'cross' | 'bang';
+export type RowIcon = 'send' | 'receive' | 'swap' | 'plus' | 'trash' | 'key' | 'refresh' | 'shield' | 'box' | 'cross' | 'bang';
 export type RowTone = 'plain' | 'warn' | 'danger';
 export type Detail = { text: string; tone?: 'ok' | 'warn' | 'danger' | 'dim' };
 /** Words of a line, an amount among them marked as what came in or went out. */
@@ -126,11 +129,39 @@ function headline(a: Activity, n: Naming, outs: Move[], ins: Move[], by: string)
         case 'burn':
             return { icon: 'trash', title: [{ text: 'Burned ' }, ...what(lead(outs), outs)], sub: words(by) };
     }
+    const act = a.acts.find((x) => x.kind !== 'nonce' || a.acts.length === 1); // a nonce moved on, said when it is all there is
+    if (act) return actLine(act, n);
     if (a.rent.yours < 0n) return { icon: 'box', title: words('Closed a token account'), sub: words(`${sol(-a.rent.yours)} SOL of rent freed`) };
     if (a.rent.yours > 0n) return { icon: 'box', title: words('Opened a token account'), sub: words(by) };
     if (a.rent.opened > 0n) return { icon: 'box', title: words('Opened an account'), sub: words(`${sol(a.rent.opened)} SOL of rent`) };
-    const programs = a.programs.map((p) => n.program(p));
-    return { icon: 'box', title: words(by || programs[programs.length - 1] || 'Transaction'), sub: words(by ? '' : programs.slice(0, -1).join(', ')) };
+    // Named by its programs, but never by those Otus adds to what it signs (limits, guards).
+    const programs = a.programs.filter((p) => p !== COMPUTE_BUDGET_PROGRAM_ADDRESS && p !== LIGHTHOUSE).map((p) => n.program(p));
+    return { icon: 'box', title: words(by || programs[0] || 'Transaction'), sub: words(by ? '' : programs.slice(1).join(', ')) };
+}
+
+const ROLE_NAMES = { mint: 'mint', freeze: 'freeze', close: 'close' } as const;
+const U64_MAX = 2n ** 64n - 1n; // an allowance without end
+
+// What a transaction did that moved no balance, in a line.
+function actLine(act: Act, n: Naming): { icon: RowIcon; title: Part[]; sub: Part[] } {
+    const words = (s: string): Part[] => [{ text: s }];
+    const symbol = (mint: Address | null) => (mint ? n.symbol(mint) : 'tokens');
+    switch (act.kind) {
+        case 'approve': {
+            const all = act.units === U64_MAX;
+            const units = act.decimals === null ? `${act.units} units of` : amount(act.units, act.decimals, false);
+            return { icon: 'key', title: words('Approved a delegate'), sub: words(`${n.who(act.delegate)} can move ${all ? 'all your' : `up to ${units}`} ${symbol(act.mint)}`) };
+        }
+        case 'revoke':
+            return { icon: 'key', title: words('Revoked a delegate'), sub: words(`on your ${symbol(act.mint)} account`) };
+        case 'authority':
+            if (act.role === 'owner') return { icon: 'key', title: words('Gave a token account away'), sub: words(act.to ? `to ${n.who(act.to)}` : '') };
+            return { icon: 'key', title: words(`Changed a ${ROLE_NAMES[act.role]} authority`), sub: words(act.to ? `to ${n.who(act.to)}` : 'Removed it') };
+        case 'nonce':
+            return { icon: 'refresh', title: words('Moved a nonce on'), sub: words('What was signed on it can no longer run') };
+        case 'assign':
+            return { icon: 'bang', title: words(act.account === n.wallet ? 'Gave your wallet to a program' : 'Gave an account to a program'), sub: words(n.program(act.program)) };
+    }
 }
 
 // A name for an address when Otus has one: yours, a contact's, a program's.
