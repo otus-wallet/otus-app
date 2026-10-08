@@ -55,8 +55,8 @@
     "proposals": [],
     "changes": [
       {
-        "title": "Your wallet would no longer be a plain wallet",
-        "note": "A program takes it over: 2VDW…SL6Z",
+        "title": "Your wallet would no longer be yours",
+        "note": "A program takes it over, with all it holds: 2VDW…SL6Z",
         "tone": "danger"
       },
       {
@@ -141,8 +141,8 @@
     "findings": [
       {
         "tone": "danger",
-        "title": "Your wallet would no longer be a plain wallet",
-        "note": "A program takes it over: 2VDW…SL6Z"
+        "title": "Your wallet would no longer be yours",
+        "note": "A program takes it over, with all it holds: 2VDW…SL6Z"
       },
       {
         "tone": "danger",
