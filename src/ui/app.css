@@ -1,0 +1,161 @@
+/* Otus's pages, built with Tailwind and shadcn/ui: the OLED look as tokens. Black, pixel titles, monospace text,
+   mint / amber / red for ok / warning / danger. shadcn's components read their colours from the tokens below. */
+@import "tailwindcss" source(none);
+@import "tw-animate-css";
+@source "./";
+
+@font-face {
+    font-family: 'Silkscreen';
+    src: url('fonts/Silkscreen.woff2') format('woff2');
+    font-weight: 400;
+    font-display: block;
+}
+@font-face {
+    font-family: 'JetBrains Mono';
+    src: url('fonts/JetBrainsMono.woff2') format('woff2');
+    font-weight: 100 800;
+    font-display: block;
+}
+
+:root {
+    color-scheme: dark;
+    --radius: 3px;
+    --background: #000000;
+    --foreground: #e6eef8;
+    --card: #05080b;
+    --card-foreground: #e6eef8;
+    --popover: #05080b;
+    --popover-foreground: #e6eef8;
+    --primary: #e6eef8;
+    --primary-foreground: #000000;
+    --secondary: #0a0f14;
+    --secondary-foreground: #e6eef8;
+    --muted: #0a0f14;
+    --muted-foreground: #6f8399;
+    --accent: #0a0f14;
+    --accent-foreground: #e6eef8;
+    --destructive: #ff5c5c;
+    --border: #263240;
+    --input: #263240;
+    --ring: #3df2a6;
+}
+
+@theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --radius-sm: 2px;
+    --radius-md: var(--radius);
+    --radius-lg: 4px;
+    --radius-xl: 6px;
+    /* Otus's own. */
+    --color-panel: #05080b;
+    --color-hover: #0a0f14;
+    --color-ink: #e6eef8;
+    --color-ink-2: #93a4b8;
+    --color-ink-3: #6f8399;
+    --color-rule: #263240;
+    --color-rule-2: #1e2833;
+    --color-ok: #3df2a6;
+    --color-ok-bg: #062419;
+    --color-ok-bd: #1c6b4c;
+    --color-warn: #ffc247;
+    --color-warn-bg: #2a1e04;
+    --color-warn-bd: #7a5a12;
+    --color-danger: #ff5c5c;
+    --color-danger-bg: #2c0909;
+    --color-danger-bd: #8a2323;
+    --color-info: #62b6ff;
+}
+
+/* The fonts, as variables the pages use: everything in JetBrains Mono, titles and labels in Silkscreen. */
+@theme {
+    --font-sans: 'JetBrains Mono', ui-monospace, monospace;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --font-pixel: 'Silkscreen', monospace;
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+    /* What can be clicked or chosen shows the hand: buttons and their like (Tailwind leaves them the arrow), the choices
+       of a menu, a label that ticks its box. */
+    button:not(:disabled),
+    [role='button']:not([aria-disabled='true']),
+    [role='option']:not([data-disabled]),
+    [role='menuitem']:not([data-disabled]),
+    [role='tab'],
+    label:has(input:not(:disabled), button:not(:disabled)),
+    summary {
+        cursor: pointer;
+    }
+    html,
+    body {
+        @apply bg-background text-foreground;
+    }
+    ::selection {
+        background: var(--color-ok-bg);
+        color: var(--color-ok);
+    }
+    [hidden] {
+        display: none !important;
+    }
+    /* Otus's line icons: drawn in the text's colour, with square ends, as the mockups draw them. */
+    svg.icon {
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: square;
+        stroke-linejoin: miter;
+        flex: none;
+    }
+    svg.tile {
+        display: block;
+        flex: none;
+    }
+    /* Scrolling bodies: a thin bar in the rules' colour, brighter under the pointer. */
+    .scroll {
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-rule) transparent;
+    }
+    .scroll:hover {
+        scrollbar-color: var(--color-ink-3) transparent;
+    }
+}
+
+/* Outside any layer: Chrome gives extension pages a font of its own (system-ui, at 75%), in a sheet no layered rule
+   overrides. */
+html,
+body {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+body {
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Labels and titles in the pixel font, as the mockups draw them. */
+@utility pixel {
+    font-family: 'Silkscreen', monospace;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}

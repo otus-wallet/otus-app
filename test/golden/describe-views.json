@@ -1,0 +1,454 @@
+[
+  {
+    "kind": "transaction",
+    "site": {
+      "origin": "https://app.example.com",
+      "host": "app.example.com",
+      "note": "Connected · 3 signatures",
+      "tone": "plain"
+    },
+    "account": {
+      "label": "Me",
+      "address": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+    },
+    "verdict": "danger",
+    "title": "Not safe",
+    "sub": "2 critical · 3 warnings",
+    "chip": {
+      "text": "2 critical",
+      "tone": "danger"
+    },
+    "signer": "ready",
+    "network": null,
+    "balances": [
+      {
+        "asset": "2MNu…wfT9",
+        "logo": "chain",
+        "icon": null,
+        "verified": false,
+        "amount": "-1000 units",
+        "tone": "danger",
+        "lines": [
+          {
+            "note": "Your account",
+            "amount": "-1000 units",
+            "tone": "danger"
+          }
+        ]
+      },
+      {
+        "asset": "SOL",
+        "logo": "sol",
+        "icon": null,
+        "verified": true,
+        "amount": "−0.000005",
+        "tone": "danger",
+        "lines": [
+          {
+            "note": "Network fee",
+            "amount": "−0.000005",
+            "tone": "plain"
+          }
+        ]
+      }
+    ],
+    "proposals": [],
+    "changes": [
+      {
+        "title": "Your wallet would no longer be a plain wallet",
+        "note": "A program takes it over: 2VDW…SL6Z",
+        "tone": "danger"
+      },
+      {
+        "title": "A token account of yours changes owner",
+        "note": "New owner 2RJD…gzmr. You lose control of it.",
+        "tone": "danger"
+      },
+      {
+        "title": "A token account of yours gets a delegate, or a bigger allowance",
+        "note": "2RJD…gzmr could move its tokens",
+        "tone": "warn"
+      }
+    ],
+    "accounts": 4,
+    "hash": "YoYK 7tTw thN9 nFSp 9xCR E6De CqHF aALd ho9D UpKt M32",
+    "counts": {
+      "programs": 1,
+      "instructions": 1,
+      "inner": 0
+    },
+    "programs": [
+      {
+        "name": "Unknown program",
+        "address": "2VDW9dFE1ZXz4zWAbaBDQFynNVdRpQ73HyfSHMzBSL6Z",
+        "standing": "unknown",
+        "tone": "danger",
+        "sub": "Uses 2 of your accounts",
+        "subTone": "danger",
+        "meta": "",
+        "metaTone": "plain",
+        "inner": "",
+        "instructions": [
+          {
+            "number": 1,
+            "name": "Unknown instruction",
+            "args": "No plugin reads it · data none",
+            "source": "unknown",
+            "accounts": [
+              {
+                "name": "4vJ9…kLKi (you)",
+                "role": "account 1 · signer · writable",
+                "tone": "danger"
+              },
+              {
+                "name": "Your 2MNu…wfT9 account",
+                "role": "account 2 · writable",
+                "tone": "danger"
+              },
+              {
+                "name": "8qbH…VfeR",
+                "role": "account 3 · writable · new",
+                "tone": "plain"
+              }
+            ],
+            "effects": [
+              {
+                "text": "−0.000005 SOL from 4vJ9…kLKi (you)",
+                "tone": "danger"
+              },
+              {
+                "text": "4vJ9…kLKi (you) now belongs to 2VDW…SL6Z",
+                "tone": "danger"
+              },
+              {
+                "text": "-1000 units 2MNu…wfT9 from your 2MNu…wfT9 account",
+                "tone": "danger"
+              },
+              {
+                "text": "Your 2MNu…wfT9 account now belongs to 2RJD…gzmr",
+                "tone": "danger"
+              },
+              {
+                "text": "2RJD…gzmr may move the tokens in your 2MNu…wfT9 account",
+                "tone": "danger"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "findings": [
+      {
+        "tone": "danger",
+        "title": "Your wallet would no longer be a plain wallet",
+        "note": "A program takes it over: 2VDW…SL6Z"
+      },
+      {
+        "tone": "danger",
+        "title": "A token account of yours changes owner",
+        "note": "New owner 2RJD…gzmr. You lose control of it."
+      },
+      {
+        "tone": "warn",
+        "title": "A token account of yours gets a delegate, or a bigger allowance",
+        "note": "2RJD…gzmr could move its tokens"
+      },
+      {
+        "tone": "warn",
+        "title": "You send almost all of one of your tokens",
+        "note": "2MNu…wfT9"
+      },
+      {
+        "tone": "warn",
+        "title": "2VDW…SL6Z is not a program Otus knows",
+        "note": "It uses 2 of your accounts · Otus can't read what it does"
+      },
+      {
+        "tone": "ok",
+        "title": "Changes",
+        "note": "-1000 units 2MNu…wfT9"
+      },
+      {
+        "tone": "ok",
+        "title": "Normal network fee",
+        "note": "0.000005 SOL for this transaction"
+      },
+      {
+        "tone": "ok",
+        "title": "Known site",
+        "note": "app.example.com · signed for before"
+      }
+    ],
+    "fee": "0.000005 SOL",
+    "guards": {
+      "held": true,
+      "text": "2 guards lock your accounts to what you see"
+    },
+    "added": [
+      "Lighthouse: 2 guards on your accounts",
+      "Compute Budget: 208,000 compute units"
+    ],
+    "cluster": "solana:mainnet",
+    "expiry": null
+  },
+  {
+    "kind": "transaction",
+    "site": {
+      "origin": "https://app.example.com",
+      "host": "app.example.com",
+      "note": "Connected · 3 signatures",
+      "tone": "plain"
+    },
+    "account": {
+      "label": "Me",
+      "address": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+    },
+    "verdict": "warn",
+    "title": "Caution",
+    "sub": "1 warning · nothing critical",
+    "chip": {
+      "text": "1 warning",
+      "tone": "warn"
+    },
+    "signer": "none",
+    "network": "devnet",
+    "balances": [
+      {
+        "asset": "SOL",
+        "logo": "sol",
+        "icon": null,
+        "verified": true,
+        "amount": "−0.100005",
+        "tone": "plain",
+        "lines": [
+          {
+            "note": "To 8qbH…VfeR",
+            "amount": "−0.1",
+            "tone": "plain"
+          },
+          {
+            "note": "Network fee",
+            "amount": "−0.000005",
+            "tone": "plain"
+          }
+        ]
+      }
+    ],
+    "proposals": [],
+    "changes": [],
+    "accounts": 3,
+    "hash": "9wVr LC8S qamf MPAa QDhh 31MK fwyi uVDt 57sP KdwN F3yi",
+    "counts": {
+      "programs": 1,
+      "instructions": 1,
+      "inner": 0
+    },
+    "programs": [
+      {
+        "name": "System Program",
+        "address": "11111111111111111111111111111111",
+        "standing": "known",
+        "tone": "ok",
+        "sub": "Uses 1 of your accounts",
+        "subTone": "plain",
+        "meta": "",
+        "metaTone": "plain",
+        "inner": "",
+        "instructions": [
+          {
+            "number": 1,
+            "name": "TransferSol",
+            "args": "0.1 SOL → 8qbH…VfeR",
+            "source": "core",
+            "accounts": [
+              {
+                "name": "4vJ9…kLKi (you)",
+                "role": "source · signer · writable",
+                "tone": "plain"
+              },
+              {
+                "name": "8qbH…VfeR",
+                "role": "destination · writable · new",
+                "tone": "plain"
+              }
+            ],
+            "effects": [
+              {
+                "text": "0.1 SOL from 4vJ9…kLKi (you) to 8qbH…VfeR",
+                "tone": "plain"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "findings": [
+      {
+        "tone": "warn",
+        "title": "First transaction for this site",
+        "note": "You never signed one for it from this wallet"
+      },
+      {
+        "tone": "ok",
+        "title": "Changes",
+        "note": "−0.1 SOL"
+      },
+      {
+        "tone": "ok",
+        "title": "No owner or authority changes",
+        "note": "Owners and authorities stay as they are"
+      },
+      {
+        "tone": "ok",
+        "title": "Normal network fee",
+        "note": "0.000005 SOL for this transaction"
+      },
+      {
+        "tone": "ok",
+        "title": "Known programs",
+        "note": "System Program"
+      }
+    ],
+    "fee": "0.000005 SOL",
+    "guards": {
+      "held": true,
+      "text": "One guard locks your account to what you see"
+    },
+    "added": [
+      "Lighthouse: one guard on your accounts",
+      "Compute Budget: 204,000 compute units"
+    ],
+    "cluster": "solana:devnet",
+    "expiry": null
+  },
+  {
+    "kind": "transaction",
+    "site": {
+      "origin": "https://app.example.com",
+      "host": "app.example.com",
+      "note": "Connected · 3 signatures",
+      "tone": "plain"
+    },
+    "account": {
+      "label": "Me",
+      "address": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+    },
+    "verdict": "ok",
+    "title": "Looks safe",
+    "sub": "1 notice",
+    "chip": {
+      "text": "1 notice",
+      "tone": "notice"
+    },
+    "signer": "ready",
+    "network": null,
+    "balances": [
+      {
+        "asset": "SOL",
+        "logo": "sol",
+        "icon": null,
+        "verified": true,
+        "amount": "−0.100005",
+        "tone": "plain",
+        "lines": [
+          {
+            "note": "To 8qbH…VfeR",
+            "amount": "−0.1",
+            "tone": "plain"
+          },
+          {
+            "note": "Network fee",
+            "amount": "−0.000005",
+            "tone": "plain"
+          }
+        ]
+      }
+    ],
+    "proposals": [],
+    "changes": [],
+    "accounts": 3,
+    "hash": "9wVr LC8S qamf MPAa QDhh 31MK fwyi uVDt 57sP KdwN F3yi",
+    "counts": {
+      "programs": 1,
+      "instructions": 1,
+      "inner": 0
+    },
+    "programs": [
+      {
+        "name": "System Program",
+        "address": "11111111111111111111111111111111",
+        "standing": "known",
+        "tone": "ok",
+        "sub": "Uses 1 of your accounts",
+        "subTone": "plain",
+        "meta": "",
+        "metaTone": "plain",
+        "inner": "",
+        "instructions": [
+          {
+            "number": 1,
+            "name": "TransferSol",
+            "args": "0.1 SOL → 8qbH…VfeR",
+            "source": "core",
+            "accounts": [
+              {
+                "name": "4vJ9…kLKi (you)",
+                "role": "source · signer · writable",
+                "tone": "plain"
+              },
+              {
+                "name": "8qbH…VfeR",
+                "role": "destination · writable · new",
+                "tone": "plain"
+              }
+            ],
+            "effects": [
+              {
+                "text": "0.1 SOL from 4vJ9…kLKi (you) to 8qbH…VfeR",
+                "tone": "plain"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "findings": [
+      {
+        "tone": "notice",
+        "title": "New site",
+        "note": "You first signed a transaction for it 1 hour ago"
+      },
+      {
+        "tone": "ok",
+        "title": "Changes",
+        "note": "−0.1 SOL"
+      },
+      {
+        "tone": "ok",
+        "title": "No owner or authority changes",
+        "note": "Owners and authorities stay as they are"
+      },
+      {
+        "tone": "ok",
+        "title": "Normal network fee",
+        "note": "0.000005 SOL for this transaction"
+      },
+      {
+        "tone": "ok",
+        "title": "Known programs",
+        "note": "System Program"
+      }
+    ],
+    "fee": "0.000005 SOL",
+    "guards": {
+      "held": true,
+      "text": "One guard locks your account to what you see"
+    },
+    "added": [
+      "Lighthouse: one guard on your accounts",
+      "Compute Budget: 204,000 compute units"
+    ],
+    "cluster": "solana:mainnet",
+    "expiry": null
+  }
+]

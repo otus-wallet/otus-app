@@ -1,0 +1,23 @@
+// The popup's page: React, with its query cache and shadcn/ui's tooltips around it, and the beat that keeps Otus open
+// while it is. It draws once the session's last balances are in the cache, so they show at once.
+import { QueryClientProvider } from '@tanstack/react-query';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+
+import { TooltipProvider } from '../components/ui/tooltip.tsx';
+import { stayOpen } from '../open.ts';
+import { App } from './App.tsx';
+import { queries, restore } from './query.ts';
+
+stayOpen();
+void restore().finally(() =>
+    createRoot(document.getElementById('app')!).render(
+        <StrictMode>
+            <QueryClientProvider client={queries}>
+                <TooltipProvider delayDuration={150}>
+                    <App />
+                </TooltipProvider>
+            </QueryClientProvider>
+        </StrictMode>,
+    ),
+);

@@ -1,0 +1,18 @@
+{
+    "manifest_version": 3,
+    "name": "Otus Wallet",
+    "version": "0.1.0",
+    "description": "A Solana wallet that gives you full, granular control over every transaction.",
+    "minimum_chrome_version": "140",
+    "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
+    "action": { "default_popup": "home.html", "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png" } },
+    "background": { "service_worker": "background.js" },
+    "content_scripts": [
+        { "matches": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"], "js": ["page.js"], "run_at": "document_start", "world": "MAIN" },
+        { "matches": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"], "js": ["content.js"], "run_at": "document_start" }
+    ],
+    "permissions": ["storage", "alarms"],
+    "content_security_policy": {
+        "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'; worker-src 'self'; media-src 'none'; font-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*"
+    }
+}

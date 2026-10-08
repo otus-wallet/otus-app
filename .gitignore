@@ -1,0 +1,14 @@
+# Build outputs
+node_modules/
+dist/
+otus.zip
+
+# Secrets
+.env
+*.env
+!*.env.example
+
+# Local
+.DS_Store
+.idea/
+*.log
