@@ -1,5 +1,5 @@
 // A transaction's three steps: where your balances go, what each program does, and the verdict.
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { Button } from '../components/ui/button.tsx';
 import { Checkbox } from '../components/ui/checkbox.tsx';
@@ -336,6 +336,26 @@ function Step({ ix, open, flip }: { ix: InstructionView; open: boolean; flip: ()
                 </div>
             )}
         </li>
+    );
+}
+
+/** The transaction as it will be signed, copied in base64 with a click, a check for a moment: to check it elsewhere. */
+export function CopyTransaction({ wire }: { wire: string }) {
+    const [done, setDone] = useState(false);
+    useEffect(() => {
+        if (!done) return;
+        const t = setTimeout(() => setDone(false), 1500);
+        return () => clearTimeout(t);
+    }, [done]);
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Copy transaction data" className={cn('size-7 text-ink-3 hover:text-ink', done && 'text-ok hover:text-ok')} onClick={() => void navigator.clipboard.writeText(wire).then(() => setDone(true))}>
+                    <Icon name={done ? 'check' : 'copy'} size={14} stroke={done ? 2.5 : 2} />
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent sideOffset={6}>Copy transaction data</TooltipContent>
+        </Tooltip>
     );
 }
 

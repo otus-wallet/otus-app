@@ -9,7 +9,7 @@ import { short } from '../dom.ts';
 import type { AccountView, Approval, Life, TransactionView } from '../view.ts';
 import { Answer, Block, Frame, Heading, Left, Notice, Steps, useArmed, useNow, WATCH_ONLY } from './Frame.tsx';
 import { OnLedger } from './Ledger.tsx';
-import { Balances, Programs, Verdict } from './Transaction.tsx';
+import { Balances, CopyTransaction, Programs, Verdict } from './Transaction.tsx';
 
 /** No, or yes: for a Ledger account, with the signature its device made (base64); to connect, with another of your
  *  accounts, chosen in the window. */
@@ -183,8 +183,15 @@ function Transaction({ t, answers, expiry, died }: { t: TransactionView; answers
             </>
         );
     };
+    // Between the site and the account: the time left to sign, and the transaction to copy once prepared.
+    const top = (expiry || t.wire) && (
+        <span className="flex items-center gap-1.5">
+            {expiry && <Left from={expiry.from} until={expiry.until} now={now} />}
+            {t.wire && <CopyTransaction wire={t.wire} />}
+        </span>
+    );
     return (
-        <Frame site={t.site} account={t.account} network={t.network} steps={<Steps at={step} reached={reached} go={go} />} chip={t.preparing ? undefined : t.chip} left={expiry && <Left from={expiry.from} until={expiry.until} now={now} />} page={step} actions={actions()}>
+        <Frame site={t.site} account={t.account} network={t.network} steps={<Steps at={step} reached={reached} go={go} />} chip={t.preparing ? undefined : t.chip} left={top} page={step} actions={actions()}>
             {expired && (
                 <Notice>
                     Its <span className="font-bold text-warn">blockhash expired</span> before you signed it, so nothing was sent. {expiry?.refresh ? 'Building it again takes a fresh one.' : 'Ask the site for it again.'}

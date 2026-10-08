@@ -1,6 +1,6 @@
 // What the approval window shows, worked out in the background from the review: text and tones only. The window
 // renders it and decides nothing.
-import type { Address } from '@solana/kit';
+import { getBase64Decoder, type Address } from '@solana/kit';
 
 import { plural, sol } from '@otus-wallet/sdk/format';
 import type { IdlInstruction } from '@otus-wallet/sdk/idl/idl';
@@ -72,6 +72,7 @@ export type TransactionView = {
     changes: Line[]; // what you would lose, or that it would fail: before anything else
     accounts: number; // how many accounts the transaction involves
     hash: string;
+    wire: string; // the transaction as it will be signed, base64, to check it elsewhere; empty while it is prepared
     counts: { programs: number; instructions: number; inner: number };
     programs: ProgramView[];
     findings: Line[];
@@ -139,6 +140,7 @@ export function describe(r: Review, p: Prepared | null, { site, account, signer,
         changes: findings.filter((f) => FIRST.has(f.code) && f.level !== 'ok').map((f) => ({ title: f.text, note: note(f), tone: f.level })),
         accounts: r.assessment.kinds.size,
         hash: p ? (p.hash.match(/.{1,4}/g)?.join(' ') ?? p.hash) : '', // of the message signed: the site's, with guards and fees when prepared
+        wire: p ? getBase64Decoder().decode(p.bytes) : '',
         counts: { programs: r.assessment.programs.length, instructions: r.message.instructions.length, inner: r.simulation.inner.reduce((k, g) => k + g.calls.length, 0) },
         programs: programs(r, findings, names(r, known, wallet, mainnet, true), verdict, told, named),
         findings: findings.map((f) => ({ tone: f.level, title: f.text, note: note(f) })),
