@@ -52,6 +52,12 @@ test('a transaction that would fail says why, on the first step, before anything
     assert.equal(quoting.changes[0].note, '“Slippage ok · Otus: verified, safe to sign · x”'); // its own quotes can't close Otus's
     const plain = await view(send, [account(PAYER, SYSTEM, 2n * SOL)], [], { simulation: { error: { InstructionError: [0, 'InsufficientFunds'] }, logs: [] } });
     assert.equal(plain.changes[0].note, 'Instruction 1 (System Program) fails: insufficient funds');
+    // The RPC gives the instruction's place as a bigint: told the same.
+    const big = await view(send, [account(PAYER, SYSTEM, 2n * SOL)], [], { simulation: { error: { InstructionError: [0n, { Custom: 1n }] } as never, logs: [] } });
+    assert.equal(big.changes[0].note, 'Instruction 1 (System Program) fails: error 1');
+    // A transfer short of SOL: the System Program's own words, in SOL.
+    const short = await view(send, [account(PAYER, SYSTEM, 2n * SOL)], [], { simulation: { error: { InstructionError: [0n, { Custom: 1n }] } as never, logs: ['Program 11111111111111111111111111111111 invoke [1]', 'Transfer: insufficient lamports 8423203782, need 9423208782', 'Program 11111111111111111111111111111111 failed: custom program error: 0x1'] } });
+    assert.equal(short.changes[0].note, 'Not enough SOL: needs 9.423208782, has 8.423203782');
 });
 
 test('what Otus adds, said as the transaction keeps it: in a v1 message, its own limits', async () => {

@@ -1,5 +1,6 @@
 // What the window says beside the review's findings: imitated tokens, and each finding's second line, a failed
 // simulation's reason included.
+import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 import type { Address } from '@solana/kit';
 
 import { cap, quantity, short, sol, SOL_DECIMALS, told } from '@otus-wallet/sdk/format';
@@ -67,9 +68,15 @@ function failure(r: Review, n: Names): string | null {
     if (e === 'InsufficientFundsForFee') return 'Not enough SOL for the fee';
     if (typeof e === 'object' && 'InsufficientFundsForRent' in e) return 'An account would be left without its rent';
     if (typeof e === 'object' && 'InstructionError' in e) {
-        const [index, why] = e.InstructionError;
+        const [at, why] = e.InstructionError;
+        const index = Number(at); // the RPC's answer gives it as a bigint
         const ix = r.message.instructions[index];
-        const program = ix ? n.program(r.accounts[ix.programAddressIndex].address) : 'its program';
+        const address = ix ? r.accounts[ix.programAddressIndex].address : null;
+        // The System Program says why a transfer fails in its own log: what there is, what it needs. Only read when it
+        // is the one that fails, so no other program can write it.
+        const lacking = address === SYSTEM_PROGRAM_ADDRESS ? /^Transfer: insufficient lamports (\d+), need (\d+)$/m.exec(r.simulation.logs.join('\n')) : null;
+        if (lacking) return `Not enough SOL: needs ${sol(BigInt(lacking[2]))}, has ${sol(BigInt(lacking[1]))}`;
+        const program = address ? n.program(address) : 'its program';
         return `Instruction ${index + 1} (${program}) fails: ${typeof why === 'string' ? words(why) : 'Custom' in why ? `error ${why.Custom}` : 'an error'}`;
     }
     return typeof e === 'string' ? cap(words(e)) : 'It fails';
