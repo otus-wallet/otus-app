@@ -10,8 +10,15 @@ it in as much detail as you want.
 - Keys sealed on your device (AES-256-GCM, password through Argon2id), or on a Ledger.
 - Works with any Solana app through Wallet Standard.
 
+The review, the guards and the decoders are [@otus-wallet/sdk](https://github.com/otus-wallet/otus-sdk), usable on
+their own.
+
 ## Build
 
+Until the SDK is on npm, clone it next to this repo:
+
+    git clone https://github.com/otus-wallet/otus-sdk ../otus-sdk
+    (cd ../otus-sdk && npm ci && npm run build)
     npm ci
     npm run build      # or: npm run watch
 
