@@ -1,7 +1,7 @@
 // Squads v4, the multisig most Solana programs and treasuries are held by. What its proposals do is out of sight: a
 // vault transaction carries the transaction the vault will run as bytes, and voting or executing names only accounts.
 // This reads them: its instructions (by their Anchor discriminators), the transaction message a proposal carries, the
-// accounts that keep proposals, and the addresses they live at. Pure; layouts from its on-chain IDL (v2.0.0).
+// accounts that keep proposals, and the addresses they live at. Pure; layouts from its onchain IDL (v2.0.0).
 import { sha256 } from '@noble/hashes/sha2.js';
 import { address, getAddressDecoder, getAddressEncoder, getProgramDerivedAddress, getU32Encoder, getU64Encoder, getU8Encoder, type Address, type ReadonlyUint8Array } from '@solana/kit';
 

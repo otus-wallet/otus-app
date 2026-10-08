@@ -412,7 +412,7 @@ function Pending({ account, to, lifetime, reject }: { account: AccountView; to: 
     );
 }
 
-// A signed transfer, in the same frame: on its way, then sent, failed on chain, or not sent. One that did not go builds
+// A signed transfer, in the same frame: on its way, then sent, failed onchain, or not sent. One that did not go builds
 // again with a fresh blockhash.
 function Outcome({ account, to, outcome, leave, again, settings }: { account: AccountView; to: string; outcome: 'sending' | Reply; leave: (sent: boolean) => void; again: () => void; settings: Settings }) {
     const signature = outcome !== 'sending' && typeof outcome.result?.signature === 'string' ? outcome.result.signature : null;
@@ -460,7 +460,7 @@ function told(outcome: 'sending' | Reply): [Tone, string, string] {
     if (outcome === 'sending') return ['plain', 'Sending', 'Signed. The network confirms it in a few seconds.'];
     if (!outcome.ok) return ['danger', 'Not sent', cap(outcome.error ?? 'it failed')];
     if (outcome.result?.outcome === 'confirmed') return ['ok', 'Sent', 'Confirmed by the network.'];
-    if (outcome.result?.outcome === 'failed') return ['danger', 'Failed on chain', 'It landed and failed: only the fee was spent.'];
+    if (outcome.result?.outcome === 'failed') return ['danger', 'Failed onchain', 'It landed and failed: only the fee was spent.'];
     return ['warn', 'Not confirmed yet', 'It may still land: check it before sending again.'];
 }
 

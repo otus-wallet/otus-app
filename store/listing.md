@@ -14,7 +14,7 @@ Texts for the developer dashboard, field by field. Keep them true to what the co
 
   Every transaction a site asks you to sign is simulated first and explained: what leaves your accounts and where it goes, what each program does, and whether anything takes control of an account of yours. Otus flags drains, look-alike sites, unknown programs and authority changes, and says plainly what it found.
 
-  When you alone sign, Otus adds guards (Lighthouse assertions) that make the transaction fail on chain if your accounts would end up worse than what you reviewed.
+  When you alone sign, Otus adds guards (Lighthouse assertions) that make the transaction fail onchain if your accounts would end up worse than what you reviewed.
 
   - Create or import a wallet (recovery phrase or private key), or watch an address.
   - Send SOL and tokens, with checks on the address you type.

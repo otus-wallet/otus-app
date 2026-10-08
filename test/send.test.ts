@@ -50,7 +50,7 @@ test('preflight skipped (the setting): the first send asks for none either', asy
     assert.deepEqual(sent, [false, false]);
 });
 
-test('returns the error of a transaction that failed on-chain', async () => {
+test('returns the error of a transaction that failed onchain', async () => {
     const error: TransactionError = { InstructionError: [0, { Custom: 1 }] };
     const s = await send(signed(transfer()), network([null, { error, confirmed: true }]).chain, instantly);
     assert.deepEqual([s.outcome, s.error], ['failed', error]);

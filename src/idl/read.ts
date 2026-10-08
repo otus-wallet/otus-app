@@ -1,4 +1,4 @@
-// A program's IDL, as the program publishes it on chain, from either of two places:
+// A program's IDL, as the program publishes it onchain, from either of two places:
 // - the Program Metadata Program's canonical "idl" account for it, which only the program's upgrade authority writes;
 // - Anchor's IDL account, at an address derived from the program, which only the program itself writes.
 // Either way it is the program's own word about itself: what it calls its instructions, their arguments and their

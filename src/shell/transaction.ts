@@ -221,7 +221,7 @@ export function withSignature(bytes: Uint8Array, address: Address, signature: Si
     return new Uint8Array(getTransactionEncoder().encode({ ...tx, signatures: { ...tx.signatures, [address]: signature } }));
 }
 
-/** Sent and watched until it lands, even to fail on chain; one the network refuses, or that can no longer land, is
+/** Sent and watched until it lands, even to fail onchain; one the network refuses, or that can no longer land, is
  *  refused in words. */
 export async function landed(signed: Uint8Array, chain: Chain, shell: Shell): Promise<Sent> {
     const s = await shell.send(signed, chain).catch((e: unknown) => {

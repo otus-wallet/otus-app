@@ -150,7 +150,7 @@ type Last = { at: number; pending?: boolean; ok?: boolean; error?: string; resul
 function bannerOf(last: Last): ['ok' | 'danger' | 'plain', 'check' | 'bang' | 'refresh', string] {
     if (last.pending) return ['plain', 'refresh', 'Your transfer is on its way'];
     if (!last.ok) return ['danger', 'bang', `Not sent: ${last.error ?? 'it failed'}`];
-    if (last.result?.outcome === 'failed') return ['danger', 'bang', 'It landed and failed on chain: only the fee was spent'];
+    if (last.result?.outcome === 'failed') return ['danger', 'bang', 'It landed and failed onchain: only the fee was spent'];
     if (last.result?.outcome !== 'confirmed') return ['plain', 'refresh', 'Sent, not confirmed yet'];
     return ['ok', 'check', 'Sent'];
 }

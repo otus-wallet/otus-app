@@ -88,7 +88,7 @@ test('your wallet turned into a nonce account, or handed to a program before it 
 test('a durable nonce is danger, read as the runtime reads it', async () => {
     const nonce = key(40);
     const advance = getAdvanceNonceAccountInstruction({ nonceAccount: nonce, nonceAuthority: signer });
-    // The nonce account signing as its own authority: valid on-chain, though Kit's parser wants three accounts.
+    // The nonce account signing as its own authority: valid onchain, though Kit's parser wants three accounts.
     const short = {
         programAddress: SYSTEM,
         accounts: [

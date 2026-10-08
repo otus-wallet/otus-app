@@ -144,7 +144,7 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
 
 /** A transfer the popup made for one of your accounts to the address typed → reviewed and approved like a site's,
  *  with that address shown whole, then signed and sent on mainnet; `signed` hears the signature before it is sent. It
- *  is that account's alone to sign. The reply says whether it landed or failed on chain. */
+ *  is that account's alone to sign. The reply says whether it landed or failed onchain. */
 export function own(bytes: Uint8Array, address: string, to: string, shell: Shell, signed?: (signature: Signature) => Promise<unknown>): Promise<Reply> {
     return reply(
         async () => {
