@@ -165,7 +165,8 @@ export function Send({ state, go }: { state: State; go: (to: Screen) => void }) 
                 const unknown = outcome === 'sending' || (outcome.ok && outcome.result?.outcome === 'unknown');
                 if (!unknown) void chrome.storage.session.remove('lastTransfer');
                 if (sent) draft = { account: account.address, asset: 'native', amount: '', to: '' };
-                if (sent || outcome === 'sending') go('lobby');
+                if (sent) go('activity'); // where it now shows
+                else if (outcome === 'sending') go('lobby');
                 else setShown(null);
             };
             return <Outcome account={view} to={shown.request.to} outcome={outcome} leave={leave} again={again} settings={state.settings} />;

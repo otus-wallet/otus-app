@@ -1,5 +1,5 @@
 // A site's transaction once approved, in its window: on its way, then how it ended, as the background tells it. It
-// shows nothing secret, so Otus's lock does not cover it; closing the window changes nothing.
+// shows nothing secret, so Otus's lock does not cover it; closing the window changes nothing. Done opens Activity.
 import { Icon } from '../components/icons.tsx';
 import type { AccountView, Outcome, SiteView, Tone } from '../view.ts';
 import { Answer, Frame } from './Frame.tsx';
@@ -10,7 +10,7 @@ export function Settled({ site, account, outcome }: { site: SiteView; account: A
     const link = outcome && 'link' in outcome ? outcome.link : null;
     const going = !outcome || outcome.phase === 'sending' || outcome.phase === 'waiting';
     return (
-        <Frame site={site} account={account} network={null} actions={<Answer onClick={() => window.close()}>{going ? 'Close' : 'Done'}</Answer>}>
+        <Frame site={site} account={account} network={null} actions={<Answer variant={going ? 'outline' : 'default'} onClick={going ? () => window.close() : activity}>{going ? 'Close' : 'Done'}</Answer>}>
             <div role="status" className={`outcome mt-3 flex items-center gap-3 rounded-[3px] border p-3.5 ${tone === 'plain' ? 'border-rule text-ink' : `border-current ${filled(tone)}`}`}>
                 <Icon name={going ? 'refresh' : MARK[tone]} size={28} stroke={2.5} />
                 <div className="flex min-w-0 flex-col gap-1">
@@ -28,6 +28,9 @@ export function Settled({ site, account, outcome }: { site: SiteView; account: A
         </Frame>
     );
 }
+
+// Done: the window becomes Otus's own, on Activity, where the transaction now shows.
+const activity = () => location.replace(chrome.runtime.getURL('home.html#activity'));
 
 // What an outcome says: its tone, its title and its words.
 function told(outcome: Outcome | null): [Tone, string, string] {

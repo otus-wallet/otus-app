@@ -58,7 +58,7 @@ export function App() {
 // Unlocked again, they start from the lobby.
 function Screens() {
     const now = useOtus();
-    const [screen, go] = useState<Screen>('lobby');
+    const [screen, go] = useState<Screen>(() => (location.hash === '#activity' ? 'activity' : 'lobby')); // a review window that ended opens Activity
     if (!now) return null; // a moment, while what is stored is read
     const { state, keys } = now;
     if (state.accounts.length === 0) return <Empty setUp={() => void setUp()} />;

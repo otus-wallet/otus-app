@@ -7,10 +7,15 @@ import { createRoot } from 'react-dom/client';
 import { TooltipProvider } from '../components/ui/tooltip.tsx';
 import { stayOpen } from '../open.ts';
 import { App } from './App.tsx';
-import { queries, restore } from './query.ts';
+import { forgetActivity, queries, restore } from './query.ts';
 
 stayOpen();
-void restore().finally(() =>
+void restore().finally(() => {
+    // Opened on Activity from a review window, once its transaction landed: what was kept of it is behind.
+    if (location.hash === '#activity') {
+        queries.removeQueries({ queryKey: ['activity'] });
+        forgetActivity();
+    }
     createRoot(document.getElementById('app')!).render(
         <StrictMode>
             <QueryClientProvider client={queries}>
@@ -19,5 +24,5 @@ void restore().finally(() =>
                 </TooltipProvider>
             </QueryClientProvider>
         </StrictMode>,
-    ),
-);
+    );
+});
