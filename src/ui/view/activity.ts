@@ -130,7 +130,7 @@ function headline(a: Activity, n: Naming, outs: Move[], ins: Move[], by: string)
             return { icon: 'trash', title: [{ text: 'Burned ' }, ...what(lead(outs), outs)], sub: words(by) };
     }
     const act = a.acts.find((x) => x.kind !== 'nonce' || a.acts.length === 1); // a nonce moved on, said when it is all there is
-    if (act) return actLine(act, n);
+    if (act) return actLine(act, a, n);
     if (a.rent.yours < 0n) return { icon: 'box', title: words('Closed a token account'), sub: words(`${sol(-a.rent.yours)} SOL of rent freed`) };
     if (a.rent.yours > 0n) return { icon: 'box', title: words('Opened a token account'), sub: words(by) };
     if (a.rent.opened > 0n) return { icon: 'box', title: words('Opened an account'), sub: words(`${sol(a.rent.opened)} SOL of rent`) };
@@ -143,7 +143,7 @@ const ROLE_NAMES = { mint: 'mint', freeze: 'freeze', close: 'close' } as const;
 const U64_MAX = 2n ** 64n - 1n; // an allowance without end
 
 // What a transaction did that moved no balance, in a line.
-function actLine(act: Act, n: Naming): { icon: RowIcon; title: Part[]; sub: Part[] } {
+function actLine(act: Act, a: Activity, n: Naming): { icon: RowIcon; title: Part[]; sub: Part[] } {
     const words = (s: string): Part[] => [{ text: s }];
     const symbol = (mint: Address | null) => (mint ? n.symbol(mint) : 'tokens');
     switch (act.kind) {
@@ -159,6 +159,8 @@ function actLine(act: Act, n: Naming): { icon: RowIcon; title: Part[]; sub: Part
             return { icon: 'key', title: words(`Changed a ${ROLE_NAMES[act.role]} authority`), sub: words(act.to ? `to ${n.who(act.to)}` : 'Removed it') };
         case 'nonce':
             return { icon: 'refresh', title: words('Moved a nonce on'), sub: words('What was signed on it can no longer run') };
+        case 'nonce-account':
+            return { icon: 'box', title: words('Opened a nonce account'), sub: words(a.rent.opened > 0n ? `${sol(a.rent.opened)} SOL of rent` : `its authority ${n.who(act.authority)}`) };
         case 'assign':
             return { icon: 'bang', title: words(act.account === n.wallet ? 'Gave your wallet to a program' : 'Gave an account to a program'), sub: words(n.program(act.program)) };
     }

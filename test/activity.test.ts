@@ -170,13 +170,14 @@ test('a token made and minted, one burned, an account opened: said as such, rent
 test('what moved no balance: a delegate given or revoked, an authority, a nonce moved on; never named by limits or guards', () => {
     const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], acts: [] as Act[], signed: true, programs: [] as Address[], main: null, squads: [], memo: null, other: null, kind: 'other' as const, moves: [] };
     const naming: Naming = { wallet: WALLET, symbol: (m) => (m === MINT ? 'USDC' : short(m)), who: (a) => (a === FRIEND ? 'Fio' : short(a)), program: (a) => (a === 'L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95' ? 'Lighthouse' : a === 'ComputeBudget111111111111111111111111111111' ? 'Compute Budget' : 'Token Program'), known: [] };
-    const [approved, unlimited, revoked, closer, nonce, guarded] = rows(
+    const [approved, unlimited, revoked, closer, nonce, nonceAccount, guarded] = rows(
         [
             { ...base, signature: 'a1', acts: [{ kind: 'approve', account: key(70), delegate: FRIEND, units: 100_000_000n, mint: MINT, decimals: 6 }] },
             { ...base, signature: 'a2', acts: [{ kind: 'approve', account: key(70), delegate: FRIEND, units: 2n ** 64n - 1n, mint: MINT, decimals: 6 }] },
             { ...base, signature: 'a3', acts: [{ kind: 'revoke', account: key(70), mint: MINT }] },
             { ...base, signature: 'a4', acts: [{ kind: 'authority', account: key(70), role: 'close', to: FRIEND }] },
             { ...base, signature: 'a5', acts: [{ kind: 'nonce', account: key(71) }] },
+            { ...base, signature: 'a7', acts: [{ kind: 'nonce-account', account: key(71), authority: WALLET }], rent: { yours: 0n, theirs: 0n, opened: 1_447_680n } },
             { ...base, signature: 'a6', programs: ['ComputeBudget111111111111111111111111111111' as Address, 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address, 'L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95' as Address] },
         ],
         naming,
@@ -186,6 +187,7 @@ test('what moved no balance: a delegate given or revoked, an authority, a nonce 
     assert.deepEqual([text(revoked.title), text(revoked.sub)], ['Revoked a delegate', 'on your USDC account']);
     assert.deepEqual([text(closer.title), text(closer.sub)], ['Changed a close authority', 'to Fio']);
     assert.deepEqual([text(nonce.title), text(nonce.sub)], ['Moved a nonce on', 'What was signed on it can no longer run']);
+    assert.deepEqual([text(nonceAccount.title), text(nonceAccount.sub)], ['Opened a nonce account', '0.00144768 SOL of rent']);
     assert.deepEqual([text(guarded.title), text(guarded.sub)], ['Token Program', '']); // not Compute Budget, nor Lighthouse
 });
 
