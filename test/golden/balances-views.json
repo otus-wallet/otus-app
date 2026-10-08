@@ -767,8 +767,11 @@
             ],
             "effects": [
               {
-                "text": "Closes your USDC account; its SOL goes to 4vJ9…kLKi (you)",
-                "tone": "plain"
+                "text": "Closes your USDC account",
+                "tone": "plain",
+                "more": [
+                  "Its SOL goes to 4vJ9…kLKi (you)"
+                ]
               }
             ]
           }
@@ -913,8 +916,11 @@
             ],
             "effects": [
               {
-                "text": "Closes your wrapped SOL account; its SOL goes to HAgk…Kpqk",
-                "tone": "warn"
+                "text": "Closes your wrapped SOL account",
+                "tone": "warn",
+                "more": [
+                  "Its SOL goes to HAgk…Kpqk"
+                ]
               }
             ]
           }

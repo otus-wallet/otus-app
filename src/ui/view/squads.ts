@@ -76,7 +76,7 @@ function lines(inside: Inside, base: Names): Line[] {
                 if (opened(e, n)) return []; // an account opened only if missing, and there already: nothing happens
                 if (e.source === 'unknown') return [line(`Calls ${base.program(e.program)}, which Otus can't read`, 'warn')];
                 const effects = story(e, n).effects;
-                return effects.length ? effects.map((f) => line(f.text, f.tone)) : [line(`${e.programName ?? base.program(e.program)}: ${e.name}, which Otus has no words for`, 'warn')];
+                return effects.length ? effects.flatMap((f) => [line(f.text, f.tone), ...(f.more ?? []).map((m) => line(m))]) : [line(`${e.programName ?? base.program(e.program)}: ${e.name}, which Otus has no words for`, 'warn')];
             });
         }
         case 'config':

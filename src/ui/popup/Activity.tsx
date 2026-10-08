@@ -176,7 +176,7 @@ function Item({ row, open, flip, explorer }: { row: Row; open: boolean; flip: ()
             {open && (
                 <div className="details flex flex-col gap-1 pb-3 pl-11 text-[11px]">
                     {row.details.map((d, i) => (
-                        <span key={i} className={cn('[overflow-wrap:anywhere]', d.tone ? DETAIL[d.tone] : 'font-bold')}>
+                        <span key={i} className={cn('[overflow-wrap:anywhere]', d.more ? 'pl-3' : '', d.tone ? DETAIL[d.tone] : d.more ? 'text-ink-2' : 'font-bold')}>
                             <Tagged text={d.text} />
                         </span>
                     ))}
