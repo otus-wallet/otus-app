@@ -3,7 +3,7 @@
 // as any site's, guards included, then lands it through Helius Sender. Mainnet only: that is where Jupiter routes.
 import { address, type Address } from '@solana/kit';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 
 import { isWrappedSol, USDC, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { short } from '@otus-wallet/sdk/format';
@@ -21,7 +21,7 @@ import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
 import { cn } from '../lib/cn.ts';
 import type { Screen } from './App.tsx';
-import { Bar, ErrorLine, Heading, Seal, Sheet, TokenLogo } from './common.tsx';
+import { Bar, ErrorLine, Seal, Sheet, TokenLogo } from './common.tsx';
 import { forgetActivity, queries } from './query.ts';
 import { current, said, useHoldings } from './store.ts';
 import { Doing, type Job } from './TakeBack.tsx';
@@ -142,43 +142,78 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
     const impact = route?.impact ?? null;
     const heavy = impact !== null && impact >= HEAVY;
     return (
-        <Sheet bar={bar} foot={<Foot disabled={!route || Boolean(problem)} anyway={heavy} onClick={swap} />}>
-            <div className="flex flex-col gap-1.5">
-                <Heading
-                    extra={
-                        available > 0n && (
+        <Sheet bar={bar} foot={<Foot disabled={!route || Boolean(problem)} anyway={heavy} onClick={swap} />} className="gap-2.5">
+            <Pane
+                label="You pay"
+                extra={
+                    <span className="flex items-center gap-2 text-[10.5px] text-ink-3">
+                        {heldWords(held, payHeld)}
+                        {available > 0n && (
                             <Button size="xs" onClick={() => setText(decimal(available, payDecimals))}>
                                 Max
                             </Button>
-                        )
-                    }
-                >
-                    You pay
-                </Heading>
-                <div className="flex gap-1.5">
-                    <TokenButton side={pay} onClick={() => setPicking('pay')} />
-                    <Input inputMode="decimal" placeholder="0" autoComplete="off" spellCheck={false} aria-label="Amount" autoFocus className="min-w-0 flex-1 text-right" value={text} onChange={(e) => setText(e.target.value)} />
-                </div>
-                <p className="text-right text-[10.5px] text-ink-3">{[heldWords(held, payHeld), paid !== null && `≈ ${dollars(paid)}`].filter(Boolean).join(' · ')}</p>
-            </div>
-            <button type="button" aria-label="Flip" onClick={flip} className="-my-2 grid size-7 cursor-pointer place-items-center self-center rounded-[3px] border border-rule text-ink-2 hover:border-ink-3 hover:text-ink">
+                        )}
+                    </span>
+                }
+                amount={<Amount aria-label="Amount" autoFocus value={text} onChange={(e) => setText(e.target.value)} />}
+                token={<TokenButton side={pay} onClick={() => setPicking('pay')} />}
+                worth={paid !== null ? `≈ ${dollars(paid)}` : ''}
+            />
+            <button type="button" aria-label="Flip" onClick={flip} className="z-10 -my-[19px] grid size-8 cursor-pointer place-items-center self-center rounded-md border border-rule bg-black text-ink-2 hover:border-ink-3 hover:text-ink">
                 <Icon name="swap" size={14} className="rotate-90" />
             </button>
-            <div className="flex flex-col gap-1.5">
-                <Heading>You get</Heading>
-                <div className="flex items-center gap-1.5">
-                    <TokenButton side={get} onClick={() => setPicking('get')} />
-                    <p className={cn('min-w-0 flex-1 truncate text-right text-base font-bold', !route && 'text-ink-3')}>{route ? decimal(route.out, getDecimals) : '0'}</p>
-                </div>
-                {route && (
-                    <p className="text-right text-[10.5px] text-ink-3">{[got !== null && `≈ ${dollars(got)}`, `at least ${decimal(route.least, getDecimals)}`, `via ${[...new Set(route.venues.map((v) => v.label))].join(', ')}`].filter(Boolean).join(' · ')}</p>
-                )}
-                {impact !== null && impact >= NOTABLE && <p className={cn('text-[10.5px]', heavy ? 'text-danger' : 'text-warn')}>{`Price impact ${impact.toFixed(impact < 10 ? 1 : 0)}%: you get that much less than the market price`}</p>}
-                {!get.verified && <p className="text-[10.5px] text-warn">{`${get.symbol} is not verified: check its address, ${short(get.mint)}`}</p>}
-            </div>
+            <Pane
+                label="You get"
+                amount={<Amount aria-label="You get" readOnly tabIndex={-1} value={route ? decimal(route.out, getDecimals) : ''} />}
+                token={<TokenButton side={get} onClick={() => setPicking('get')} />}
+                worth={got !== null ? `≈ ${dollars(got)}` : ''}
+            />
+            {route && (
+                <dl className="flex flex-col gap-1.5 rounded-md border border-rule px-3.5 py-2.5 text-[10.5px]">
+                    <Fact name="Rate">{`1 ${pay.symbol} ≈ ${rate(route, payDecimals, getDecimals)} ${get.symbol}`}</Fact>
+                    <Fact name="At least">{`${decimal(route.least, getDecimals)} ${get.symbol}`}</Fact>
+                    <Fact name="Route">{[...new Set(route.venues.map((v) => v.label))].join(', ')}</Fact>
+                </dl>
+            )}
+            {impact !== null && impact >= NOTABLE && <p className={cn('text-[10.5px]', heavy ? 'text-danger' : 'text-warn')}>{`Price impact ${impact.toFixed(impact < 10 ? 1 : 0)}%: you get that much less than the market price`}</p>}
+            {!get.verified && <p className="text-[10.5px] text-warn">{`${get.symbol} is not verified: check its address, ${short(get.mint)}`}</p>}
             <ErrorLine>{problem || (quote.isError ? said(quote.error) : '')}</ErrorLine>
         </Sheet>
     );
+}
+
+// One side of the swap in its own box: what it is, the amount and the token side by side, and what it is worth.
+const Pane = ({ label, extra, amount, token, worth }: { label: string; extra?: ReactNode; amount: ReactNode; token: ReactNode; worth: string }) => (
+    <div className="flex flex-col gap-1.5 rounded-md border border-rule bg-panel px-3.5 pt-2.5 pb-2 transition-[box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
+        <div className="flex h-5 items-center justify-between">
+            <span className="pixel text-[10px] text-ink-2">{label}</span>
+            {extra}
+        </div>
+        <div className="flex items-center gap-2">
+            {amount}
+            {token}
+        </div>
+        <p className="h-4 text-[10.5px] text-ink-3">{worth}</p>
+    </div>
+);
+
+// An amount as a pane shows it: large, left, borderless; read only on the side the quote fills.
+const Amount = (props: InputHTMLAttributes<HTMLInputElement>) => (
+    <input inputMode="decimal" placeholder="0" autoComplete="off" spellCheck={false} {...props} className="min-w-0 flex-1 bg-transparent text-[22px] leading-8 font-bold outline-none placeholder:text-ink-3 read-only:cursor-default" />
+);
+
+// One line of the quote's facts: its name, and what it says.
+const Fact = ({ name, children }: { name: string; children: ReactNode }) => (
+    <div className="flex items-baseline justify-between gap-3">
+        <dt className="shrink-0 text-ink-3">{name}</dt>
+        <dd className="min-w-0 truncate text-right text-ink-2">{children}</dd>
+    </div>
+);
+
+// How much one of what you pay brings of what you get, at the quote: shown with up to six significant digits.
+function rate(route: Route, payDecimals: number, getDecimals: number): string {
+    const one = Number(route.out) / 10 ** getDecimals / (Number(route.ask.amount) / 10 ** payDecimals);
+    return one.toLocaleString('en-US', { maximumSignificantDigits: 6 });
 }
 
 const Foot = ({ disabled, anyway, onClick }: { disabled: boolean; anyway: boolean; onClick: () => void }) => (
@@ -198,7 +233,7 @@ function heldWords(held: ReturnType<typeof useHoldings>, h: Holding | undefined)
 
 // A side's token, to pick another.
 const TokenButton = ({ side, onClick }: { side: Side; onClick: () => void }) => (
-    <button type="button" aria-label={`Token: ${side.symbol}`} onClick={onClick} className="flex h-[34px] shrink-0 cursor-pointer items-center gap-1.5 rounded-[3px] border border-rule bg-panel px-2 text-xs font-bold hover:border-ink-3">
+    <button type="button" aria-label={`Token: ${side.symbol}`} onClick={onClick} className="flex h-[34px] min-w-[108px] shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-rule bg-black px-2.5 text-xs font-bold hover:border-ink-3">
         <TokenLogo asset={side} size={18} />
         {side.symbol}
         <Icon name="down" size={12} className="text-ink-3" />

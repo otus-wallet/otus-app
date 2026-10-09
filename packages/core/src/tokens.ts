@@ -26,7 +26,7 @@ export async function tokens(mints: string[], throughOtus: boolean): Promise<Map
             const batch = asking.slice(i, i + PER_SEARCH);
             const response = await fetch(`${throughOtus ? THROUGH_OTUS : JUPITER}?query=${batch.join(',')}`, { method: methodFor(throughOtus), credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(WAIT) });
             if (!response.ok) throw new Error(`Jupiter answered ${response.status}`);
-            const found = new Map((await response.json() as unknown[]).flatMap((t) => (info(t) ? [[info(t)!.id, info(t)!] as const] : [])));
+            const found = new Map((await response.json() as unknown[]).flatMap((t) => (info(t) ? [[info(t)!.id, served(info(t)!, throughOtus)] as const] : [])));
             for (const m of batch) looked.set(m, found.get(m) ?? null);
         }
     } catch {} // no names or prices beats no balances
@@ -42,10 +42,14 @@ export async function search(words: string, throughOtus: boolean): Promise<Token
     if (!response.ok) throw new Error(`Jupiter answered ${response.status}`);
     const answer: unknown = await response.json();
     if (!Array.isArray(answer)) throw new Error('Jupiter answered something else');
-    const found = answer.flatMap((t) => (info(t) ? [info(t)!] : []));
+    const found = answer.flatMap((t) => (info(t) ? [served(info(t)!, throughOtus)] : []));
     for (const t of found) looked.set(t.id, t);
     return found;
 }
+
+// A verified token's icon through Otus's server, which fetches it once, writes it anew and keeps it: quick, from any
+// host, and no icon's host learns who looks. Otherwise as Jupiter gave it.
+const served = (t: TokenInfo, throughOtus: boolean): TokenInfo => (throughOtus && t.icon && t.verified ? { ...t, icon: `${OTUS_RPC}/icon/${t.id}` } : t);
 
 // Otus's server takes a search posted, the only way an extension's page sends its Origin to a host it may reach;
 // Jupiter itself takes it as a GET.

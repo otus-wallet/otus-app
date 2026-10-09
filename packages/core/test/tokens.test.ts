@@ -67,3 +67,12 @@ test('a search answered with anything but a list is an error, never read', async
     t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ tokens: [] })));
     await assert.rejects(search('bonk', true), /something else/);
 });
+
+test("a verified token's icon comes through Otus's server while mainnet is read through it, as Jupiter gave it otherwise", async (t) => {
+    const VERIFIED = key(45);
+    const OTHER_WAY = key(46);
+    t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify([VERIFIED, OTHER_WAY, key(47)].map((id, i) => ({ id, symbol: 'T', isVerified: i < 2, icon: 'https://example.com/t.png' })))));
+    assert.equal((await tokens([VERIFIED], true)).get(VERIFIED)?.icon, `${OTUS_RPC}/icon/${VERIFIED}`);
+    assert.equal((await tokens([OTHER_WAY], false)).get(OTHER_WAY)?.icon, 'https://example.com/t.png');
+    assert.equal((await search('t', true)).find((x) => x.id === key(47))?.icon, 'https://example.com/t.png', 'unverified: left as it is, and never shown');
+});
