@@ -82,7 +82,7 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
                 <Part title="Can move or close">
                     <ul>
                         {rows.map((row, i) => (
-                            <li key={i} className="flex items-center gap-3 border-t border-dashed border-rule-2 py-2.5 first:border-t-0">
+                            <li key={i} className="flex items-center gap-3 border-t border-dashed border-rule-2 py-2.5 first:border-t-0 first:pt-0">
                                 <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
                                     <span className={cn('text-[12px] font-bold [overflow-wrap:anywhere]', row.grant.kind === 'closer' ? 'text-ink' : 'text-warn')}>{row.title}</span>
                                     <span className="text-[10.5px] text-ink-3 [overflow-wrap:anywhere]">{row.sub}</span>
