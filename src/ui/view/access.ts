@@ -68,5 +68,5 @@ export function others(grants: Grant[]): number {
 /** Who else has access, in a few words: none, someone, or how many; never "only you" while some issuers went unread. */
 export function accessWords(n: number, unchecked = 0): string {
     if (n === 0) return unchecked > 0 ? 'No one else, among what Otus could check' : 'Only you can move your funds';
-    return n === 1 ? 'Someone else can move your funds' : `${n} others can move your funds`;
+    return n === 1 ? 'Someone else can control some of your funds' : `${n} others can control some of your funds`;
 }

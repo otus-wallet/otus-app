@@ -66,8 +66,8 @@ test('a wallet a program took over comes first; wrapped SOL a stranger can close
 test('others counts each one once', () => {
     const permanent: Grant = { kind: 'permanent', mint: key(21), to: key(35) };
     assert.equal(others([delegate, { ...delegate, account: key(36) }, permanent, nonce]), 3);
-    assert.equal(accessWords(1), 'Someone else can move your funds');
-    assert.equal(accessWords(3), '3 others can move your funds');
+    assert.equal(accessWords(1), 'Someone else can control some of your funds');
+    assert.equal(accessWords(3), '3 others can control some of your funds');
 });
 
 test('signing keeps what a site can still use: a transaction on a nonce, and the delegates it gave', () => {

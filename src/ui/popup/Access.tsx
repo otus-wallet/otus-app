@@ -18,7 +18,7 @@ import { YOU } from '../view/names.ts';
 import { accessRows, accessWords, freezable, others, type AccessNaming, type AccessRow } from '../view/access.ts';
 import { KNOWN_SYMBOLS } from './Activity.tsx';
 import type { Screen } from './App.tsx';
-import { Bar, Heading, Sheet } from './common.tsx';
+import { Bar, Sheet } from './common.tsx';
 import { queries } from './query.ts';
 import { current, said, useAccess, useHeldNow } from './store.ts';
 import { TakeBack } from './TakeBack.tsx';
@@ -120,9 +120,10 @@ function fixOf({ grant }: AccessRow): Fix {
     throw new Error('nothing to take back');
 }
 
+// A part of the screen under its title, as large as the review window's section titles.
 const Part = ({ title, children }: { title: string; children: ReactNode }) => (
     <div className="flex flex-col gap-1.5">
-        <Heading>{title}</Heading>
+        <h2 className="pixel text-[12px] text-ink-2">{title}</h2>
         {children}
     </div>
 );
