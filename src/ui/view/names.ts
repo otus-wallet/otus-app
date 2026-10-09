@@ -86,5 +86,6 @@ export function names(r: Review, known: Known, wallet: Address, mainnet: boolean
             const t = known.tokens.get(mint);
             return t?.verified ? t.icon : null; // an unverified token's image could be its maker's tracker
         },
+        holds: (a) => (changed.get(a)?.before?.token ?? asLoaded(a)?.token)?.amount ?? null,
     };
 }
