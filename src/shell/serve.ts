@@ -1,9 +1,10 @@
 // What the background answers: sites' requests, and the transfers made in Otus's own popup, and what it makes there to
 // take access back. Each is checked, shown to the user and, once approved, signed with state as it is then. A reply
 // never throws.
-import { getBase58Decoder, getBase64Decoder, getPublicKeyFromAddress, getTransactionDecoder, isAddress, isSolanaError, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, verifySignature, type Address, type Signature, type SignatureBytes } from '@solana/kit';
+import { createAddressWithSeed, getBase58Decoder, getBase64Decoder, getPublicKeyFromAddress, getTransactionDecoder, isAddress, isSolanaError, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, verifySignature, type Address, type Signature, type SignatureBytes } from '@solana/kit';
 
 import { COMPUTE_BUDGET_PROGRAM_ADDRESS } from '@solana-program/compute-budget';
+import { STAKE_PROGRAM_ADDRESS } from '@solana-program/stake';
 import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
@@ -20,6 +21,7 @@ import { delegatesGiven, waitingOn } from '@otus-wallet/sdk/access/access';
 import { isTokenProgram } from '@otus-wallet/sdk/programs/addresses';
 import { timedOut } from '@otus-wallet/sdk/rpc';
 import type { Sent } from '../send/send.ts';
+import { STAKE_SPACE } from '../send/stake.ts';
 import { explorerOf, networkOf, rpcFor } from '../settings.ts';
 import { signInFields, signInText } from '../siws.ts';
 import type { TokenInfo } from '../tokens.ts';
@@ -48,6 +50,7 @@ const NO_SIGNER = 'no account in Otus can sign: a watched one cannot connect';
 // A transfer made in the popup has no site: this stands for one in its review.
 const OWN_SITE: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Your own transfer', tone: 'plain' };
 const TAKING_BACK: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Taking access back', tone: 'plain' };
+const STAKING: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Your own stake', tone: 'plain' };
 
 /** A site's call and the origin the browser gave → the reply for the site. */
 export function serve(call: unknown, origin: string, shell: Shell): Promise<Reply> {
@@ -237,6 +240,80 @@ export function takeBack(bytes: Uint8Array, address: string, shell: Shell, signe
         },
         { rejected: 'You rejected it', failed: 'Otus could not send it' },
     );
+}
+
+/** What the popup made for native staking (a stake account of the wallet's made and delegated; a stake of its unstaked,
+ *  or withdrawn to it) → reviewed and approved like a site's transaction, then signed and sent on the network the
+ *  wallet shows; `signed` hears the signature before it is sent. It is that account's alone to sign, and does nothing
+ *  else. The reply says whether it landed or failed onchain. */
+export function stakeOwn(bytes: Uint8Array, address: string, shell: Shell, signed?: (signature: Signature) => Promise<unknown>): Promise<Reply> {
+    return reply(
+        async () => {
+            const state = await shell.load();
+            const account = accountOf(state, address);
+            if (!account || !signs(account)) throw new Refused(NO_KEY);
+            const cluster = networkOf(state.settings); // the network the wallet shows
+            const chain = shell.chain(rpcFor(cluster, state.settings));
+            const way = { cluster, chain, site: STAKING, blockhash: chain.latest(), context: { signedBefore: null, own: true } } as const;
+            const { r, p, signature: signedOnDevice } = await approved(bytes, account, way, shell, async (r) => {
+                if (r.signers.some((s) => s !== account.address)) throw new Refused('another account would have to sign it');
+                if (!(await stakesOnly(r, account.address))) throw new Refused('it does more than stake');
+            });
+            if (!(signedOnDevice && onDevice(account))) await unexpired(r, chain);
+            const signature = await signFor(account, messageOf(p.bytes), shell, null, signedOnDevice);
+            await signed?.(getBase58Decoder().decode(signature) as Signature);
+            return landed(withSignature(p.bytes, account.address, signature), chain, shell);
+        },
+        { rejected: 'You rejected it', failed: 'Otus could not send it' },
+    );
+}
+
+// A legacy or v0 message (v1's limits and fee live in its config) with Compute Budget's SetComputeUnitLimit (2) first,
+// then only what Otus builds for stake: a stake account made at the address a seed of the owner's derives (System's
+// CreateAccountWithSeed, 3), set to answer to the owner alone with no lockup (Stake's Initialize, 0) and delegated by
+// it (DelegateStake, 2); or a stake unstaked by the owner (Deactivate, 5); or one withdrawn to the owner (Withdraw, 4).
+async function stakesOnly(r: Review, owner: Address): Promise<boolean> {
+    const [limit, ...rest] = r.message.instructions;
+    type Ix = Review['message']['instructions'][number];
+    const program = (ix: Ix) => r.accounts[ix.programAddressIndex].address;
+    const at = (ix: Ix, i: number) => r.accounts[ix.accountIndices[i]]?.address;
+    const is = (ix: Ix, of: Address, n: number, accounts: number) => program(ix) === of && ix.accountIndices.length === accounts && ix.data.length >= 4 && new DataView(ix.data.buffer, ix.data.byteOffset, 4).getUint32(0, true) === n;
+    const b58 = getBase58Decoder();
+    if (r.message.version === 1 || !limit || program(limit) !== COMPUTE_BUDGET_PROGRAM_ADDRESS || limit.data.length !== 5 || limit.data[0] !== 2) return false;
+    if (rest.length === 1) {
+        const [ix] = rest;
+        if (is(ix, STAKE_PROGRAM_ADDRESS, 5, 2)) return ix.data.length === 4 && at(ix, 1) === owner;
+        if (is(ix, STAKE_PROGRAM_ADDRESS, 4, 3)) return ix.data.length === 12 && at(ix, 1) === owner && at(ix, 2) === owner;
+        return false;
+    }
+    if (rest.length !== 3) return false;
+    const [create, init, delegate] = rest;
+    if (!is(create, SYSTEM_PROGRAM_ADDRESS, 3, 3) || !is(init, STAKE_PROGRAM_ADDRESS, 0, 1) || !is(delegate, STAKE_PROGRAM_ADDRESS, 2, 3)) return false;
+    // CreateAccountWithSeed: its base (32), its seed (u64 length, text), lamports, space (u64 each), the new owner (32).
+    const d = create.data;
+    if (d.length < 4 + 32 + 8) return false;
+    const view = new DataView(d.buffer, d.byteOffset, d.byteLength);
+    const length = view.getBigUint64(36, true);
+    if (length > 32n || d.length !== 4 + 32 + 8 + Number(length) + 8 + 8 + 32) return false;
+    const after = 44 + Number(length);
+    let seed: string;
+    try {
+        seed = new TextDecoder('utf-8', { fatal: true }).decode(d.subarray(44, after));
+    } catch {
+        return false;
+    }
+    const stake = at(create, 1);
+    const fits =
+        b58.decode(d.subarray(4, 36)) === owner &&
+        at(create, 0) === owner &&
+        at(create, 2) === owner &&
+        view.getBigUint64(after + 8, true) === STAKE_SPACE &&
+        b58.decode(d.subarray(after + 16)) === STAKE_PROGRAM_ADDRESS &&
+        stake === (await createAddressWithSeed({ baseAddress: owner, programAddress: STAKE_PROGRAM_ADDRESS, seed }));
+    // Initialize: the owner stakes and withdraws (32 each), with no lockup (48 zero bytes). DelegateStake: by the owner.
+    const i = init.data;
+    const answers = i.length === 4 + 64 + 48 && b58.decode(i.subarray(4, 36)) === owner && b58.decode(i.subarray(36, 68)) === owner && i.subarray(68).every((b) => b === 0);
+    return fits && answers && at(init, 0) === stake && delegate.data.length === 4 && at(delegate, 0) === stake && at(delegate, 2) === owner;
 }
 
 // A legacy or v0 message (v1's limits and fee live in its config) with Compute Budget's SetComputeUnitLimit (2) first,

@@ -39,7 +39,9 @@ import { send } from '../src/send/send.ts';
 import { DEFAULT_SETTINGS, OTUS_RPC } from '../src/settings.ts';
 import type { Answer } from '../src/shell/approvals.ts';
 import { fix } from '../src/send/fix.ts';
-import { own, serve, takeBack, type Shell } from '../src/shell/serve.ts';
+import { own, serve, stakeOwn, takeBack, type Shell } from '../src/shell/serve.ts';
+import { staking, stakeAt } from '../src/send/stake.ts';
+import { getCompiledTransactionMessageDecoder, getCompiledTransactionMessageEncoder } from '@solana/kit';
 import { followed } from '../src/shell/transaction.ts';
 import type { Review } from '@otus-wallet/sdk/review/review';
 import type { Status } from '@otus-wallet/sdk/chain';
@@ -734,3 +736,44 @@ test('a transfer made in the popup shows after two round trips (blockhash with t
     assert.ok(final - first >= 2 * RTT && final - first < 3.5 * RTT, `prepared ${Math.round(final - first)} ms later`);
 });
 
+
+test('what the popup makes for stake is reviewed as Otus’s own, signed and sent; anything more is refused', async () => {
+    const w = await wallet();
+    const life = { blockhash: blockhash(key(9)), lastValidBlockHeight: 0n };
+    const made = await staking(w.me, { kind: 'stake', seed: 'stake:0', lamports: 1_001_666_240n, vote: key(40) }, life);
+    assert.equal(result<{ outcome: string }>(await stakeOwn(made, w.me, w.shell)).outcome, 'confirmed');
+    const shown = w.approvals[0];
+    assert.ok(shown.kind === 'transaction');
+    assert.deepEqual([shown.site.host, shown.site.note], ['Otus', 'Your own stake']);
+    const stake = await stakeAt(w.me, 'stake:0');
+    assert.equal(result<{ outcome: string }>(await stakeOwn(await staking(w.me, { kind: 'unstake', stake }, life), w.me, w.shell)).outcome, 'confirmed');
+    assert.equal(result<{ outcome: string }>(await stakeOwn(await staking(w.me, { kind: 'withdraw', stake, lamports: 5n }, life), w.me, w.shell)).outcome, 'confirmed');
+    assert.equal(w.sent.length, 3);
+    // Bytes changed in what Otus built: another withdrawer, an account the seed does not derive, another recipient.
+    const bent = (bytes: Uint8Array, ix: number, change: (data: Uint8Array) => void, account?: [number, number]) => {
+        const tx = getTransactionDecoder().decode(bytes);
+        const message = getCompiledTransactionMessageDecoder().decode(tx.messageBytes) as { instructions: { data?: Uint8Array; accountIndices?: number[] }[] };
+        const instructions = message.instructions.map((x, i) => {
+            if (i !== ix) return x;
+            const data = new Uint8Array(x.data ?? []);
+            change(data);
+            const accountIndices = [...(x.accountIndices ?? [])];
+            if (account) accountIndices[account[0]] = account[1];
+            return { ...x, data, accountIndices };
+        });
+        const messageBytes = getCompiledTransactionMessageEncoder().encode({ ...message, instructions } as never);
+        return new Uint8Array(getTransactionEncoder().encode({ ...tx, messageBytes } as never));
+    };
+    const stranger = new Uint8Array(getBase58Encoder().encode(key(6)));
+    const withdrawer = bent(made, 2, (d) => d.set(stranger, 36));
+    assert.match(((await stakeOwn(withdrawer, w.me, w.shell)) as { error: string }).error, /does more than stake/);
+    const locked = bent(made, 2, (d) => (d[68] = 1));
+    assert.match(((await stakeOwn(locked, w.me, w.shell)) as { error: string }).error, /does more than stake/);
+    const reseeded = bent(made, 1, (d) => (d[44] = 'x'.charCodeAt(0)));
+    assert.match(((await stakeOwn(reseeded, w.me, w.shell)) as { error: string }).error, /does more than stake/);
+    // A transfer is no stake, nor is a stake another wallet signs.
+    assert.match(((await stakeOwn(bytes(w.transfer()), w.me, w.shell)) as { error: string }).error, /does more than stake/);
+    const theirs = await staking(key(5), { kind: 'unstake', stake }, life);
+    assert.match(((await stakeOwn(theirs, w.me, w.shell)) as { error: string }).error, /does not sign this transaction/);
+    assert.equal(w.sent.length, 3);
+});

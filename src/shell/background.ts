@@ -11,7 +11,7 @@ import { tokens } from '../tokens.ts';
 import type { Approval, Life } from '../ui/view.ts';
 import { answerOf, approve, kept, type Answer } from './approvals.ts';
 import { keysCall, lock, LOCK_ALARM, locked, prune, shielded, sign, type KeysCall, type KeysReply } from './keys.ts';
-import { own, serve, takeBack } from './serve.ts';
+import { own, serve, stakeOwn, takeBack } from './serve.ts';
 import { edited, load, update, type Edit, type State } from './state.ts';
 
 const shell = { load, update, approve, sign, chain: (rpc: string) => rpcChain(rpcAt(rpc)), send: async (signed: Uint8Array, chain: Chain) => send(signed, chain, undefined, (await load()).settings.preflight !== false), tokens, now: Date.now };
@@ -116,7 +116,7 @@ async function settle(restart = true) {
 // gets the review back, and answers on it; then it hears how it went. A popup closed before answering says no. Once
 // approved, how it goes is kept for the lobby too, as the popup may close while it lands: on its way, then signed (with
 // its signature, so a worker that stops can still tell), then the outcome. What the popup makes to take access back
-// (`fix`) goes the same way, and only Access hears how it went.
+// (`fix`), or for native stake (`stake`), goes the same way, and only the screen that made it hears how it went.
 chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== 'own' || !ours(port.sender) || !popup(port.sender)) return; // the toolbar popup's alone, or a review window gone on to Activity
     let started = false;
@@ -129,7 +129,7 @@ chrome.runtime.onConnect.addListener((port) => {
         done();
         asked?.decide(false);
     });
-    port.onMessage.addListener((m: { own?: unknown; account?: unknown; to?: unknown; fix?: unknown; approve?: unknown; signature?: unknown }) => {
+    port.onMessage.addListener((m: { own?: unknown; account?: unknown; to?: unknown; fix?: unknown; stake?: unknown; approve?: unknown; signature?: unknown }) => {
         // A yes counts only while Otus is unlocked, as in an approval window: a Ledger's needs no keystore to sign.
         if (asked && 'approve' in m) {
             const { decide, approval, ready } = asked;
@@ -141,13 +141,14 @@ chrome.runtime.onConnect.addListener((port) => {
         }
         const { own: bytes, account, to } = m;
         const fixing = m.fix === true;
-        // A transfer names whom it pays; taking access back names no one: one or the other, never both.
-        if (started || typeof bytes !== 'string' || typeof account !== 'string' || (typeof to === 'string') === fixing) return;
+        const staking = m.stake === true;
+        // A transfer names whom it pays; taking access back or stake names no one: one of them, never two.
+        if (started || typeof bytes !== 'string' || typeof account !== 'string' || (fixing && staking) || (typeof to === 'string') === (fixing || staking)) return;
         started = true;
         if (reviewing && reviewing !== port) return tell({ done: { ok: false, error: 'Another transfer of yours is being reviewed' } });
         reviewing = port;
         let told = null as Promise<void> | null; // once approved: what the lobby is told, in order
-        const record = (last: object) => (fixing ? Promise.resolve() : (told = (told ?? Promise.resolve()).then(() => chrome.storage.session.set({ lastTransfer: { ...last, at: Date.now() } }))));
+        const record = (last: object) => (fixing || staking ? Promise.resolve() : (told = (told ?? Promise.resolve()).then(() => chrome.storage.session.set({ lastTransfer: { ...last, at: Date.now() } }))));
         const approve = (approval: Approval, follow?: (tell: (life: Life) => void) => void, later?: Promise<Approval>) =>
             new Promise<Answer>((decide) => {
                 follow?.((life) => tell({ life }));
@@ -186,7 +187,7 @@ chrome.runtime.onConnect.addListener((port) => {
                 return record({ pending: true, signature });
             };
             const wire = new Uint8Array(getBase64Encoder().encode(bytes));
-            const reply = fixing ? await takeBack(wire, account, { ...shell, approve }, signed) : await own(wire, account, to as string, { ...shell, approve }, signed);
+            const reply = fixing ? await takeBack(wire, account, { ...shell, approve }, signed) : staking ? await stakeOwn(wire, account, { ...shell, approve }, signed) : await own(wire, account, to as string, { ...shell, approve }, signed);
             if (told) await record(reply);
             return reply;
         })().finally(() => {
