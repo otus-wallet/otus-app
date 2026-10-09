@@ -21,7 +21,7 @@ install({
             await chrome.tabs.create({ url: `${page}${hash}` });
         }
     },
-    openTab: async (page) => void (await chrome.tabs.create({ url: chrome.runtime.getURL(page) })),
+    openTab: (page) => chrome.tabs.create({ url: chrome.runtime.getURL(page) }).then(() => {}),
     inTab: () => chrome.tabs.getCurrent().then((tab) => tab !== undefined),
     closeTab: () => chrome.tabs.getCurrent((t) => void (t?.id !== undefined && chrome.tabs.remove(t.id))),
     reload: () => chrome.runtime.reload(),

@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "node build.mjs",
-    "package": "node build.mjs --store && cd dist && rm -f ../otus.zip && zip -qrX ../otus.zip .",
+    "package": "node build.mjs --store && cd dist-store && rm -f ../otus.zip && zip -qrX ../otus.zip .",
     "watch": "node build.mjs --watch",
     "test": "node --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"

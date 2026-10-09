@@ -1,6 +1,7 @@
 # Build outputs
 node_modules/
 dist/
+dist-store/
 otus.zip
 
 # Secrets

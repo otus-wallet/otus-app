@@ -1,6 +1,6 @@
 // What Otus's pages ask of the platform they run on: the extension's background, storage and tabs in Chrome, the app's
-// native side on a phone. The pages reach the platform only through here, so this file lists all they can ask of it.
-// Each app installs its own, once, before any page module runs.
+// native side on a phone. The pages use no extension API but through here, so this file lists all they ask of it. Each
+// app installs its own, once, before any page module runs: its build checks every bundle that uses it sets it.
 import type { KeysCall } from './shell/keys.ts';
 import type { Edit } from './shell/state.ts';
 
@@ -49,5 +49,5 @@ export let platform: Platform;
 /** Sets the platform, once. */
 export function install(p: Platform) {
     if (platform) throw new Error('The platform is set already');
-    platform = p;
+    platform = Object.freeze(p);
 }
