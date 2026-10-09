@@ -46,7 +46,7 @@ The Otus you installed can be checked against this code: build the release's tag
 `chrome://version` shows, then `Extensions/gciljmcmgcigmoakpmdcbefjabcnhekl/X.Y.Z_0`. It says THE SAME when every file
 matches, byte for byte. Left out is only what the store adds: its signature of the files (`_metadata/`) and the
 manifest's `key` and `update_url`. With the same `zip`, `npm run package` gives the release's `otus.zip` byte for byte
-too. Releases up to v0.2.0 carry the time they were built, and can't be matched.
+too.
 
 ## Test
 
