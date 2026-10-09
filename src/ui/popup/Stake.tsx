@@ -8,10 +8,11 @@ import { short, sol } from '@otus-wallet/sdk/format';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
 import { seedOf, stakeAt, staking } from '../../send/stake.ts';
 import { units as unitsOf } from '../../send/transfer.ts';
-import { networkOf, walletRpc } from '../../settings.ts';
+import { networkOf, OTUS_RPC, walletRpc } from '../../settings.ts';
 import { signs, type State } from '../../shell/state.ts';
 import { lockedOf, nextSeed, standingOf, type StakeAccount, type Standing } from '../../stake/stakes.ts';
 import type { Validator } from '../../stake/validators.ts';
+import { Logo } from '../components/icons.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
 import { cn } from '../lib/cn.ts';
@@ -38,6 +39,7 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
     const validators = useValidators(rpc, networkOf(state.settings), epoch.data?.epoch);
     const byVote = useMemo(() => new Map((validators.data ?? []).map((v) => [v.vote, v])), [validators.data]);
     const nameOf = (vote: Address | null) => (vote === null ? 'Not delegated' : (byVote.get(vote)?.name ?? short(vote)));
+    const logos = logosShown(state);
 
     if (doing) {
         // Read again whatever happened: what is still on its way may land.
@@ -100,7 +102,7 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
                                         {read.map((s) => {
                                             if ('unreadable' in s) {
                                                 return (
-                                                    <Row key={s.address} title={short(s.address)} sub={`${sol(s.lamports)} SOL · Otus can't read this stake account`}>
+                                                    <Row key={s.address} title={short(s.address)} sub={`${sol(s.lamports)} SOL · Otus can't read this stake account`} logo={<ValidatorLogo node={null} shown={false} />}>
                                                         {null}
                                                     </Row>
                                                 );
@@ -110,7 +112,7 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
                                             const words = standing ? standingWords(standing, epoch.data!.left, locked) : '';
                                             const action = mine && standing ? actionOf(standing, s.staker === owner, locked) : null;
                                             return (
-                                                <Row key={s.address} title={nameOf(s.vote)} sub={`${sol(s.lamports)} SOL${words ? ` · ${words}` : ''}`}>
+                                                <Row key={s.address} title={nameOf(s.vote)} sub={`${sol(s.lamports)} SOL${words ? ` · ${words}` : ''}`} logo={<ValidatorLogo node={(s.vote && byVote.get(s.vote)?.node) ?? null} shown={logos} />}>
                                                     {action && (
                                                         <Button size="sm" className="shrink-0" onClick={() => setDoing(job(action, s))}>
                                                             {action === 'unstake' ? 'Unstake' : 'Withdraw'}
@@ -209,7 +211,7 @@ function NewStake({ state, terms, validators, error, back, start }: { state: Sta
                 <ul className="flex flex-col gap-1.5">
                     {listed.map((v) => (
                         <li key={v.vote}>
-                            <ValidatorRow v={v} on={picked?.vote === v.vote} pick={() => setPicked(v)} />
+                            <ValidatorRow v={v} on={picked?.vote === v.vote} pick={() => setPicked(v)} logos={logosShown(state)} />
                         </li>
                     ))}
                 </ul>
@@ -218,33 +220,48 @@ function NewStake({ state, terms, validators, error, back, start }: { state: Sta
     );
 }
 
-// A validator to pick: its declared name or address, the top-third mark, then its address, commission and stake, and
-// what to know first.
-function ValidatorRow({ v, on, pick }: { v: Validator; on: boolean; pick: () => void }) {
+// Whether validators' logos are shown: on mainnet through Otus's RPC, whose server fetches each logo and writes it anew,
+// so that no validator's server learns who looks. With an endpoint of your own, Otus's server is asked nothing.
+const logosShown = (state: State) => state.settings.network === 'mainnet';
+
+// A validator's logo by its identity, from Otus's server; the plain mark when it has none, or it is not shown.
+function ValidatorLogo({ node, shown }: { node: string | null; shown: boolean }) {
+    const [failed, setFailed] = useState(false);
+    if (!shown || !node || failed) return <Logo name="chain" size={28} className="shrink-0 rounded-[3px] bg-panel text-ink-3" />;
+    return <img src={`${OTUS_RPC}/logo/${node}`} alt="" width={28} height={28} crossOrigin="anonymous" referrerPolicy="no-referrer" loading="lazy" onError={() => setFailed(true)} className="size-7 shrink-0 rounded-[3px] bg-panel object-contain" />;
+}
+
+// A validator to pick: its logo, its declared name or address, the top-third mark, then its address, commission and
+// stake, and what to know first.
+function ValidatorRow({ v, on, pick, logos }: { v: Validator; on: boolean; pick: () => void; logos: boolean }) {
     const { title, sub, notes } = validatorWords(v);
     return (
-        <button type="button" aria-pressed={on} onClick={pick} className={cn('flex w-full cursor-pointer flex-col gap-[3px] rounded-[3px] border px-2.5 py-2 text-left', on ? 'border-ok-bd bg-ok-bg' : 'border-rule hover:border-ink-3')}>
-            <span className="flex items-center gap-1.5">
-                <span className={cn('min-w-0 flex-1 truncate text-[12px] font-bold', on && 'text-ok')}>{title}</span>
-                {v.top && (
-                    <Tip text="One of the few validators that together hold a third of all stake">
-                        <span className="pixel shrink-0 rounded-sm border border-rule px-[3px] py-px text-[8px] text-ink-3">Top third</span>
-                    </Tip>
-                )}
-            </span>
-            <span className="text-[10.5px] text-ink-3">{sub}</span>
-            {notes.map((n) => (
-                <span key={n.text} className={cn('text-[10.5px]', n.tone === 'danger' ? 'text-danger' : 'text-warn')}>
-                    {n.text}
+        <button type="button" aria-pressed={on} onClick={pick} className={cn('flex w-full cursor-pointer items-start gap-2.5 rounded-[3px] border px-2.5 py-2 text-left', on ? 'border-ok-bd bg-ok-bg' : 'border-rule hover:border-ink-3')}>
+            <ValidatorLogo node={v.node} shown={logos} />
+            <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
+                <span className="flex items-center gap-1.5">
+                    <span className={cn('min-w-0 flex-1 truncate text-[12px] font-bold', on && 'text-ok')}>{title}</span>
+                    {v.top && (
+                        <Tip text="One of the few validators that together hold a third of all stake">
+                            <span className="pixel shrink-0 rounded-sm border border-rule px-[3px] py-px text-[8px] text-ink-3">Top third</span>
+                        </Tip>
+                    )}
                 </span>
-            ))}
+                <span className="text-[10.5px] text-ink-3">{sub}</span>
+                {notes.map((n) => (
+                    <span key={n.text} className={cn('text-[10.5px]', n.tone === 'danger' ? 'text-danger' : 'text-warn')}>
+                        {n.text}
+                    </span>
+                ))}
+            </span>
         </button>
     );
 }
 
 // One stake: whom it is with, how much and where it stands, and what can be done with it.
-const Row = ({ title, sub, children }: { title: string; sub: string; children: ReactNode }) => (
+const Row = ({ title, sub, logo, children }: { title: string; sub: string; logo: ReactNode; children: ReactNode }) => (
     <li className="flex items-center gap-3 border-t border-dashed border-rule-2 py-2.5 first:border-t-0 first:pt-0">
+        {logo}
         <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
             <span className="text-[12px] font-bold [overflow-wrap:anywhere]">{title}</span>
             <span className="text-[10.5px] text-ink-3 [overflow-wrap:anywhere]">{sub}</span>
