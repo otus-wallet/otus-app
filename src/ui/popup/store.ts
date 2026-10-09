@@ -13,6 +13,9 @@ import type { KeyStatus } from '../../shell/keys.ts';
 import { load, save, type Edit, type State } from '../../shell/state.ts';
 import { ask } from '../ask.ts';
 import { holdings, type Holdings } from '../holdings.ts';
+import { epochOf, stakeRent, stakesOf } from '../../stake/stakes.ts';
+import { validatorNames, validatorsOf } from '../../stake/validators.ts';
+import { named } from '../../shell/state.ts';
 import { accessKey, activityKey, forgetActivity, holdingsKey, queries, type ActivityPages } from './query.ts';
 
 export type Otus = { state: State; keys: KeyStatus };
@@ -109,6 +112,43 @@ export function useAccess(rpc: string, address: Address, state: State) {
         staleTime: ACCESS_FRESH,
         refetchOnReconnect: false,
     });
+}
+
+const STAKE_FRESH = 30_000; // ms a wallet's stake accounts, and the epoch, are taken as current
+const VALIDATORS_FRESH = 10 * 60_000; // ms the validators are
+const NAMES_FOR = 7 * 24 * 3600_000; // ms validators' names are kept: reading them all is megabytes
+
+/** The stake accounts a wallet withdraws from. */
+export const useStakes = (rpc: string, address: Address) => useQuery({ queryKey: ['stakes', rpc, address], queryFn: () => stakesOf(rpcAt(rpc), address), staleTime: STAKE_FRESH });
+
+/** What staking hangs on now: the epoch and about how long is left of it, the network's least stake, a stake account's
+ *  rent. */
+export const useStakeTerms = (rpc: string) =>
+    useQuery({
+        queryKey: ['stakeTerms', rpc],
+        queryFn: async () => {
+            const r = rpcAt(rpc);
+            const [epoch, { value: min }, rent] = await Promise.all([epochOf(r), r.getStakeMinimumDelegation({ commitment: 'confirmed' }).send(), stakeRent(r)]);
+            return { ...epoch, min, rent };
+        },
+        staleTime: STAKE_FRESH,
+    });
+
+/** The validators of the network the wallet shows, ranked; their names kept for a week, those of validators alive. */
+export const useValidators = (rpc: string, cluster: string, epoch: bigint | undefined) =>
+    useQuery({ queryKey: ['validators', rpc, String(epoch)], queryFn: () => validatorsOf(rpcAt(rpc), epoch!, (nodes) => namesFor(rpc, cluster, nodes)), enabled: epoch !== undefined, staleTime: VALIDATORS_FRESH });
+
+type KeptNames = Record<string, { at: number; names: [string, string][] }>; // by network
+
+async function namesFor(rpc: string, cluster: string, nodes: Set<string>): Promise<Map<string, string>> {
+    const kept = (((await chrome.storage.local.get('validatorNames')).validatorNames ?? {}) as KeptNames) || {};
+    const mine = kept[cluster];
+    if (mine && Date.now() - mine.at < NAMES_FOR && Array.isArray(mine.names)) {
+        return new Map(mine.names.filter((e) => Array.isArray(e) && typeof e[0] === 'string' && typeof e[1] === 'string' && named(e[1])).map(([node, name]) => [node, named(name)]));
+    }
+    const names = [...(await validatorNames(rpcAt(rpc)))].filter(([node]) => nodes.has(node));
+    await chrome.storage.local.set({ validatorNames: { ...kept, [cluster]: { at: Date.now(), names } } }).catch(() => {});
+    return new Map(names);
 }
 
 /** What a wallet held when last read, without reading it: names for its tokens. */

@@ -62,6 +62,7 @@ export function Lobby({ state, go }: { state: State; go: (to: Screen) => void })
                     <Act name="receive" label="Receive" onClick={() => go('receive')} />
                     <Act name="send" label="Send" onClick={signs(account) ? () => go('send') : undefined} tip={signs(account) ? undefined : 'Watch only: Otus holds no key for it'} />
                     <Act name="swap" label="Swap" soon />
+                    <Act name="stake" label="Stake" onClick={() => go('stake')} />
                 </div>
                 <ul className={cn('assets', !read && 'unread')}>
                     {assets.filter((a) => a.verified).map((a) => <Asset key={a.native ? 'native' : a.mint} asset={a} dim={!read} />)}
@@ -108,8 +109,8 @@ export function WalletBar({ state, go }: { state: State; go: (to: Screen) => voi
     );
 }
 
-// Receive, Send, Swap: an icon over its name in the pixel font; one that cannot be used yet says why, or "Soon".
-function Act({ name, label, onClick, tip, soon = false }: { name: 'receive' | 'send' | 'swap'; label: string; onClick?: () => void; tip?: string; soon?: boolean }) {
+// Receive, Send, Swap, Stake: an icon over its name in the pixel font; one that cannot be used yet says why, or "Soon".
+function Act({ name, label, onClick, tip, soon = false }: { name: 'receive' | 'send' | 'swap' | 'stake'; label: string; onClick?: () => void; tip?: string; soon?: boolean }) {
     const off = !onClick;
     const act = (
         <button
@@ -120,7 +121,7 @@ function Act({ name, label, onClick, tip, soon = false }: { name: 'receive' | 's
         >
             <Icon name={name} size={18} />
             <span className="pixel text-[10px] tracking-[0.04em]">{label}</span>
-            {soon && <span className="pixel absolute top-1 right-1 rounded-sm border border-rule px-[3px] py-px text-[8px] text-ink-3">Soon</span>}
+            {soon && <span className="pixel absolute top-[3px] right-[3px] rounded-sm border border-rule px-[2px] text-[7px] leading-[10px] text-ink-3">Soon</span>}
         </button>
     );
     return tip ? <Tip text={tip}>{act}</Tip> : act;

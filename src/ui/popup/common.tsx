@@ -153,6 +153,13 @@ export function TokenLogo({ asset, size = 28 }: { asset: Holding; size?: number 
     return <img src={asset.icon} alt="" width={size} height={size} crossOrigin="anonymous" referrerPolicy="no-referrer" loading="lazy" onError={() => setFailed(true)} className="shrink-0 rounded-[3px] bg-panel object-cover" />;
 }
 
+/** One of a few choices side by side, the one on marked. */
+export const Choice = ({ text, on, onClick }: { text: string; on: boolean; onClick: () => void }) => (
+    <button type="button" aria-pressed={on} onClick={onClick} className={cn('h-7 cursor-pointer rounded-[3px] border px-[9px] text-[11px] font-bold', on ? 'border-ok-bd bg-ok-bg text-ok' : 'border-rule text-ink-2 hover:border-ink-3')}>
+        {text}
+    </button>
+);
+
 export const ErrorLine = ({ children }: { children: ReactNode }) =>
     children ? (
         <p role="alert" className="text-[10.5px] text-danger">

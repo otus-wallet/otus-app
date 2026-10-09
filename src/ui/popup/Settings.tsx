@@ -13,9 +13,8 @@ import { Input } from '../components/ui/input.tsx';
 import { Icon, Tile } from '../components/icons.tsx';
 import { ask } from '../ask.ts';
 import { short } from '../dom.ts';
-import { cn } from '../lib/cn.ts';
 import type { Screen } from './App.tsx';
-import { Bar, ErrorLine, Sheet, TabBar } from './common.tsx';
+import { Bar, Choice, ErrorLine, Sheet, TabBar } from './common.tsx';
 import { edit, said, setSettings } from './store.ts';
 
 const REPO = 'https://github.com/otus-wallet/otus-extension';
@@ -139,12 +138,6 @@ function Preflight({ on }: { on: boolean }) {
 }
 
 // A choice among a few, lit when chosen.
-const Choice = ({ text, on, onClick }: { text: string; on: boolean; onClick: () => void }) => (
-    <button type="button" aria-pressed={on} onClick={onClick} className={cn('h-7 cursor-pointer rounded-[3px] border px-[9px] text-[11px] font-bold', on ? 'border-ok-bd bg-ok-bg text-ok' : 'border-rule text-ink-2 hover:border-ink-3')}>
-        {text}
-    </button>
-);
-
 // The network the wallet shows: mainnet through Otus's RPC, Solana's public devnet, or an endpoint of your own (with
 // your provider key if it has one, shown with its secrets hidden), whose network it says itself when you save it.
 function NetworkChoice({ settings }: { settings: Settings }) {

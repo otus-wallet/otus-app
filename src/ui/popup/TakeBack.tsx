@@ -1,8 +1,8 @@
-// Taking access back, from Access: Otus builds the transaction (a delegate revoked, a nonce moved on) and the background
-// reviews it as any site's, guards included; the review shows here with the time left to sign, then how it went.
-// Leaving, or no, says no: nothing is sent.
+// What Otus builds in the popup besides a transfer, reviewed as any site's transaction, guards included: taking access
+// back from Access (a delegate revoked, a nonce moved on), or native stake from Stake. The review shows here with the
+// time left to sign, then how it went. Leaving, or no, says no: nothing is sent.
 import { getBase64Decoder, type Blockhash } from '@solana/kit';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { cap, short } from '@otus-wallet/sdk/format';
 import { fix, type Fix } from '../../send/fix.ts';
@@ -19,14 +19,27 @@ import { said } from './store.ts';
 
 const REVIEW_WAIT = 60_000; // ms for the review to come; each RPC request gives up sooner
 const TAKING_BACK: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Taking access back', tone: 'plain' };
+const STAKING: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Your own stake', tone: 'plain' };
 // No blockhash yet: the background reads one while it reviews it, and puts it in.
 const UNSET: Lifetime = { blockhash: '11111111111111111111111111111111' as Blockhash, lastValidBlockHeight: 0n };
 
 type Reply = { ok: boolean; error?: string; result?: { signature?: unknown; outcome?: unknown } };
 type Heard = { review: Approval } | { life: Life } | { done: Reply };
 
+/** What Otus builds, as the background is told it (`fix`: taking access back; `stake`: native stake); `make` builds it
+ *  (again on a retry) for a lifetime; `doing` heads the screen ("Taking back"), `landed` titles it once confirmed
+ *  ("Taken back"), and `where` is the screen to check again when that is not known yet. */
+export type Job = { kind: 'fix' | 'stake'; make: (lifetime: Lifetime) => Uint8Array | Promise<Uint8Array>; doing: string; landed: string; where: string };
+
 /** `what`: what is taken back, and `title` says it; `done` hears whether it landed, or that the user left. */
 export function TakeBack({ account, what, title, settings, done }: { account: Account; what: Fix; title: string; settings: Settings; done: (landed: boolean) => void }) {
+    const job = useMemo((): Job => ({ kind: 'fix', make: (lifetime) => fix(account.address, what, lifetime), doing: 'Taking back', landed: 'Taken back', where: 'Access' }), [account.address, what]);
+    return <Doing account={account} job={job} title={title} settings={settings} done={done} />;
+}
+
+/** A job of Otus's own, reviewed, signed and sent here. `job` must stay the same object while it is on: a new one is
+ *  built and reviewed anew. */
+export function Doing({ account, job, title, settings, done }: { account: Account; job: Job; title: string; settings: Settings; done: (landed: boolean) => void }) {
     const [approval, setApproval] = useState<Approval | null>(null);
     const [life, setLife] = useState<Life | undefined>();
     const [outcome, setOutcome] = useState<'sending' | Reply | null>(null);
@@ -37,45 +50,50 @@ export function TakeBack({ account, what, title, settings, done }: { account: Ac
 
     useEffect(() => {
         let live = true;
+        let port: chrome.runtime.Port | null = null;
+        let late: ReturnType<typeof setTimeout> | undefined;
         setApproval(null);
         setLife(undefined);
         setOutcome(null);
         const from = Date.now(); // before the blockhash is read: the time to sign counted short, never long
         setLifetime({ from, until: from + SIGN_WITHIN });
         const stop = (why: string) => live && setOutcome({ ok: false, error: why });
-        let bytes: Uint8Array;
-        try {
-            bytes = fix(account.address, what, UNSET);
-        } catch (e) {
-            stop(said(e));
-            return;
-        }
-        const port = chrome.runtime.connect({ name: 'own' });
-        waiting.current = port;
-        const late = setTimeout(() => waiting.current === port && (port.disconnect(), stop('Otus did not answer in time: nothing was sent')), REVIEW_WAIT);
-        port.onMessage.addListener((m: Heard) => {
-            clearTimeout(late);
+        void (async () => {
+            let bytes: Uint8Array;
+            try {
+                bytes = await job.make(UNSET);
+            } catch (e) {
+                return stop(said(e));
+            }
             if (!live) return;
-            if ('review' in m) return setApproval(m.review);
-            if ('life' in m) return setLife(m.life);
-            port.disconnect();
-            if (waiting.current === port) return stop(m.done.error ?? 'Otus could not send it'); // refused before any answer
-            if (sending.current !== port) return;
-            sending.current = null;
-            setOutcome(m.done);
-        });
-        port.onDisconnect.addListener(() => {
-            clearTimeout(late);
-            if (waiting.current === port) return stop('Otus stopped before you answered: nothing was sent');
-            if (sending.current === port) stop('Otus stopped while sending it: check Access again in a moment');
-        });
-        port.postMessage({ own: getBase64Decoder().decode(bytes), account: account.address, fix: true });
+            const p = chrome.runtime.connect({ name: 'own' });
+            port = p;
+            waiting.current = p;
+            late = setTimeout(() => waiting.current === p && (p.disconnect(), stop('Otus did not answer in time: nothing was sent')), REVIEW_WAIT);
+            p.onMessage.addListener((m: Heard) => {
+                clearTimeout(late);
+                if (!live) return;
+                if ('review' in m) return setApproval(m.review);
+                if ('life' in m) return setLife(m.life);
+                p.disconnect();
+                if (waiting.current === p) return stop(m.done.error ?? 'Otus could not send it'); // refused before any answer
+                if (sending.current !== p) return;
+                sending.current = null;
+                setOutcome(m.done);
+            });
+            p.onDisconnect.addListener(() => {
+                clearTimeout(late);
+                if (waiting.current === p) return stop('Otus stopped before you answered: nothing was sent');
+                if (sending.current === p) stop(`Otus stopped while sending it: check ${job.where} again in a moment`);
+            });
+            p.postMessage({ own: getBase64Decoder().decode(bytes), account: account.address, [job.kind]: true });
+        })();
         return () => {
             live = false;
             clearTimeout(late);
-            if (waiting.current === port) port.disconnect(); // leaving says no
+            if (port && waiting.current === port) port.disconnect(); // leaving says no
         };
-    }, [account.address, what, attempt]);
+    }, [account.address, job, attempt]);
 
     const view: AccountView = { label: account.label, address: account.address };
     // No leaves; yes stays here while it goes, and says how it went.
@@ -91,22 +109,24 @@ export function TakeBack({ account, what, title, settings, done }: { account: Ac
         }
         setOutcome('sending');
     };
-    if (outcome) return <Outcome account={view} title={title} outcome={outcome} done={done} again={() => setAttempt((n) => n + 1)} settings={settings} />;
+    if (outcome) return <Outcome account={view} job={job} title={title} outcome={outcome} done={done} again={() => setAttempt((n) => n + 1)} settings={settings} />;
     const expiry = lifetime ? { ...lifetime, refresh: () => setAttempt((n) => n + 1) } : undefined;
-    if (!approval) return <Pending account={view} title={title} lifetime={lifetime} reject={() => answer(false)} />;
+    if (!approval) return <Pending account={view} job={job} title={title} lifetime={lifetime} reject={() => answer(false)} />;
     return <Approve approval={approval} answers={{ answer }} expiry={expiry} life={life} />;
 }
 
-// What is taken back, above the review.
-const Taken = ({ title }: { title: string }) => (
+// What is done, above the review.
+const Taken = ({ job, title }: { job: Job; title: string }) => (
     <Block>
-        <Heading>Taking back</Heading>
+        <Heading>{job.doing}</Heading>
         <p className="text-xs font-bold">{title}</p>
     </Block>
 );
 
+const siteOf = (job: Job) => (job.kind === 'stake' ? STAKING : TAKING_BACK);
+
 // The review's frame at once, while the background simulates it: Next waits for it.
-function Pending({ account, title, lifetime, reject }: { account: AccountView; title: string; lifetime: { from: number; until: number } | null; reject: () => void }) {
+function Pending({ account, job, title, lifetime, reject }: { account: AccountView; job: Job; title: string; lifetime: { from: number; until: number } | null; reject: () => void }) {
     const now = useNow(lifetime ? 250 : null);
     const actions = (
         <>
@@ -117,17 +137,17 @@ function Pending({ account, title, lifetime, reject }: { account: AccountView; t
         </>
     );
     return (
-        <Frame site={TAKING_BACK} account={account} network={null} steps={<Steps at={0} />} left={lifetime && <Left from={lifetime.from} until={lifetime.until} now={now} />} actions={actions}>
-            <Taken title={title} />
+        <Frame site={siteOf(job)} account={account} network={null} steps={<Steps at={0} />} left={lifetime && <Left from={lifetime.from} until={lifetime.until} now={now} />} actions={actions}>
+            <Taken job={job} title={title} />
         </Frame>
     );
 }
 
 // Signed, in the same frame: on its way, then done, failed onchain, or not sent. One that did not go builds again with a
 // fresh blockhash.
-function Outcome({ account, title, outcome, done, again, settings }: { account: AccountView; title: string; outcome: 'sending' | Reply; done: (landed: boolean) => void; again: () => void; settings: Settings }) {
+function Outcome({ account, job, title, outcome, done, again, settings }: { account: AccountView; job: Job; title: string; outcome: 'sending' | Reply; done: (landed: boolean) => void; again: () => void; settings: Settings }) {
     const signature = outcome !== 'sending' && typeof outcome.result?.signature === 'string' ? outcome.result.signature : null;
-    const [tone, heading, words] = told(outcome);
+    const [tone, heading, words] = told(outcome, job);
     const landed = outcome !== 'sending' && outcome.ok && outcome.result?.outcome === 'confirmed';
     const actions = () => {
         if (outcome === 'sending' || landed || (outcome.ok && outcome.result?.outcome === 'unknown')) {
@@ -147,8 +167,8 @@ function Outcome({ account, title, outcome, done, again, settings }: { account: 
         );
     };
     return (
-        <Frame site={TAKING_BACK} account={account} network={null} actions={actions()}>
-            <Taken title={title} />
+        <Frame site={siteOf(job)} account={account} network={null} actions={actions()}>
+            <Taken job={job} title={title} />
             <div role="status" className={`outcome flex items-center gap-3 rounded-[3px] border p-3.5 ${tone === 'plain' ? 'border-rule text-ink' : `border-current ${filled(tone)}`}`}>
                 <Icon name={outcome === 'sending' ? 'refresh' : MARK[tone]} size={28} stroke={2.5} />
                 <div className="flex min-w-0 flex-col gap-1">
@@ -167,10 +187,10 @@ function Outcome({ account, title, outcome, done, again, settings }: { account: 
 }
 
 // What an outcome says: its tone, its title and its words.
-function told(outcome: 'sending' | Reply): [Tone, string, string] {
+function told(outcome: 'sending' | Reply, job: Job): [Tone, string, string] {
     if (outcome === 'sending') return ['plain', 'Sending', 'Signed. The network confirms it in a few seconds.'];
     if (!outcome.ok) return ['danger', 'Not sent', cap(outcome.error ?? 'it failed')];
-    if (outcome.result?.outcome === 'confirmed') return ['ok', 'Taken back', 'Confirmed by the network.'];
+    if (outcome.result?.outcome === 'confirmed') return ['ok', job.landed, 'Confirmed by the network.'];
     if (outcome.result?.outcome === 'failed') return ['danger', 'Failed onchain', 'It landed and failed: only the fee was spent.'];
-    return ['warn', 'Not confirmed yet', 'It may still land: check Access again in a moment.'];
+    return ['warn', 'Not confirmed yet', `It may still land: check ${job.where} again in a moment.`];
 }

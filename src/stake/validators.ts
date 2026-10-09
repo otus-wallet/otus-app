@@ -17,10 +17,11 @@ export type Validator = { vote: Address; node: Address; commission: number; stak
 
 type VoteAccount = { votePubkey: Address; nodePubkey: Address; commission: number; activatedStake: bigint; epochCredits: readonly (readonly [bigint, bigint, bigint])[] };
 
-/** The validators, voting ones first, the best paying first; `names`: each identity's declared name. */
-export async function validatorsOf(rpc: Rpc<SolanaRpcApi>, epoch: bigint, names: ReadonlyMap<string, string>): Promise<Validator[]> {
+/** The validators, voting ones first, the best paying first; `names` gives the declared names of these identities. */
+export async function validatorsOf(rpc: Rpc<SolanaRpcApi>, epoch: bigint, names: (nodes: Set<string>) => Promise<ReadonlyMap<string, string>>): Promise<Validator[]> {
     const { current, delinquent } = await rpc.getVoteAccounts({ commitment: 'confirmed' }).send();
-    return ranked(current as readonly VoteAccount[], delinquent as readonly VoteAccount[], epoch, names);
+    const all = [...current, ...delinquent] as readonly VoteAccount[];
+    return ranked(current as readonly VoteAccount[], delinquent as readonly VoteAccount[], epoch, await names(new Set(all.map((v) => v.nodePubkey))));
 }
 
 /** Vote accounts → validators, ranked: voting first, then by score, then by address for a steady order. */
