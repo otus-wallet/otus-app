@@ -10,14 +10,8 @@ import { App } from './App.tsx';
 import { forgetActivity, queries, restore } from './query.ts';
 
 stayOpen();
-// Opened from a review window once its transaction landed: on Activity, read afresh, as what was kept is behind.
-async function opened() {
-    const { openOn } = await chrome.storage.session.get('openOn');
-    if (openOn !== 'activity') return;
-    await chrome.storage.session.remove('openOn');
-    history.replaceState(null, '', '#activity');
-}
-void Promise.all([opened().catch(() => {}), restore()]).finally(() => {
+void restore().finally(() => {
+    // Opened on Activity from a review window, once its transaction landed: what was kept of it is behind.
     if (location.hash === '#activity') {
         queries.removeQueries({ queryKey: ['activity'] });
         forgetActivity();

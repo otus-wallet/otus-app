@@ -9,7 +9,7 @@ import { send } from '../send/send.ts';
 import { lockMinutes, walletRpc } from '../settings.ts';
 import { tokens } from '../tokens.ts';
 import type { Approval, Life } from '../ui/view.ts';
-import { answerOf, approve, type Answer } from './approvals.ts';
+import { answerOf, approve, kept, type Answer } from './approvals.ts';
 import { keysCall, lock, LOCK_ALARM, locked, prune, shielded, sign, type KeysCall, type KeysReply } from './keys.ts';
 import { own, serve, takeBack } from './serve.ts';
 import { edited, load, update, type Edit, type State } from './state.ts';
@@ -17,6 +17,8 @@ import { edited, load, update, type Edit, type State } from './state.ts';
 const shell = { load, update, approve, sign, chain: (rpc: string) => rpcChain(rpcAt(rpc)), send: async (signed: Uint8Array, chain: Chain) => send(signed, chain, undefined, (await load()).settings.preflight !== false), tokens, now: Date.now };
 const PAGES = new URL(chrome.runtime.getURL('')).origin;
 const ours = (sender?: chrome.runtime.MessageSender) => sender?.id === chrome.runtime.id && sender.origin === PAGES;
+// Otus's popup: the toolbar's, which no tab holds, or Otus's own home page in a review window it kept open after a yes.
+const popup = (sender?: chrome.runtime.MessageSender) => !sender?.tab || (kept.has(sender.tab.windowId) && sender.url?.split('#')[0] === chrome.runtime.getURL('home.html'));
 const tabs = new Map<number, { origin: string; documentId?: string }>(); // documents that called, to tell them when their accounts change
 let reviewing: chrome.runtime.Port | null = null; // the popup's port whose transfer is being reviewed
 
@@ -116,7 +118,7 @@ async function settle(restart = true) {
 // its signature, so a worker that stops can still tell), then the outcome. What the popup makes to take access back
 // (`fix`) goes the same way, and only Access hears how it went.
 chrome.runtime.onConnect.addListener((port) => {
-    if (port.name !== 'own' || !ours(port.sender) || port.sender?.tab) return; // the toolbar popup's alone
+    if (port.name !== 'own' || !ours(port.sender) || !popup(port.sender)) return; // the toolbar popup's alone, or a review window gone on to Activity
     let started = false;
     let gone = false;
     let asked: { approval: Approval; ready: boolean; decide: (answer: Answer) => void } | null = null;
@@ -206,7 +208,7 @@ chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== 'open' || !ours(port.sender)) return;
     // The toolbar popup, which no tab holds, and the setup tab: any other page of Otus's in a tab or window, as another
     // extension can open one, keeps nothing open.
-    if (port.sender?.tab && port.sender.url?.split('#')[0] !== chrome.runtime.getURL('welcome.html')) return;
+    if (!popup(port.sender) && port.sender?.url?.split('#')[0] !== chrome.runtime.getURL('welcome.html')) return;
     open++;
     port.onMessage.addListener(settle); // the page is still there
     port.onDisconnect.addListener(() => (open--, settle()));

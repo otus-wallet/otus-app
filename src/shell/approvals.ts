@@ -14,6 +14,8 @@ export type Answer = boolean | SignatureBytes | { account: Address };
 type Pending = { approval: Approval; ready: boolean; told?: (approval: Approval) => void; follow?: (tell: (life: Life) => void) => void; decide: (answer: Answer) => void; port?: chrome.runtime.Port };
 const pending = new Map<string, Pending>();
 const windows = new Map<number, string>(); // approval windows, to the request they ask about
+/** Approval windows kept open after a yes: one may go on to Activity, where Otus is as its popup is. */
+export const kept = new Set<number>();
 
 /** Opens a window asking the user; true only when they approve, or for a Ledger account the signature its window got
  *  from the device on approval (serve checks it), or, to connect, the account they chose there (serve checks it is
@@ -54,8 +56,10 @@ export async function approve(approval: Approval, follow?: (tell: (life: Life) =
         const port = asked?.port;
         if (opened?.id !== undefined) {
             windows.delete(opened.id);
-            if (answer !== false && after && port) after((outcome) => void tellPort(port, { outcome }));
-            else chrome.windows.remove(opened.id).catch(() => {});
+            if (answer !== false && after && port) {
+                kept.add(opened.id);
+                after((outcome) => void tellPort(port, { outcome }));
+            } else chrome.windows.remove(opened.id).catch(() => {});
         }
     }
 }
@@ -98,6 +102,7 @@ function tellPort(port: chrome.runtime.Port, message: object) {
 
 // A window closed before its page connected says no as well.
 chrome.windows.onRemoved.addListener((window) => {
+    kept.delete(window);
     const id = windows.get(window);
     if (id !== undefined) pending.get(id)?.decide(false);
 });
