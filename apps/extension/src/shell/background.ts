@@ -8,12 +8,13 @@ import type { KeysCall, KeysReply } from '@otus-wallet/core/keystore.ts';
 import { rpcChain, type Chain } from '@otus-wallet/sdk/chain';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
 import { send } from '@otus-wallet/core/send/send.ts';
+import { throughSender } from '@otus-wallet/core/swap/sender.ts';
 import { lockMinutes, OTUS_RPC, rpcFor, walletRpc } from '@otus-wallet/core/settings.ts';
 import { tokens } from '@otus-wallet/core/tokens.ts';
 import type { Approval, Life } from '@otus-wallet/core/view.ts';
 import { answerOf, approve, kept, type Answer } from './approvals.ts';
 import { keysCall, lock, LOCK_ALARM, locked, prune, shielded, sign } from './keys.ts';
-import { own, serve, stakeOwn, takeBack } from './serve.ts';
+import { own, serve, stakeOwn, swapOwn, takeBack } from './serve.ts';
 import { edited, load, update, type Edit, type State } from '@otus-wallet/core/state.ts';
 
 const shell = {
@@ -26,6 +27,7 @@ const shell = {
     // Through Otus's server when mainnet is read through it: see tokens.ts.
     tokens: async (mints: string[]) => tokens(mints, rpcFor('solana:mainnet', (await load()).settings) === OTUS_RPC),
     now: Date.now,
+    fast: throughSender,
 };
 const PAGES = new URL(chrome.runtime.getURL('')).origin;
 const ours = (sender?: chrome.runtime.MessageSender) => sender?.id === chrome.runtime.id && sender.origin === PAGES;
@@ -128,7 +130,8 @@ async function settle(restart = true) {
 // gets the review back, and answers on it; then it hears how it went. A popup closed before answering says no. Once
 // approved, how it goes is kept for the lobby too, as the popup may close while it lands: on its way, then signed (with
 // its signature, so a worker that stops can still tell), then the outcome. What the popup makes to take access back
-// (`fix`), or for native stake (`stake`), goes the same way, and only the screen that made it hears how it went.
+// (`fix`), for native stake (`stake`) or a swap (`swap`), goes the same way, and only the screen that made it hears how
+// it went.
 chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== 'own' || !ours(port.sender) || !popup(port.sender)) return; // the toolbar popup's alone, or a review window gone on to Activity
     let started = false;
@@ -141,7 +144,7 @@ chrome.runtime.onConnect.addListener((port) => {
         done();
         asked?.decide(false);
     });
-    port.onMessage.addListener((m: { own?: unknown; account?: unknown; to?: unknown; fix?: unknown; stake?: unknown; approve?: unknown; signature?: unknown }) => {
+    port.onMessage.addListener((m: { own?: unknown; account?: unknown; to?: unknown; fix?: unknown; stake?: unknown; swap?: unknown; approve?: unknown; signature?: unknown }) => {
         // A yes counts only while Otus is unlocked, as in an approval window: a Ledger's needs no keystore to sign.
         if (asked && 'approve' in m) {
             const { decide, approval, ready } = asked;
@@ -154,13 +157,15 @@ chrome.runtime.onConnect.addListener((port) => {
         const { own: bytes, account, to } = m;
         const fixing = m.fix === true;
         const staking = m.stake === true;
-        // A transfer names whom it pays; taking access back or stake names no one: one of them, never two.
-        if (started || typeof bytes !== 'string' || typeof account !== 'string' || (fixing && staking) || (typeof to === 'string') === (fixing || staking)) return;
+        const swapping = m.swap === true;
+        // A transfer names whom it pays; taking access back, stake or a swap names no one: one of them, never two.
+        const kinds = [fixing, staking, swapping].filter(Boolean).length;
+        if (started || typeof bytes !== 'string' || typeof account !== 'string' || kinds > 1 || (typeof to === 'string') === (kinds === 1)) return;
         started = true;
         if (reviewing && reviewing !== port) return tell({ done: { ok: false, error: 'Another transfer of yours is being reviewed' } });
         reviewing = port;
         let told = null as Promise<void> | null; // once approved: what the lobby is told, in order
-        const record = (last: object) => (fixing || staking ? Promise.resolve() : (told = (told ?? Promise.resolve()).then(() => chrome.storage.session.set({ lastTransfer: { ...last, at: Date.now() } }))));
+        const record = (last: object) => (kinds === 1 ? Promise.resolve() : (told = (told ?? Promise.resolve()).then(() => chrome.storage.session.set({ lastTransfer: { ...last, at: Date.now() } }))));
         const approve = (approval: Approval, follow?: (tell: (life: Life) => void) => void, later?: Promise<Approval>) =>
             new Promise<Answer>((decide) => {
                 follow?.((life) => tell({ life }));
@@ -199,7 +204,7 @@ chrome.runtime.onConnect.addListener((port) => {
                 return record({ pending: true, signature });
             };
             const wire = new Uint8Array(getBase64Encoder().encode(bytes));
-            const reply = fixing ? await takeBack(wire, account, { ...shell, approve }, signed) : staking ? await stakeOwn(wire, account, { ...shell, approve }, signed) : await own(wire, account, to as string, { ...shell, approve }, signed);
+            const reply = await ownJob(wire, account, to, { ...shell, approve }, signed, { fixing, staking, swapping });
             if (told) await record(reply);
             return reply;
         })().finally(() => {
@@ -273,3 +278,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
     });
 });
 chrome.tabs.onRemoved.addListener((tab) => tabs.delete(tab));
+
+// Which of Otus's own jobs the popup sent, to its handler.
+function ownJob(wire: Uint8Array, account: string, to: unknown, s: Parameters<typeof own>[3], signed: (signature: Signature) => Promise<unknown>, kind: { fixing: boolean; staking: boolean; swapping: boolean }) {
+    if (kind.fixing) return takeBack(wire, account, s, signed);
+    if (kind.staking) return stakeOwn(wire, account, s, signed);
+    if (kind.swapping) return swapOwn(wire, account, s, signed);
+    return own(wire, account, to as string, s, signed);
+}

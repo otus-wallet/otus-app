@@ -6,7 +6,7 @@ import { createAddressWithSeed, getBase58Decoder, getBase64Decoder, getPublicKey
 import { COMPUTE_BUDGET_PROGRAM_ADDRESS } from '@solana-program/compute-budget';
 import { STAKE_PROGRAM_ADDRESS } from '@solana-program/stake';
 import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
-import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
+import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
 import type { Chain } from '@otus-wallet/sdk/chain';
 import { gate } from '../gate.ts';
@@ -18,10 +18,12 @@ import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Review } from '@otus-wallet/sdk/review/review';
 import { programsCalled } from '@otus-wallet/sdk/review/sites';
 import { delegatesGiven, waitingOn } from '@otus-wallet/sdk/access/access';
-import { isTokenProgram } from '@otus-wallet/sdk/programs/addresses';
+import { isTokenProgram, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { timedOut } from '@otus-wallet/sdk/rpc';
 import type { Sent } from '@otus-wallet/core/send/send.ts';
 import { STAKE_SPACE } from '@otus-wallet/core/send/stake.ts';
+import { SENDER_TIPS, TIP } from '@otus-wallet/core/swap/build.ts';
+import { JUPITER } from '@otus-wallet/core/swap/route.ts';
 import { explorerOf, networkOf, rpcFor } from '@otus-wallet/core/settings.ts';
 import { signInFields, signInText } from '../siws.ts';
 import type { TokenInfo } from '@otus-wallet/core/tokens.ts';
@@ -41,6 +43,7 @@ export type Shell = {
     send(signed: Uint8Array, chain: Chain): Promise<Sent>; // sent, then watched until it lands or cannot
     tokens(mints: string[]): Promise<Map<string, TokenInfo | null>>; // names and prices, from Jupiter
     now(): number; // ms since 1970
+    fast?(chain: Chain): Chain; // the chain a swap lands through: Helius Sender's, by Otus's server; without it, the chain itself
 };
 
 const NOT_CONNECTED = 'this site is not connected to that account';
@@ -51,6 +54,7 @@ const NO_SIGNER = 'no account in Otus can sign: a watched one cannot connect';
 const OWN_SITE: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Your own transfer', tone: 'plain' };
 const TAKING_BACK: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Taking access back', tone: 'plain' };
 const STAKING: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Your own stake', tone: 'plain' };
+const SWAPPING: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Your own swap', tone: 'plain' };
 
 /** A site's call and the origin the browser gave → the reply for the site. */
 export function serve(call: unknown, origin: string, shell: Shell): Promise<Reply> {
@@ -266,6 +270,68 @@ export function stakeOwn(bytes: Uint8Array, address: string, shell: Shell, signe
         },
         { rejected: 'You rejected it', failed: 'Otus could not send it' },
     );
+}
+
+/** What the popup made for a swap (a Jupiter route, built by Otus with a tip to Helius Sender) → reviewed and approved
+ *  like a site's transaction, then signed and landed through Sender, on mainnet only; `signed` hears the signature
+ *  before it is sent. It is that account's alone to sign, and does nothing else. The reply says whether it landed or
+ *  failed onchain. */
+export function swapOwn(bytes: Uint8Array, address: string, shell: Shell, signed?: (signature: Signature) => Promise<unknown>): Promise<Reply> {
+    return reply(
+        async () => {
+            const state = await shell.load();
+            const account = accountOf(state, address);
+            if (!account || !signs(account)) throw new Refused(NO_KEY);
+            const cluster = networkOf(state.settings); // the network the wallet shows
+            if (cluster !== 'solana:mainnet') throw new Refused('swaps are on mainnet only');
+            const chain = shell.chain(rpcFor(cluster, state.settings));
+            const way = { cluster, chain, site: SWAPPING, blockhash: chain.latest(), context: { signedBefore: null, own: true } } as const;
+            const { r, p, signature: signedOnDevice } = await approved(bytes, account, way, shell, async (r) => {
+                if (r.signers.some((s) => s !== account.address)) throw new Refused('another account would have to sign it');
+                if (!(await swapsOnly(r, account.address))) throw new Refused('it does more than swap');
+            });
+            if (!(signedOnDevice && onDevice(account))) await unexpired(r, chain);
+            const signature = await signFor(account, messageOf(p.bytes), shell, null, signedOnDevice);
+            await signed?.(getBase58Decoder().decode(signature) as Signature);
+            return landed(withSignature(p.bytes, account.address, signature), shell.fast?.(chain) ?? chain, shell);
+        },
+        { rejected: 'You rejected it', failed: 'Otus could not send it' },
+    );
+}
+
+// A v0 message with Compute Budget's SetComputeUnitLimit (2) first and a tip to one of Sender's accounts last (System's
+// Transfer, 2, of exactly TIP from the owner), and between them only what a Jupiter route sets up, swaps and cleans up
+// for this owner: its token accounts opened (Associated Token's CreateIdempotent, 1, paid by it, for it), SOL moved into
+// its own wrapped-SOL account (Transfer) and synced (a token program's SyncNative, 17), Jupiter's one swap, and a token
+// account of its closed back to it (CloseAccount, 9). Jupiter's swap is opaque: the review simulates it, and the guards
+// hold what comes of it.
+async function swapsOnly(r: Review, owner: Address): Promise<boolean> {
+    type Ix = Review['message']['instructions'][number];
+    const program = (ix: Ix) => r.accounts[ix.programAddressIndex].address;
+    const at = (ix: Ix, i: number) => r.accounts[ix.accountIndices[i]]?.address;
+    const transfer = (ix: Ix, to: (a: Address | undefined) => boolean, lamports?: bigint) =>
+        program(ix) === SYSTEM_PROGRAM_ADDRESS && ix.data.length === 12 && ix.accountIndices.length === 2 && new DataView(ix.data.buffer, ix.data.byteOffset, 12).getUint32(0, true) === 2 && at(ix, 0) === owner && to(at(ix, 1)) && (lamports === undefined || new DataView(ix.data.buffer, ix.data.byteOffset, 12).getBigUint64(4, true) === lamports);
+    const instructions = r.message.instructions;
+    const [limit] = instructions;
+    const tip = instructions.at(-1);
+    if (r.message.version !== 0 || instructions.length < 3 || !limit || !tip || program(limit) !== COMPUTE_BUDGET_PROGRAM_ADDRESS || limit.data.length !== 5 || limit.data[0] !== 2) return false;
+    if (!transfer(tip, (a) => a !== undefined && SENDER_TIPS.includes(a), TIP)) return false;
+    const [wrapped] = await findAssociatedTokenPda({ owner, mint: WSOL, tokenProgram: TOKEN_PROGRAM_ADDRESS });
+    let swaps = 0;
+    for (const ix of instructions.slice(1, -1)) {
+        const p = program(ix);
+        if (p === JUPITER) swaps++;
+        else if (p === ASSOCIATED_TOKEN_PROGRAM_ADDRESS) {
+            if (ix.data.length !== 1 || ix.data[0] !== 1 || ix.accountIndices.length !== 6 || at(ix, 0) !== owner || at(ix, 2) !== owner) return false;
+        } else if (p === SYSTEM_PROGRAM_ADDRESS) {
+            if (!transfer(ix, (a) => a === wrapped)) return false;
+        } else if (isTokenProgram(p)) {
+            const syncs = ix.data.length === 1 && ix.data[0] === 17 && ix.accountIndices.length === 1 && at(ix, 0) === wrapped;
+            const closes = ix.data.length === 1 && ix.data[0] === 9 && ix.accountIndices.length === 3 && at(ix, 1) === owner && at(ix, 2) === owner;
+            if (!syncs && !closes) return false;
+        } else return false;
+    }
+    return swaps === 1;
 }
 
 // A legacy or v0 message (v1's limits and fee live in its config) with Compute Budget's SetComputeUnitLimit (2) first,

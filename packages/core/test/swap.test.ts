@@ -4,7 +4,10 @@ import { test } from 'node:test';
 
 import { address, type Address, type Blockhash } from '@solana/kit';
 
+import type { Chain } from '@otus-wallet/sdk/chain';
 import { decode } from '@otus-wallet/sdk/review/decode';
+import { OTUS_RPC } from '../src/settings.ts';
+import { throughSender } from '../src/swap/sender.ts';
 import { fittingRoute, MOST_ACCOUNTS, SENDER_TIPS, swapping, TIP } from '../src/swap/build.ts';
 import { JUPITER, readRoute, type Ask } from '../src/swap/route.ts';
 
@@ -127,4 +130,23 @@ test('a route too large to leave room for the guards is asked again with fewer a
     asked.length = 0;
     await fittingRoute({ input: TAKER, output: TAKER, amount: 1n, taker: TAKER, slippageBps: 50 }, async (ask) => (asked.push(ask.maxAccounts), readRoute(ROUTES['usdc-sol'], askOf(ROUTES['usdc-sol']))));
     assert.deepEqual(asked, [MOST_ACCOUNTS[0]]);
+});
+
+test("a swap is sent to Otus's server for Sender, as the server takes it; all else is read from the chain as before", async (t) => {
+    const posts: { url: string; body: Record<string, unknown> }[] = [];
+    t.mock.method(globalThis, 'fetch', async (url: string, init: { body: string }) => {
+        posts.push({ url: String(url), body: JSON.parse(init.body) });
+        return new Response(JSON.stringify({ jsonrpc: '2.0', id: posts.at(-1)!.body.id, result: '5'.repeat(88) }), { headers: { 'content-type': 'application/json' } });
+    });
+    const asked: string[] = [];
+    const chain = { status: async () => (asked.push('status'), null), send: async () => void asked.push('chain send') } as unknown as Chain;
+    const fast = throughSender(chain);
+    await fast.send(Uint8Array.of(1, 2, 3), true);
+    await fast.status('x' as never);
+    assert.equal(posts.length, 1);
+    assert.equal(posts[0].url, `${OTUS_RPC}/send`);
+    assert.equal(posts[0].body.method, 'sendTransaction');
+    // Kit adds the commitment of its own: one of the fields Otus's server takes, and writes anew.
+    assert.deepEqual(posts[0].body.params, ['AQID', { encoding: 'base64', skipPreflight: true, maxRetries: 0, preflightCommitment: 'confirmed' }]);
+    assert.deepEqual(asked, ['status']);
 });

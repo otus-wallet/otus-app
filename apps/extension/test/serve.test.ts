@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { getTransferSolInstruction } from '@solana-program/system';
-import { getCreateAssociatedTokenIdempotentInstruction, getRevokeInstruction, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
+import { findAssociatedTokenPda, getCloseAccountInstruction, getCreateAssociatedTokenIdempotentInstruction, getRevokeInstruction, getSyncNativeInstruction, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import {
     AccountRole,
+    address,
     appendTransactionMessageInstruction,
     blockhash,
     compileTransaction,
@@ -39,7 +40,9 @@ import { send } from '@otus-wallet/core/send/send.ts';
 import { DEFAULT_SETTINGS, OTUS_RPC } from '@otus-wallet/core/settings.ts';
 import type { Answer } from '../src/shell/approvals.ts';
 import { fix } from '@otus-wallet/core/send/fix.ts';
-import { own, serve, stakeOwn, takeBack, type Shell } from '../src/shell/serve.ts';
+import { own, serve, stakeOwn, swapOwn, takeBack, type Shell } from '../src/shell/serve.ts';
+import { SENDER_TIPS, swapping, TIP } from '@otus-wallet/core/swap/build.ts';
+import { JUPITER, type Route } from '@otus-wallet/core/swap/route.ts';
 import { staking, stakeAt } from '@otus-wallet/core/send/stake.ts';
 import { getCompiledTransactionMessageDecoder, getCompiledTransactionMessageEncoder } from '@solana/kit';
 import { followed } from '../src/shell/transaction.ts';
@@ -793,4 +796,76 @@ test('what the popup makes for stake is reviewed as Otus’s own, signed and sen
     const theirs = await staking(key(5), { kind: 'unstake', stake }, life);
     assert.match(((await stakeOwn(theirs, w.me, w.shell)) as { error: string }).error, /does not sign this transaction/);
     assert.equal(w.sent.length, 4);
+});
+
+
+// SyncNative as Jupiter's routes have it: the account alone (the generated client adds the rent sysvar).
+const syncNative = (account: Address) => ({ programAddress: TOKEN_PROGRAM_ADDRESS, accounts: [{ address: account, role: AccountRole.WRITABLE }], data: Uint8Array.of(17) });
+
+// A swap as Otus builds it from a Jupiter route, SOL for USDC: the wrapped-SOL account opened, SOL moved in and synced,
+// the USDC account opened, Jupiter's swap (its accounts opaque), the wrapped-SOL account closed back; `change` bends it.
+async function swapFor(me: Address, change: (r: Route, at: { wrapped: Address; usdc: Address }) => void = () => {}, tip = SENDER_TIPS[0]) {
+    const WSOL = address('So11111111111111111111111111111111111111112');
+    const USDC = address('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+    const [wrapped] = await findAssociatedTokenPda({ owner: me, mint: WSOL, tokenProgram: TOKEN_PROGRAM_ADDRESS });
+    const [usdc] = await findAssociatedTokenPda({ owner: me, mint: USDC, tokenProgram: TOKEN_PROGRAM_ADDRESS });
+    const signer = createNoopSigner(me);
+    const route: Route = {
+        ask: { input: WSOL, output: USDC, amount: 10_000_000n, taker: me, slippageBps: 50, maxAccounts: 64 },
+        out: 1_000_000n,
+        least: 995_000n,
+        impact: null,
+        venues: [{ label: 'Whirlpool', share: 100 }],
+        setup: [
+            getCreateAssociatedTokenIdempotentInstruction({ payer: signer, ata: wrapped, owner: me, mint: WSOL }),
+            getTransferSolInstruction({ source: signer, destination: wrapped, amount: 10_000_000n }),
+            syncNative(wrapped),
+            getCreateAssociatedTokenIdempotentInstruction({ payer: signer, ata: usdc, owner: me, mint: USDC }),
+        ],
+        swap: { programAddress: JUPITER, accounts: [{ address: me, role: AccountRole.WRITABLE_SIGNER }, { address: wrapped, role: AccountRole.WRITABLE }, { address: usdc, role: AccountRole.WRITABLE }, { address: key(30), role: AccountRole.WRITABLE }], data: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]) },
+        cleanup: [getCloseAccountInstruction({ account: wrapped, destination: me, owner: signer })],
+        tables: {},
+    };
+    change(route, { wrapped, usdc });
+    return swapping(route, { blockhash: blockhash(key(9)), lastValidBlockHeight: 0n }, tip);
+}
+
+test('what the popup makes for a swap is reviewed as Otus’s own, signed and landed through Sender; anything more is refused', async () => {
+    const w = await wallet();
+    const landedFast: Uint8Array[] = [];
+    const fast = { ...w.shell, fast: (c: Chain) => ({ ...c, send: async (tx: Uint8Array) => void landedFast.push(tx) }) };
+    assert.equal(result<{ outcome: string }>(await swapOwn(await swapFor(w.me), w.me, fast)).outcome, 'confirmed');
+    const shown = w.approvals[0];
+    assert.ok(shown.kind === 'transaction');
+    assert.deepEqual([shown.site.host, shown.site.note], ['Otus', 'Your own swap']);
+    assert.equal(landedFast.length, 1, 'sent through Sender');
+    assert.equal(w.sent.length, 0, 'not through the RPC');
+    // Bent: one more transfer out, an account opened for another, a token account closed to another, SOL moved to an
+    // account other than the wallet's wrapped SOL, Jupiter twice, a tip elsewhere.
+    const bent: [string, Promise<Uint8Array>][] = [
+        ['a transfer out', swapFor(w.me, (r) => r.setup.push(getTransferSolInstruction({ source: createNoopSigner(w.me), destination: key(6), amount: 1n })))],
+        ['an account for another', swapFor(w.me, (r) => (r.setup[3] = getCreateAssociatedTokenIdempotentInstruction({ payer: createNoopSigner(w.me), ata: key(31), owner: key(6), mint: key(32) })))],
+        ['closed to another', swapFor(w.me, (r, a) => (r.cleanup = [getCloseAccountInstruction({ account: a.wrapped, destination: key(6), owner: createNoopSigner(w.me) })]))],
+        ['SOL elsewhere', swapFor(w.me, (r, a) => (r.setup[1] = getTransferSolInstruction({ source: createNoopSigner(w.me), destination: a.usdc, amount: 10_000_000n })))],
+        ['synced elsewhere', swapFor(w.me, (r, a) => (r.setup[2] = syncNative(a.usdc)))],
+        ['synced with more accounts', swapFor(w.me, (r, a) => (r.setup[2] = getSyncNativeInstruction({ account: a.wrapped })))],
+        ['Jupiter twice', swapFor(w.me, (r) => r.setup.push(r.swap))],
+        ['no swap', swapFor(w.me, (r) => (r.swap = syncNative(key(33))))],
+        ['a tip elsewhere', swapFor(w.me, () => {}, key(7))],
+    ];
+    for (const [what, made] of bent) assert.match(((await swapOwn(await made, w.me, fast)) as { error: string }).error, /does more than swap/, what);
+    // The tip's amount, or the limit's place, changed in the bytes.
+    const made = await swapFor(w.me);
+    const tx = getTransactionDecoder().decode(made);
+    const message = getCompiledTransactionMessageDecoder().decode(tx.messageBytes) as { instructions: { data?: Uint8Array }[] };
+    const rewritten = (instructions: unknown[]) => new Uint8Array(getTransactionEncoder().encode({ ...tx, messageBytes: getCompiledTransactionMessageEncoder().encode({ ...message, instructions } as never) } as never));
+    const more = message.instructions.map((x, i) => (i === message.instructions.length - 1 ? { ...x, data: Uint8Array.from([2, 0, 0, 0, ...new Uint8Array(new BigUint64Array([TIP + 1n]).buffer)]) } : x));
+    assert.match(((await swapOwn(rewritten(more), w.me, fast)) as { error: string }).error, /does more than swap/, 'a larger tip');
+    assert.match(((await swapOwn(rewritten(message.instructions.slice(1)), w.me, fast)) as { error: string }).error, /does more than swap/, 'no limit first');
+    // A transfer is no swap; nor is a swap another wallet signs; nor one off mainnet.
+    assert.match(((await swapOwn(bytes(w.transfer()), w.me, fast)) as { error: string }).error, /does more than swap/);
+    assert.match(((await swapOwn(await swapFor(key(5)), w.me, fast)) as { error: string }).error, /does not sign this transaction/);
+    await w.shell.update((s) => ({ settings: { ...s.settings, network: 'devnet' } }));
+    assert.match(((await swapOwn(made, w.me, fast)) as { error: string }).error, /mainnet only/);
+    assert.equal(landedFast.length, 1);
 });
