@@ -1,22 +1,28 @@
-// Token names, logos and prices from Jupiter's token API, for the popup's balances and the review's lines. Jupiter
-// learns which tokens are looked up; each is asked once while the page or worker lives.
+// Token names, logos and prices from Jupiter's token search, for the popup's balances and the review's lines: through
+// Otus's server when mainnet is read through it (Jupiter then learns what Otus asks, not who), else from Jupiter
+// itself, keyless, so that a wallet on an RPC of its own asks Otus's server nothing. Each token is asked once while the
+// page or worker lives.
 import { latin } from '@otus-wallet/sdk/review/sites';
+
+import { OTUS_RPC } from './settings.ts';
 
 export type TokenInfo = { id: string; name: string; symbol: string; icon: string | null; verified: boolean; usdPrice: number | null; change24h: number | null; decimals: number | null }; // change24h: percent
 
-const JUPITER = 'https://lite-api.jup.ag/tokens/v2/search';
+const THROUGH_OTUS = `${OTUS_RPC}/tokens`;
+const JUPITER = 'https://api.jup.ag/tokens/v2/search';
 const PER_SEARCH = 100; // mints in one search
 const WAIT = 8_000; // ms for Jupiter to answer, after which the tokens go without
 
 const looked = new Map<string, TokenInfo | null>(); // null: Jupiter does not know it
 
-/** What Jupiter says of these mints; an empty answer for those it does not know, or when it does not answer. */
-export async function tokens(mints: string[]): Promise<Map<string, TokenInfo | null>> {
+/** What Jupiter says of these mints, through Otus's server or not; an empty answer for those it does not know, or
+ *  when it does not answer. */
+export async function tokens(mints: string[], throughOtus: boolean): Promise<Map<string, TokenInfo | null>> {
     const asking = [...new Set(mints)].filter((m) => !looked.has(m));
     try {
         for (let i = 0; i < asking.length; i += PER_SEARCH) {
             const batch = asking.slice(i, i + PER_SEARCH);
-            const response = await fetch(`${JUPITER}?query=${batch.join(',')}`, { credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(WAIT) });
+            const response = await fetch(`${throughOtus ? THROUGH_OTUS : JUPITER}?query=${batch.join(',')}`, { credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(WAIT) });
             if (!response.ok) throw new Error(`Jupiter answered ${response.status}`);
             const found = new Map((await response.json() as unknown[]).flatMap((t) => (info(t) ? [[info(t)!.id, info(t)!] as const] : [])));
             for (const m of batch) looked.set(m, found.get(m) ?? null);

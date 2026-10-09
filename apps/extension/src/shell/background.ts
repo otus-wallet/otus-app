@@ -8,7 +8,7 @@ import type { KeysCall, KeysReply } from '@otus-wallet/core/keystore.ts';
 import { rpcChain, type Chain } from '@otus-wallet/sdk/chain';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
 import { send } from '@otus-wallet/core/send/send.ts';
-import { lockMinutes, walletRpc } from '@otus-wallet/core/settings.ts';
+import { lockMinutes, OTUS_RPC, rpcFor, walletRpc } from '@otus-wallet/core/settings.ts';
 import { tokens } from '@otus-wallet/core/tokens.ts';
 import type { Approval, Life } from '@otus-wallet/core/view.ts';
 import { answerOf, approve, kept, type Answer } from './approvals.ts';
@@ -16,7 +16,17 @@ import { keysCall, lock, LOCK_ALARM, locked, prune, shielded, sign } from './key
 import { own, serve, stakeOwn, takeBack } from './serve.ts';
 import { edited, load, update, type Edit, type State } from '@otus-wallet/core/state.ts';
 
-const shell = { load, update, approve, sign, chain: (rpc: string) => rpcChain(rpcAt(rpc)), send: async (signed: Uint8Array, chain: Chain) => send(signed, chain, undefined, (await load()).settings.preflight !== false), tokens, now: Date.now };
+const shell = {
+    load,
+    update,
+    approve,
+    sign,
+    chain: (rpc: string) => rpcChain(rpcAt(rpc)),
+    send: async (signed: Uint8Array, chain: Chain) => send(signed, chain, undefined, (await load()).settings.preflight !== false),
+    // Through Otus's server when mainnet is read through it: see tokens.ts.
+    tokens: async (mints: string[]) => tokens(mints, rpcFor('solana:mainnet', (await load()).settings) === OTUS_RPC),
+    now: Date.now,
+};
 const PAGES = new URL(chrome.runtime.getURL('')).origin;
 const ours = (sender?: chrome.runtime.MessageSender) => sender?.id === chrome.runtime.id && sender.origin === PAGES;
 // Otus's popup: the toolbar's, which no tab holds, or Otus's own home page in a review window it kept open after a yes.

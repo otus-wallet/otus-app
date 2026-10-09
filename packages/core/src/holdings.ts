@@ -3,6 +3,7 @@ import { address, type Address } from '@solana/kit';
 
 import { TOKEN_PROGRAMS, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
+import { OTUS_RPC } from './settings.ts';
 import { tokens, type TokenInfo } from './tokens.ts';
 
 /** One asset of the wallet. `usd` is null when Jupiter has no price for it; `native`: SOL itself, not wrapped. */
@@ -53,7 +54,7 @@ export async function holdings(rpcUrl: string, owner: Address, mainnet = true): 
     });
     const always = mainnet ? ALWAYS : [];
     for (const mint of always) if (!units.has(mint)) units.set(mint, { units: 0n, decimals: 6, source: null, most: 0n });
-    const known = mainnet ? await tokens([WSOL, ...units.keys()]) : new Map<string, TokenInfo | null>();
+    const known = mainnet ? await tokens([WSOL, ...units.keys()], rpcUrl === OTUS_RPC) : new Map<string, TokenInfo | null>();
     const value = (mint: string, u: bigint, decimals: number) => {
         const price = known.get(mint)?.usdPrice;
         return typeof price === 'number' ? (Number(u) / 10 ** decimals) * price : null;
