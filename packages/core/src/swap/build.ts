@@ -18,6 +18,7 @@ import {
     type Address,
 } from '@solana/kit';
 
+import { WSOL } from '@otus-wallet/sdk/programs/addresses';
 import type { Lifetime } from '../send/transfer.ts';
 import { routeFor, type Ask, type Route } from './route.ts';
 
@@ -57,11 +58,12 @@ export function swapping(route: Route, lifetime: Lifetime, tipTo = SENDER_TIPS[M
 
 /** The most bytes a v0 transaction may have. */
 const MOST_BYTES = 1232;
-/** What Otus's guards take when it prepares a swap: Lighthouse and three holds (the wallet, the token paid, the token
- *  got), measured at about 260 bytes; two take about 170. */
-const GUARD_ROOM = 260;
+/** What Otus's guards take when it prepares a swap, as measured: Lighthouse and two holds, the wallet and the token
+ *  got or paid when the other side is SOL (its wrapped account is closed, and holds nothing), about 172 bytes; with a
+ *  token on each side, three holds, about 260. With room to spare. */
+const guardRoom = (ask: Pick<Ask, 'input' | 'output'>) => (ask.input === WSOL || ask.output === WSOL ? 190 : 270);
 /** The accounts a route may use, tried in turn: fewer leave more room, at the cost of fewer venues. */
-export const MOST_ACCOUNTS = [64, 48, 36];
+export const MOST_ACCOUNTS = [64, 48, 36, 28, 20];
 
 /** A route for what is asked whose swap leaves room for the guards: asked with fewer accounts while it does not. The
  *  last one tried when none does: then it goes unguarded, and the review says so. */
@@ -69,7 +71,7 @@ export async function fittingRoute(ask: Omit<Ask, 'maxAccounts'>, find: (ask: As
     let route: Route | null = null;
     for (const maxAccounts of MOST_ACCOUNTS) {
         route = await find({ ...ask, maxAccounts });
-        if (swapping(route, SIZED, SENDER_TIPS[0]).length + GUARD_ROOM <= MOST_BYTES) return route;
+        if (swapping(route, SIZED, SENDER_TIPS[0]).length + guardRoom(ask) <= MOST_BYTES) return route;
     }
     return route!;
 }

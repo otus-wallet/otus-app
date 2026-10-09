@@ -2,6 +2,8 @@
 // Otus's server when mainnet is read through it (Jupiter then learns what Otus asks, not who), else from Jupiter
 // itself, keyless, so that a wallet on an RPC of its own asks Otus's server nothing. Each token is asked once while the
 // page or worker lives.
+import { isAddress } from '@solana/kit';
+
 import { latin } from '@otus-wallet/sdk/review/sites';
 
 import { OTUS_RPC } from './settings.ts';
@@ -38,7 +40,9 @@ export async function search(words: string, throughOtus: boolean): Promise<Token
     if (!query) return [];
     const response = await fetch(`${throughOtus ? THROUGH_OTUS : JUPITER}?query=${encodeURIComponent(query)}`, { method: methodFor(throughOtus), credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(WAIT) });
     if (!response.ok) throw new Error(`Jupiter answered ${response.status}`);
-    const found = ((await response.json()) as unknown[]).flatMap((t) => (info(t) ? [info(t)!] : []));
+    const answer: unknown = await response.json();
+    if (!Array.isArray(answer)) throw new Error('Jupiter answered something else');
+    const found = answer.flatMap((t) => (info(t) ? [info(t)!] : []));
     for (const t of found) looked.set(t.id, t);
     return found;
 }
@@ -53,7 +57,7 @@ export const cachedToken = (mint: string): TokenInfo | null => looked.get(mint) 
 // One of Jupiter's answers, read with care: its names come from token makers.
 function info(t: unknown): TokenInfo | null {
     const v = t as { id?: unknown; name?: unknown; symbol?: unknown; icon?: unknown; isVerified?: unknown; usdPrice?: unknown; decimals?: unknown; stats24h?: { priceChange?: unknown } };
-    if (typeof v?.id !== 'string') return null;
+    if (typeof v?.id !== 'string' || !isAddress(v.id)) return null; // a mint's address, or nothing
     return {
         id: v.id,
         name: clean(v.name),

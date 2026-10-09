@@ -9,6 +9,7 @@ import { rpcChain, type Chain } from '@otus-wallet/sdk/chain';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
 import { send } from '@otus-wallet/core/send/send.ts';
 import { throughSender } from '@otus-wallet/core/swap/sender.ts';
+import { askedFrom, type Asked } from '@otus-wallet/core/swap/terms.ts';
 import { lockMinutes, OTUS_RPC, rpcFor, walletRpc } from '@otus-wallet/core/settings.ts';
 import { tokens } from '@otus-wallet/core/tokens.ts';
 import type { Approval, Life } from '@otus-wallet/core/view.ts';
@@ -157,7 +158,9 @@ chrome.runtime.onConnect.addListener((port) => {
         const { own: bytes, account, to } = m;
         const fixing = m.fix === true;
         const staking = m.stake === true;
-        const swapping = m.swap === true;
+        const swapAsked = askedFrom(m.swap); // a swap comes with what was asked for, which it is held to
+        const swapping = swapAsked !== null;
+        if (m.swap !== undefined && !swapping) return;
         // A transfer names whom it pays; taking access back, stake or a swap names no one: one of them, never two.
         const kinds = [fixing, staking, swapping].filter(Boolean).length;
         if (started || typeof bytes !== 'string' || typeof account !== 'string' || kinds > 1 || (typeof to === 'string') === (kinds === 1)) return;
@@ -204,7 +207,7 @@ chrome.runtime.onConnect.addListener((port) => {
                 return record({ pending: true, signature });
             };
             const wire = new Uint8Array(getBase64Encoder().encode(bytes));
-            const reply = await ownJob(wire, account, to, { ...shell, approve }, signed, { fixing, staking, swapping });
+            const reply = await ownJob(wire, account, to, { ...shell, approve }, signed, { fixing, staking, asked: swapAsked });
             if (told) await record(reply);
             return reply;
         })().finally(() => {
@@ -280,9 +283,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
 chrome.tabs.onRemoved.addListener((tab) => tabs.delete(tab));
 
 // Which of Otus's own jobs the popup sent, to its handler.
-function ownJob(wire: Uint8Array, account: string, to: unknown, s: Parameters<typeof own>[3], signed: (signature: Signature) => Promise<unknown>, kind: { fixing: boolean; staking: boolean; swapping: boolean }) {
+function ownJob(wire: Uint8Array, account: string, to: unknown, s: Parameters<typeof own>[3], signed: (signature: Signature) => Promise<unknown>, kind: { fixing: boolean; staking: boolean; asked: Asked | null }) {
     if (kind.fixing) return takeBack(wire, account, s, signed);
     if (kind.staking) return stakeOwn(wire, account, s, signed);
-    if (kind.swapping) return swapOwn(wire, account, s, signed);
+    if (kind.asked) return swapOwn(wire, account, kind.asked, s, signed);
     return own(wire, account, to as string, s, signed);
 }

@@ -28,11 +28,11 @@ const UNSET: Lifetime = { blockhash: '11111111111111111111111111111111' as Block
 type Reply = { ok: boolean; error?: string; result?: { signature?: unknown; outcome?: unknown } };
 type Heard = { review: Approval } | { life: Life } | { done: Reply };
 
-/** What Otus builds, as the background is told it (`fix`: taking access back; `stake`: native stake; `swap`: a swap);
- *  `make` builds it
- *  (again on a retry) for a lifetime; `doing` heads the screen ("Taking back"), `landed` titles it once confirmed
- *  ("Taken back"), and `where` is the screen to check again when that is not known yet. */
-export type Job = { kind: 'fix' | 'stake' | 'swap'; make: (lifetime: Lifetime) => Uint8Array | Promise<Uint8Array>; doing: string; landed: string; where: string };
+/** What Otus builds, as the background is told it (`fix`: taking access back; `stake`: native stake; `swap`: a swap,
+ *  with what `asked` says the last one built was asked for); `make` builds it (again on a retry) for a lifetime;
+ *  `doing` heads the screen ("Taking back"), `landed` titles it once confirmed ("Taken back"), and `where` is the screen
+ *  to check again when that is not known yet. */
+export type Job = { kind: 'fix' | 'stake' | 'swap'; make: (lifetime: Lifetime) => Uint8Array | Promise<Uint8Array>; doing: string; landed: string; where: string; asked?: () => object };
 
 /** `what`: what is taken back, and `title` says it; `done` hears whether it landed, or that the user left. */
 export function TakeBack({ account, what, title, settings, done }: { account: Account; what: Fix; title: string; settings: Settings; done: (landed: boolean) => void }) {
@@ -41,8 +41,9 @@ export function TakeBack({ account, what, title, settings, done }: { account: Ac
 }
 
 /** A job of Otus's own, reviewed, signed and sent here. `job` must stay the same object while it is on: a new one is
- *  built and reviewed anew. */
-export function Doing({ account, job, title, settings, done }: { account: Account; job: Job; title: string; settings: Settings; done: (landed: boolean) => void }) {
+ *  built and reviewed anew. `done` hears whether it landed, and whether it may have gone out (on its way, or not
+ *  confirmed yet): then it should not be made again at once. */
+export function Doing({ account, job, title, settings, done }: { account: Account; job: Job; title: string; settings: Settings; done: (landed: boolean, gone?: boolean) => void }) {
     const [approval, setApproval] = useState<Approval | null>(null);
     const [life, setLife] = useState<Life | undefined>();
     const [outcome, setOutcome] = useState<'sending' | Reply | null>(null);
@@ -95,7 +96,8 @@ export function Doing({ account, job, title, settings, done }: { account: Accoun
                 if (sending.current === p) stop(`Otus stopped while sending it: check ${job.where} again in a moment`);
             });
             try {
-                p.postMessage({ own: getBase64Decoder().decode(bytes), account: account.address, [job.kind]: true });
+                // A swap tells what was asked for, which the background holds it to; the others, only their kind.
+                p.postMessage({ own: getBase64Decoder().decode(bytes), account: account.address, [job.kind]: job.asked?.() ?? true });
             } catch {
                 clearTimeout(late);
                 stop('Otus was reloaded: open it again');
@@ -158,14 +160,14 @@ function Pending({ account, job, title, lifetime, reject }: { account: AccountVi
 
 // Signed, in the same frame: on its way, then done, failed onchain, or not sent. One that did not go builds again with a
 // fresh blockhash.
-function Outcome({ account, job, title, outcome, done, again, settings }: { account: AccountView; job: Job; title: string; outcome: 'sending' | Reply; done: (landed: boolean) => void; again: () => void; settings: Settings }) {
+function Outcome({ account, job, title, outcome, done, again, settings }: { account: AccountView; job: Job; title: string; outcome: 'sending' | Reply; done: (landed: boolean, gone?: boolean) => void; again: () => void; settings: Settings }) {
     const signature = outcome !== 'sending' && typeof outcome.result?.signature === 'string' ? outcome.result.signature : null;
     const [tone, heading, words] = told(outcome, job);
     const landed = outcome !== 'sending' && outcome.ok && outcome.result?.outcome === 'confirmed';
     const actions = () => {
         if (outcome === 'sending' || landed || (outcome.ok && outcome.result?.outcome === 'unknown')) {
             return (
-                <Answer variant={outcome === 'sending' ? 'outline' : 'default'} onClick={() => done(landed)}>
+                <Answer variant={outcome === 'sending' ? 'outline' : 'default'} onClick={() => done(landed, true)}>
                     {outcome === 'sending' ? 'Close' : 'Done'}
                 </Answer>
             );

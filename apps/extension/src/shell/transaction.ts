@@ -100,9 +100,9 @@ export type Way = { cluster: Cluster; chain: Chain; site: SiteView; recipient?: 
  * A transaction for this account → reviewed; refused by `checks` when whoever asked says so; shown as reviewed at once,
  * while it is prepared (guards, fees: two more simulations) and its programs' IDLs are read, then shown again as
  * prepared, the only form that can be approved; its blockhash watched meanwhile. Throws Rejected when the user says
- * no, or what went wrong preparing it.
+ * no, or what went wrong preparing it; `ready` may refuse it as prepared, before it can be approved.
  */
-export async function approved(bytes: Uint8Array, account: Account, way: Way, shell: Shell, checks: (r: Review) => void | Promise<void>, after?: (tell: (outcome: Outcome) => void) => void): Promise<{ r: Review; p: Prepared; signature?: SignatureBytes }> {
+export async function approved(bytes: Uint8Array, account: Account, way: Way, shell: Shell, checks: (r: Review) => void | Promise<void>, after?: (tell: (outcome: Outcome) => void) => void, ready?: (p: Prepared) => void): Promise<{ r: Review; p: Prepared; signature?: SignatureBytes }> {
     // A Ledger's Solana app misreads v1: shown all the same, so the user hears why it cannot be signed.
     const unsignable = account.ledger !== undefined && (await decode(bytes)).message.version === 1;
     // Yours, and the addresses you keep: what lands with them is not someone else's.
@@ -126,6 +126,7 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     const shown = { site: way.site, account: accountView(account), signer: signerOf(account), cluster: way.cluster, known, expiry: null, recipient: way.recipient, later: way.later, away };
     const blocked = unsignable ? LEDGER_V1 : undefined;
     const prepared = preparing.then(([p, told]): { p: Prepared; approval: TransactionView } => {
+        ready?.(p); // refused as prepared: the window says no before it can be approved
         const view = describe(r, p, { ...shown, known: { ...known, told } });
         // A Ledger signs in the window, on approval: it gets the very message to sign, and its signature comes back.
         const ledger = account.ledger && { path: account.ledger.path, message: getBase64Decoder().decode(messageOf(p.bytes)) };

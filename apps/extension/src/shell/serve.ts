@@ -24,6 +24,7 @@ import type { Sent } from '@otus-wallet/core/send/send.ts';
 import { STAKE_SPACE } from '@otus-wallet/core/send/stake.ts';
 import { SENDER_TIPS, TIP } from '@otus-wallet/core/swap/build.ts';
 import { JUPITER } from '@otus-wallet/core/swap/route.ts';
+import { termsOf, type Asked } from '@otus-wallet/core/swap/terms.ts';
 import { explorerOf, networkOf, rpcFor } from '@otus-wallet/core/settings.ts';
 import { signInFields, signInText } from '../siws.ts';
 import type { TokenInfo } from '@otus-wallet/core/tokens.ts';
@@ -272,11 +273,11 @@ export function stakeOwn(bytes: Uint8Array, address: string, shell: Shell, signe
     );
 }
 
-/** What the popup made for a swap (a Jupiter route, built by Otus with a tip to Helius Sender) → reviewed and approved
- *  like a site's transaction, then signed and landed through Sender, on mainnet only; `signed` hears the signature
- *  before it is sent. It is that account's alone to sign, and does nothing else. The reply says whether it landed or
- *  failed onchain. */
-export function swapOwn(bytes: Uint8Array, address: string, shell: Shell, signed?: (signature: Signature) => Promise<unknown>): Promise<Reply> {
+/** What the popup made for a swap (a Jupiter route, built by Otus with a tip to Helius Sender), as `asked` there →
+ *  reviewed and approved like a site's transaction, guarded, then signed and landed through Sender, on mainnet only;
+ *  `signed` hears the signature before it is sent. It is that account's alone to sign, does nothing else, and swaps on
+ *  the very terms asked. The reply says whether it landed or failed onchain. */
+export function swapOwn(bytes: Uint8Array, address: string, asked: Asked, shell: Shell, signed?: (signature: Signature) => Promise<unknown>): Promise<Reply> {
     return reply(
         async () => {
             const state = await shell.load();
@@ -286,10 +287,17 @@ export function swapOwn(bytes: Uint8Array, address: string, shell: Shell, signed
             if (cluster !== 'solana:mainnet') throw new Refused('swaps are on mainnet only');
             const chain = shell.chain(rpcFor(cluster, state.settings));
             const way = { cluster, chain, site: SWAPPING, blockhash: chain.latest(), context: { signedBefore: null, own: true } } as const;
-            const { r, p, signature: signedOnDevice } = await approved(bytes, account, way, shell, async (r) => {
+            const checks = async (r: Review) => {
                 if (r.signers.some((s) => s !== account.address)) throw new Refused('another account would have to sign it');
-                if (!(await swapsOnly(r, account.address))) throw new Refused('it does more than swap');
-            });
+                if (!(await swapsOnly(r, account.address, asked))) throw new Refused('it does more than swap');
+            };
+            // Unguarded, a swap would rest on the route's own least alone: never signed so. One that fails as it is now
+            // (more than you hold, a price gone) says so.
+            const ready = (p: Prepared) => {
+                if (p.unguarded === 'the simulation failed') throw new Refused('the swap would fail as it is now (check what you hold, and quote it again), so nothing was sent');
+                if (p.unguarded !== null || p.holds.length === 0) throw new Refused(`Otus could not lock this swap (${(p.unguarded ?? 'nothing to hold').toLowerCase()}), so nothing was sent`);
+            };
+            const { r, p, signature: signedOnDevice } = await approved(bytes, account, way, shell, checks, undefined, ready);
             if (!(signedOnDevice && onDevice(account))) await unexpired(r, chain);
             const signature = await signFor(account, messageOf(p.bytes), shell, null, signedOnDevice);
             await signed?.(getBase58Decoder().decode(signature) as Signature);
@@ -301,11 +309,15 @@ export function swapOwn(bytes: Uint8Array, address: string, shell: Shell, signed
 
 // A v0 message with Compute Budget's SetComputeUnitLimit (2) first and a tip to one of Sender's accounts last (System's
 // Transfer, 2, of exactly TIP from the owner), and between them only what a Jupiter route sets up, swaps and cleans up
-// for this owner: its token accounts opened (Associated Token's CreateIdempotent, 1, paid by it, for it), SOL moved into
-// its own wrapped-SOL account (Transfer) and synced (a token program's SyncNative, 17), Jupiter's one swap, and a token
-// account of its closed back to it (CloseAccount, 9). Jupiter's swap is opaque: the review simulates it, and the guards
-// hold what comes of it.
-async function swapsOnly(r: Review, owner: Address): Promise<boolean> {
+// for this owner, as asked:
+// - at most three of its own token accounts opened (Associated Token's CreateIdempotent, 1, paid by it, with the System
+//   Program, a token program, and the very address the three derive);
+// - paying SOL, that amount moved into its wrapped-SOL account (Transfer) and synced (a token program's SyncNative, 17);
+// - Jupiter's one swap (route_v2 or shared_accounts_route_v2), signed by it, with the amount, quote and slippage asked
+//   and no fee, from its own account of the mint paid into its own account of the mint asked for (see `termsOf`);
+// - its wrapped-SOL account closed back to it (CloseAccount, 9).
+// The route plan is Jupiter's: the review simulates it, and the guards hold what comes of it.
+async function swapsOnly(r: Review, owner: Address, asked: Asked): Promise<boolean> {
     type Ix = Review['message']['instructions'][number];
     const program = (ix: Ix) => r.accounts[ix.programAddressIndex].address;
     const at = (ix: Ix, i: number) => r.accounts[ix.accountIndices[i]]?.address;
@@ -316,22 +328,32 @@ async function swapsOnly(r: Review, owner: Address): Promise<boolean> {
     const tip = instructions.at(-1);
     if (r.message.version !== 0 || instructions.length < 3 || !limit || !tip || program(limit) !== COMPUTE_BUDGET_PROGRAM_ADDRESS || limit.data.length !== 5 || limit.data[0] !== 2) return false;
     if (!transfer(tip, (a) => a !== undefined && SENDER_TIPS.includes(a), TIP)) return false;
+    const ownAccount = async (mint: Address | undefined, program: Address | undefined) => mint && program && isTokenProgram(program) && (await findAssociatedTokenPda({ owner, mint, tokenProgram: program }))[0];
     const [wrapped] = await findAssociatedTokenPda({ owner, mint: WSOL, tokenProgram: TOKEN_PROGRAM_ADDRESS });
-    let swaps = 0;
+    const paysSol = asked.input === WSOL;
+    const opened = new Set<Address | undefined>();
+    let [swaps, wraps] = [0, 0];
     for (const ix of instructions.slice(1, -1)) {
         const p = program(ix);
-        if (p === JUPITER) swaps++;
-        else if (p === ASSOCIATED_TOKEN_PROGRAM_ADDRESS) {
-            if (ix.data.length !== 1 || ix.data[0] !== 1 || ix.accountIndices.length !== 6 || at(ix, 0) !== owner || at(ix, 2) !== owner) return false;
+        if (p === JUPITER) {
+            swaps++;
+            const t = termsOf(ix.data, (i) => at(ix, i));
+            const terms = t !== null && t.signer === owner && t.inputMint === asked.input && t.outputMint === asked.output && t.amount === asked.amount && t.quoted === asked.out && t.slippageBps === asked.slippageBps;
+            if (!terms || t.platformFeeBps !== 0 || t.positiveSlippageBps !== 0 || (t.elsewhere !== undefined && t.elsewhere !== JUPITER)) return false;
+            if (t.source !== (await ownAccount(t.inputMint, t.inputProgram)) || t.destination !== (await ownAccount(t.outputMint, t.outputProgram))) return false;
+        } else if (p === ASSOCIATED_TOKEN_PROGRAM_ADDRESS) {
+            if (ix.data.length !== 1 || ix.data[0] !== 1 || ix.accountIndices.length !== 6 || at(ix, 0) !== owner || at(ix, 2) !== owner || at(ix, 4) !== SYSTEM_PROGRAM_ADDRESS) return false;
+            if (at(ix, 1) !== (await ownAccount(at(ix, 3), at(ix, 5))) || opened.has(at(ix, 1))) return false;
+            opened.add(at(ix, 1));
         } else if (p === SYSTEM_PROGRAM_ADDRESS) {
-            if (!transfer(ix, (a) => a === wrapped)) return false;
+            if (!paysSol || ++wraps > 1 || !transfer(ix, (a) => a === wrapped, asked.amount)) return false;
         } else if (isTokenProgram(p)) {
-            const syncs = ix.data.length === 1 && ix.data[0] === 17 && ix.accountIndices.length === 1 && at(ix, 0) === wrapped;
-            const closes = ix.data.length === 1 && ix.data[0] === 9 && ix.accountIndices.length === 3 && at(ix, 1) === owner && at(ix, 2) === owner;
+            const syncs = paysSol && ix.data.length === 1 && ix.data[0] === 17 && ix.accountIndices.length === 1 && at(ix, 0) === wrapped;
+            const closes = ix.data.length === 1 && ix.data[0] === 9 && ix.accountIndices.length === 3 && at(ix, 0) === wrapped && at(ix, 1) === owner && at(ix, 2) === owner;
             if (!syncs && !closes) return false;
         } else return false;
     }
-    return swaps === 1;
+    return swaps === 1 && opened.size <= 3;
 }
 
 // A legacy or v0 message (v1's limits and fee live in its config) with Compute Budget's SetComputeUnitLimit (2) first,

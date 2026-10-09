@@ -124,7 +124,7 @@ test('a route too large to leave room for the guards is asked again with fewer a
         return big ? { ...route, setup: Array(12).fill(route.setup).flat() } : route;
     };
     const route = await fittingRoute({ input: TAKER, output: TAKER, amount: 1n, taker: TAKER, slippageBps: 50 }, find);
-    assert.deepEqual(asked, [64, 48, 36]);
+    assert.deepEqual(asked, [64, 48, 36]); // a small one fits at 36, the first under 40
     assert.equal(route.venues.length, 1);
     // One that fits at once is asked once.
     asked.length = 0;
@@ -149,4 +149,50 @@ test("a swap is sent to Otus's server for Sender, as the server takes it; all el
     // Kit adds the commitment of its own: one of the fields Otus's server takes, and writes anew.
     assert.deepEqual(posts[0].body.params, ['AQID', { encoding: 'base64', skipPreflight: true, maxRetries: 0, preflightCommitment: 'confirmed' }]);
     assert.deepEqual(asked, ['status']);
+});
+
+test("a swap whose instruction carries other terms than the route states is refused", () => {
+    const name = 'sol-usdc';
+    const ask = askOf(ROUTES[name]);
+    // The swap's data, bent at a byte: the amount in (8), the quote (16), the slippage (24), the fees (26, 28).
+    const bent = (at: number, value: number) => {
+        const r = copy(ROUTES[name]);
+        const swap = r.swapInstruction as { data: string };
+        const data = Buffer.from(swap.data, 'base64');
+        data[at] = value;
+        swap.data = data.toString('base64');
+        return r;
+    };
+    for (const [what, at, value] of [['amount in', 8, 7], ['quote', 16, 7], ['slippage', 24, 200], ['platform fee', 26, 1], ['positive slippage', 28, 1], ['another instruction', 0, 0]] as const) {
+        assert.throws(() => readRoute(bent(at, value), ask), /terms/, what);
+    }
+    // Its other destination set: what comes out would land elsewhere.
+    const elsewhere = copy(ROUTES[name]);
+    (elsewhere.swapInstruction as { accounts: { pubkey: string }[] }).accounts[7].pubkey = 'So11111111111111111111111111111111111111112';
+    assert.throws(() => readRoute(elsewhere, ask), /terms/);
+});
+
+test('a route at another slippage, or with too low a least for its own, is refused', () => {
+    const route = ROUTES['usdc-sol'];
+    const ask = askOf(route);
+    assert.throws(() => readRoute({ ...route, slippageBps: 300 }, ask), /not for what was asked/);
+    const out = BigInt(route.outAmount as string);
+    assert.throws(() => readRoute({ ...route, otherAmountThreshold: String(out - (out * 50n) / 10_000n - 2n) }, ask), /too little/);
+    assert.doesNotThrow(() => readRoute({ ...route, otherAmountThreshold: String(out - (out * 50n + 9_999n) / 10_000n) }, ask));
+});
+
+test('an account opened with another program as its token program, or for another wallet, is refused', () => {
+    const ask = askOf(ROUTES['sol-usdc']);
+    const opened = (i: number, address: string) => {
+        const r = copy(ROUTES['sol-usdc']);
+        (r.setupInstructions as { accounts: { pubkey: string }[] }[])[0].accounts[i].pubkey = address;
+        return r;
+    };
+    const ATTACKER = 'Attacker111111111111111111111111111111111111';
+    assert.throws(() => readRoute(opened(5, ATTACKER), ask), /opens an account otherwise/);
+    assert.throws(() => readRoute(opened(4, ATTACKER), ask), /opens an account otherwise/);
+    assert.throws(() => readRoute(opened(2, ATTACKER), ask), /opens an account otherwise/);
+    const many = copy(ROUTES['sol-usdc']);
+    many.setupInstructions = Array(7).fill((many.setupInstructions as unknown[])[0]);
+    assert.throws(() => readRoute(many, ask), /not as asked/);
 });

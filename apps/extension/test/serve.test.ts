@@ -43,6 +43,7 @@ import { fix } from '@otus-wallet/core/send/fix.ts';
 import { own, serve, stakeOwn, swapOwn, takeBack, type Shell } from '../src/shell/serve.ts';
 import { SENDER_TIPS, swapping, TIP } from '@otus-wallet/core/swap/build.ts';
 import { JUPITER, type Route } from '@otus-wallet/core/swap/route.ts';
+import type { Asked } from '@otus-wallet/core/swap/terms.ts';
 import { staking, stakeAt } from '@otus-wallet/core/send/stake.ts';
 import { getCompiledTransactionMessageDecoder, getCompiledTransactionMessageEncoder } from '@solana/kit';
 import { followed } from '../src/shell/transaction.ts';
@@ -802,31 +803,54 @@ test('what the popup makes for stake is reviewed as Otus’s own, signed and sen
 // SyncNative as Jupiter's routes have it: the account alone (the generated client adds the rent sysvar).
 const syncNative = (account: Address) => ({ programAddress: TOKEN_PROGRAM_ADDRESS, accounts: [{ address: account, role: AccountRole.WRITABLE }], data: Uint8Array.of(17) });
 
+const WSOL = address('So11111111111111111111111111111111111111112');
+const USDC = address('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+// What the popup asked for: 0.01 SOL for USDC, quoted at 1 USDC, 0.5% slippage.
+const ASKED: Asked = { input: WSOL, output: USDC, amount: 10_000_000n, out: 1_000_000n, slippageBps: 50 };
+
+// Jupiter's route_v2 as its IDL lays it out: the amount in, the quote, the slippage, the platform fee and positive
+// slippage share, an empty route plan; the taker, its source and destination accounts, the mints, their token
+// programs, no other destination (Jupiter's own address), its event authority and itself.
+function routeV2(me: Address, at: { wrapped: Address; usdc: Address }, terms: Partial<{ amount: bigint; quoted: bigint; slippage: number; fee: number; positive: number; source: Address; destination: Address; output: Address; elsewhere: Address }> = {}) {
+    const data = new Uint8Array(8 + 8 + 8 + 2 + 2 + 2 + 4);
+    data.set([0xbb, 0x64, 0xfa, 0xcc, 0x31, 0xc4, 0xaf, 0x14]);
+    const view = new DataView(data.buffer);
+    view.setBigUint64(8, terms.amount ?? ASKED.amount, true);
+    view.setBigUint64(16, terms.quoted ?? ASKED.out, true);
+    view.setUint16(24, terms.slippage ?? ASKED.slippageBps, true);
+    view.setUint16(26, terms.fee ?? 0, true);
+    view.setUint16(28, terms.positive ?? 0, true);
+    const r = (a: Address, role = AccountRole.READONLY) => ({ address: a, role });
+    return {
+        programAddress: JUPITER,
+        accounts: [r(me, AccountRole.WRITABLE_SIGNER), r(terms.source ?? at.wrapped, AccountRole.WRITABLE), r(terms.destination ?? at.usdc, AccountRole.WRITABLE), r(WSOL), r(terms.output ?? USDC), r(TOKEN_PROGRAM_ADDRESS), r(TOKEN_PROGRAM_ADDRESS), r(terms.elsewhere ?? JUPITER), r(key(30)), r(JUPITER)],
+        data,
+    };
+}
+
 // A swap as Otus builds it from a Jupiter route, SOL for USDC: the wrapped-SOL account opened, SOL moved in and synced,
-// the USDC account opened, Jupiter's swap (its accounts opaque), the wrapped-SOL account closed back; `change` bends it.
-async function swapFor(me: Address, change: (r: Route, at: { wrapped: Address; usdc: Address }) => void = () => {}, tip = SENDER_TIPS[0]) {
-    const WSOL = address('So11111111111111111111111111111111111111112');
-    const USDC = address('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+// the USDC account opened, Jupiter's swap, the wrapped-SOL account closed back; `change` bends it.
+async function swapFor(me: Address, change: (r: Route, at: { wrapped: Address; usdc: Address }) => void | Promise<void> = () => {}, tip = SENDER_TIPS[0]) {
     const [wrapped] = await findAssociatedTokenPda({ owner: me, mint: WSOL, tokenProgram: TOKEN_PROGRAM_ADDRESS });
     const [usdc] = await findAssociatedTokenPda({ owner: me, mint: USDC, tokenProgram: TOKEN_PROGRAM_ADDRESS });
     const signer = createNoopSigner(me);
     const route: Route = {
-        ask: { input: WSOL, output: USDC, amount: 10_000_000n, taker: me, slippageBps: 50, maxAccounts: 64 },
-        out: 1_000_000n,
+        ask: { input: WSOL, output: USDC, amount: ASKED.amount, taker: me, slippageBps: ASKED.slippageBps, maxAccounts: 64 },
+        out: ASKED.out,
         least: 995_000n,
         impact: null,
         venues: [{ label: 'Whirlpool', share: 100 }],
         setup: [
             getCreateAssociatedTokenIdempotentInstruction({ payer: signer, ata: wrapped, owner: me, mint: WSOL }),
-            getTransferSolInstruction({ source: signer, destination: wrapped, amount: 10_000_000n }),
+            getTransferSolInstruction({ source: signer, destination: wrapped, amount: ASKED.amount }),
             syncNative(wrapped),
             getCreateAssociatedTokenIdempotentInstruction({ payer: signer, ata: usdc, owner: me, mint: USDC }),
         ],
-        swap: { programAddress: JUPITER, accounts: [{ address: me, role: AccountRole.WRITABLE_SIGNER }, { address: wrapped, role: AccountRole.WRITABLE }, { address: usdc, role: AccountRole.WRITABLE }, { address: key(30), role: AccountRole.WRITABLE }], data: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]) },
+        swap: routeV2(me, { wrapped, usdc }),
         cleanup: [getCloseAccountInstruction({ account: wrapped, destination: me, owner: signer })],
         tables: {},
     };
-    change(route, { wrapped, usdc });
+    await change(route, { wrapped, usdc });
     return swapping(route, { blockhash: blockhash(key(9)), lastValidBlockHeight: 0n }, tip);
 }
 
@@ -834,38 +858,68 @@ test('what the popup makes for a swap is reviewed as Otus’s own, signed and la
     const w = await wallet();
     const landedFast: Uint8Array[] = [];
     const fast = { ...w.shell, fast: (c: Chain) => ({ ...c, send: async (tx: Uint8Array) => void landedFast.push(tx) }) };
-    assert.equal(result<{ outcome: string }>(await swapOwn(await swapFor(w.me), w.me, fast)).outcome, 'confirmed');
+    assert.equal(result<{ outcome: string }>(await swapOwn(await swapFor(w.me), w.me, ASKED, fast)).outcome, 'confirmed');
     const shown = w.approvals[0];
     assert.ok(shown.kind === 'transaction');
     assert.deepEqual([shown.site.host, shown.site.note], ['Otus', 'Your own swap']);
     assert.equal(landedFast.length, 1, 'sent through Sender');
     assert.equal(w.sent.length, 0, 'not through the RPC');
-    // Bent: one more transfer out, an account opened for another, a token account closed to another, SOL moved to an
-    // account other than the wallet's wrapped SOL, Jupiter twice, a tip elsewhere.
+    const me = createNoopSigner(w.me);
+    const stranger = key(6);
     const bent: [string, Promise<Uint8Array>][] = [
-        ['a transfer out', swapFor(w.me, (r) => r.setup.push(getTransferSolInstruction({ source: createNoopSigner(w.me), destination: key(6), amount: 1n })))],
-        ['an account for another', swapFor(w.me, (r) => (r.setup[3] = getCreateAssociatedTokenIdempotentInstruction({ payer: createNoopSigner(w.me), ata: key(31), owner: key(6), mint: key(32) })))],
-        ['closed to another', swapFor(w.me, (r, a) => (r.cleanup = [getCloseAccountInstruction({ account: a.wrapped, destination: key(6), owner: createNoopSigner(w.me) })]))],
-        ['SOL elsewhere', swapFor(w.me, (r, a) => (r.setup[1] = getTransferSolInstruction({ source: createNoopSigner(w.me), destination: a.usdc, amount: 10_000_000n })))],
-        ['synced elsewhere', swapFor(w.me, (r, a) => (r.setup[2] = syncNative(a.usdc)))],
-        ['synced with more accounts', swapFor(w.me, (r, a) => (r.setup[2] = getSyncNativeInstruction({ account: a.wrapped })))],
-        ['Jupiter twice', swapFor(w.me, (r) => r.setup.push(r.swap))],
-        ['no swap', swapFor(w.me, (r) => (r.swap = syncNative(key(33))))],
+        // Around the swap: a transfer out, accounts opened otherwise, SOL moved or synced elsewhere, closed elsewhere.
+        ['a transfer out', swapFor(w.me, (r) => void r.setup.push(getTransferSolInstruction({ source: me, destination: stranger, amount: 1n })))],
+        ['an account for another', swapFor(w.me, (r) => void (r.setup[3] = getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: key(31), owner: stranger, mint: key(32) })))],
+        ['an account with a fake token program', swapFor(w.me, async (r) => void (r.setup[3] = getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: (await findAssociatedTokenPda({ owner: w.me, mint: USDC, tokenProgram: key(33) }))[0], owner: w.me, mint: USDC, tokenProgram: key(33) })))],
+        ['an account at an address it does not derive', swapFor(w.me, (r) => void (r.setup[3] = getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: key(34), owner: w.me, mint: USDC })))],
+        ['an account opened twice', swapFor(w.me, (r) => void r.setup.push(r.setup[3]))],
+        ['SOL elsewhere', swapFor(w.me, (r, a) => void (r.setup[1] = getTransferSolInstruction({ source: me, destination: a.usdc, amount: ASKED.amount })))],
+        ['more SOL wrapped than asked', swapFor(w.me, (r, a) => void (r.setup[1] = getTransferSolInstruction({ source: me, destination: a.wrapped, amount: ASKED.amount * 50n })))],
+        ['SOL wrapped twice', swapFor(w.me, (r) => void r.setup.splice(2, 0, r.setup[1]))],
+        ['synced elsewhere', swapFor(w.me, (r, a) => void (r.setup[2] = syncNative(a.usdc)))],
+        ['synced with more accounts', swapFor(w.me, (r, a) => void (r.setup[2] = getSyncNativeInstruction({ account: a.wrapped })))],
+        ['a token account closed that is not wrapped SOL', swapFor(w.me, (r, a) => void (r.cleanup = [getCloseAccountInstruction({ account: a.usdc, destination: w.me, owner: me })]))],
+        ['closed to another', swapFor(w.me, (r, a) => void (r.cleanup = [getCloseAccountInstruction({ account: a.wrapped, destination: stranger, owner: me })]))],
+        // The swap's own terms: other than asked, with a fee, from or into other accounts.
+        ['more in than asked', swapFor(w.me, (r, a) => void (r.swap = routeV2(w.me, a, { amount: ASKED.amount * 50n })))],
+        ['a lower quote', swapFor(w.me, (r, a) => void (r.swap = routeV2(w.me, a, { quoted: 1n })))],
+        ['a wider slippage', swapFor(w.me, (r, a) => void (r.swap = routeV2(w.me, a, { slippage: 10_000 })))],
+        ['a platform fee', swapFor(w.me, (r, a) => void (r.swap = routeV2(w.me, a, { fee: 100 })))],
+        ['a positive slippage share', swapFor(w.me, (r, a) => void (r.swap = routeV2(w.me, a, { positive: 50 })))],
+        ['into another wallet', swapFor(w.me, async (r, a) => void (r.swap = routeV2(w.me, a, { destination: (await findAssociatedTokenPda({ owner: stranger, mint: USDC, tokenProgram: TOKEN_PROGRAM_ADDRESS }))[0] })))],
+        ['to another destination', swapFor(w.me, (r, a) => void (r.swap = routeV2(w.me, a, { elsewhere: a.usdc })))],
+        ['from another account', swapFor(w.me, (r, a) => void (r.swap = routeV2(w.me, a, { source: a.usdc })))],
+        ['for another token', swapFor(w.me, (r, a) => void (r.swap = routeV2(w.me, a, { output: key(35) })))],
+        ['another of Jupiter’s instructions', swapFor(w.me, (r, a) => void (r.swap = { ...routeV2(w.me, a), data: Uint8Array.of(1, 2, 3, 4, 5, 6, 7, 8, ...new Uint8Array(26)) }))],
+        ['Jupiter twice', swapFor(w.me, (r) => void r.setup.push(r.swap))],
+        ['no swap', swapFor(w.me, (r) => void (r.swap = syncNative(key(36))))],
         ['a tip elsewhere', swapFor(w.me, () => {}, key(7))],
     ];
-    for (const [what, made] of bent) assert.match(((await swapOwn(await made, w.me, fast)) as { error: string }).error, /does more than swap/, what);
+    for (const [what, made] of bent) assert.match(((await swapOwn(await made, w.me, ASKED, fast)) as { error: string }).error, /does more than swap/, what);
+    // Asked for a token, nothing may wrap SOL.
+    assert.match(((await swapOwn(await swapFor(w.me), w.me, { ...ASKED, input: USDC, output: WSOL }, fast)) as { error: string }).error, /does more than swap/);
     // The tip's amount, or the limit's place, changed in the bytes.
     const made = await swapFor(w.me);
     const tx = getTransactionDecoder().decode(made);
     const message = getCompiledTransactionMessageDecoder().decode(tx.messageBytes) as { instructions: { data?: Uint8Array }[] };
     const rewritten = (instructions: unknown[]) => new Uint8Array(getTransactionEncoder().encode({ ...tx, messageBytes: getCompiledTransactionMessageEncoder().encode({ ...message, instructions } as never) } as never));
     const more = message.instructions.map((x, i) => (i === message.instructions.length - 1 ? { ...x, data: Uint8Array.from([2, 0, 0, 0, ...new Uint8Array(new BigUint64Array([TIP + 1n]).buffer)]) } : x));
-    assert.match(((await swapOwn(rewritten(more), w.me, fast)) as { error: string }).error, /does more than swap/, 'a larger tip');
-    assert.match(((await swapOwn(rewritten(message.instructions.slice(1)), w.me, fast)) as { error: string }).error, /does more than swap/, 'no limit first');
+    assert.match(((await swapOwn(rewritten(more), w.me, ASKED, fast)) as { error: string }).error, /does more than swap/, 'a larger tip');
+    assert.match(((await swapOwn(rewritten(message.instructions.slice(1)), w.me, ASKED, fast)) as { error: string }).error, /does more than swap/, 'no limit first');
     // A transfer is no swap; nor is a swap another wallet signs; nor one off mainnet.
-    assert.match(((await swapOwn(bytes(w.transfer()), w.me, fast)) as { error: string }).error, /does more than swap/);
-    assert.match(((await swapOwn(await swapFor(key(5)), w.me, fast)) as { error: string }).error, /does not sign this transaction/);
+    assert.match(((await swapOwn(bytes(w.transfer()), w.me, ASKED, fast)) as { error: string }).error, /does more than swap/);
+    assert.match(((await swapOwn(await swapFor(key(5)), w.me, ASKED, fast)) as { error: string }).error, /does not sign this transaction/);
     await w.shell.update((s) => ({ settings: { ...s.settings, network: 'devnet' } }));
-    assert.match(((await swapOwn(made, w.me, fast)) as { error: string }).error, /mainnet only/);
+    assert.match(((await swapOwn(made, w.me, ASKED, fast)) as { error: string }).error, /mainnet only/);
     assert.equal(landedFast.length, 1);
+});
+
+test('a swap Otus could not guard is refused before it can be approved', async () => {
+    // The review's simulation goes well; the guarded one fails, so preparing leaves it unguarded.
+    let simulations = 0;
+    const base = { error: null, logs: [], fee: 5000n, unitsConsumed: null, loaded: null, inner: [], innerListed: true };
+    const w = await wallet({ chain: { simulate: async (_tx, watch) => ({ ...base, after: watch.map((address) => ({ exists: false as const, address })), ...(++simulations > 1 && { error: { InstructionError: [9, { Custom: 1 }] } as never }) }) } });
+    const reply = (await swapOwn(await swapFor(w.me), w.me, ASKED, w.shell)) as { error: string };
+    assert.match(reply.error, /could not lock this swap/);
+    assert.equal(w.sent.length, 0);
 });
