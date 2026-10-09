@@ -62,7 +62,7 @@ export function Lobby({ state, go }: { state: State; go: (to: Screen) => void })
                 <div className="acts flex gap-2 pt-1 pb-1.5">
                     <Act name="receive" label="Receive" onClick={() => go('receive')} />
                     <Act name="send" label="Send" onClick={signs(account) ? () => go('send') : undefined} tip={signs(account) ? undefined : 'Watch only: Otus holds no key for it'} />
-                    <Act name="swap" label="Swap" soon />
+                    <Act name="swap" label="Swap" onClick={signs(account) && mainnet ? () => go('swap') : undefined} tip={!mainnet ? 'Swaps are on mainnet only' : signs(account) ? undefined : 'Watch only: Otus holds no key for it'} />
                     <Act name="stake" label="Stake" onClick={() => go('stake')} />
                 </div>
                 <ul className={cn('assets', !read && 'unread')}>
@@ -111,18 +111,17 @@ export function WalletBar({ state, go }: { state: State; go: (to: Screen) => voi
 }
 
 // Receive, Send, Swap, Stake: an icon over its name in the pixel font; one that cannot be used yet says why, or "Soon".
-function Act({ name, label, onClick, tip, soon = false }: { name: 'receive' | 'send' | 'swap' | 'stake'; label: string; onClick?: () => void; tip?: string; soon?: boolean }) {
+function Act({ name, label, onClick, tip }: { name: 'receive' | 'send' | 'swap' | 'stake'; label: string; onClick?: () => void; tip?: string }) {
     const off = !onClick;
     const act = (
         <button
             type="button"
             onClick={onClick}
             aria-disabled={off || undefined}
-            className={cn('act relative flex h-[58px] flex-1 flex-col items-center justify-center gap-1.5 rounded-[3px] border border-rule bg-panel text-ink', off ? 'cursor-default text-ink-3' : 'cursor-pointer hover:border-ink-3')}
+            className={cn('act flex h-[58px] flex-1 flex-col items-center justify-center gap-1.5 rounded-[3px] border border-rule bg-panel text-ink', off ? 'cursor-default text-ink-3' : 'cursor-pointer hover:border-ink-3')}
         >
             <Icon name={name} size={18} />
             <span className="pixel text-[10px] tracking-[0.04em]">{label}</span>
-            {soon && <span className="pixel absolute top-[3px] right-[3px] rounded-sm border border-rule px-[2px] text-[7px] leading-[10px] text-ink-3">Soon</span>}
         </button>
     );
     return tip ? <Tip text={tip}>{act}</Tip> : act;

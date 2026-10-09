@@ -16,10 +16,11 @@ import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
 import type { State } from '@otus-wallet/core/state.ts';
 import { useOtus } from './store.ts';
 import { StakeScreen } from './Stake.tsx';
+import { SwapScreen } from './Swap.tsx';
 import { WalletScreen } from './WalletScreen.tsx';
 import { Wallets } from './Wallets.tsx';
 
-export type Screen = 'lobby' | 'activity' | 'access' | 'wallet' | 'wallets' | 'settings' | 'receive' | 'send' | 'stake';
+export type Screen = 'lobby' | 'activity' | 'access' | 'wallet' | 'wallets' | 'settings' | 'receive' | 'send' | 'stake' | 'swap';
 
 // The setup tab, for a new wallet or one to import: the one already open, if any, rather than another.
 async function setUp(hash = '') {
@@ -80,6 +81,8 @@ function shown(screen: Screen, state: State, keys: KeyStatus, go: (to: Screen) =
             return <Send state={state} go={go} />;
         case 'stake':
             return <StakeScreen state={state} go={go} />;
+        case 'swap':
+            return <SwapScreen state={state} go={go} />;
         default:
             return <Lobby state={state} go={go} />;
     }

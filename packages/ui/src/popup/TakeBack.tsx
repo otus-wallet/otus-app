@@ -1,5 +1,5 @@
 // What Otus builds in the popup besides a transfer, reviewed as any site's transaction, guards included: taking access
-// back from Access (a delegate revoked, a nonce moved on), or native stake from Stake. The review shows here with the
+// back from Access (a delegate revoked, a nonce moved on), native stake from Stake, or a swap from Swap. The review shows here with the
 // time left to sign, then how it went. Leaving, or no, says no: nothing is sent.
 import { getBase64Decoder, type Blockhash } from '@solana/kit';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -21,16 +21,18 @@ import { said } from './store.ts';
 const REVIEW_WAIT = 60_000; // ms for the review to come; each RPC request gives up sooner
 const TAKING_BACK: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Taking access back', tone: 'plain' };
 const STAKING: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Your own stake', tone: 'plain' };
+const SWAPPING: SiteView = { origin: 'otus://popup', host: 'Otus', note: 'Your own swap', tone: 'plain' };
 // No blockhash yet: the background reads one while it reviews it, and puts it in.
 const UNSET: Lifetime = { blockhash: '11111111111111111111111111111111' as Blockhash, lastValidBlockHeight: 0n };
 
 type Reply = { ok: boolean; error?: string; result?: { signature?: unknown; outcome?: unknown } };
 type Heard = { review: Approval } | { life: Life } | { done: Reply };
 
-/** What Otus builds, as the background is told it (`fix`: taking access back; `stake`: native stake); `make` builds it
+/** What Otus builds, as the background is told it (`fix`: taking access back; `stake`: native stake; `swap`: a swap);
+ *  `make` builds it
  *  (again on a retry) for a lifetime; `doing` heads the screen ("Taking back"), `landed` titles it once confirmed
  *  ("Taken back"), and `where` is the screen to check again when that is not known yet. */
-export type Job = { kind: 'fix' | 'stake'; make: (lifetime: Lifetime) => Uint8Array | Promise<Uint8Array>; doing: string; landed: string; where: string };
+export type Job = { kind: 'fix' | 'stake' | 'swap'; make: (lifetime: Lifetime) => Uint8Array | Promise<Uint8Array>; doing: string; landed: string; where: string };
 
 /** `what`: what is taken back, and `title` says it; `done` hears whether it landed, or that the user left. */
 export function TakeBack({ account, what, title, settings, done }: { account: Account; what: Fix; title: string; settings: Settings; done: (landed: boolean) => void }) {
@@ -134,7 +136,7 @@ const Taken = ({ job, title }: { job: Job; title: string }) => (
     </Block>
 );
 
-const siteOf = (job: Job) => (job.kind === 'stake' ? STAKING : TAKING_BACK);
+const siteOf = (job: Job) => ({ fix: TAKING_BACK, stake: STAKING, swap: SWAPPING })[job.kind];
 
 // The review's frame at once, while the background simulates it: Next waits for it.
 function Pending({ account, job, title, lifetime, reject }: { account: AccountView; job: Job; title: string; lifetime: { from: number; until: number } | null; reject: () => void }) {

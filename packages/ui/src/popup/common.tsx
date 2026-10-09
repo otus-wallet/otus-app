@@ -145,7 +145,7 @@ export function Seal({ symbol, size = 9 }: { symbol: string; size?: number }) {
 /** SOL, USDC and USDT from the extension's own logos; another verified token from its icon; anything else, the chain's
  *  mark in grey. Only a verified token's icon is fetched, from where its makers keep it, without cookies or saying which
  *  page asks. */
-export function TokenLogo({ asset, size = 28 }: { asset: Holding; size?: number }) {
+export function TokenLogo({ asset, size = 28 }: { asset: Pick<Holding, 'mint' | 'icon'>; size?: number }) {
     const [failed, setFailed] = useState(false);
     const mark = asset.mint === WSOL ? 'sol' : asset.mint === USDC ? 'usdc' : asset.mint === USDT ? 'usdt' : null;
     if (mark) return <Logo name={mark} size={size} className="rounded-[3px] bg-panel" />;
