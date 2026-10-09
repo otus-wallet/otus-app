@@ -33,6 +33,21 @@ In `chrome://extensions`: Developer mode, "Load unpacked", pick `apps/extension/
 The release zip (`npm run package`) is the store's build: loaded unpacked, it gets an extension ID Otus's RPC
 doesn't serve, so set your own RPC in Settings (a Helius one for Activity).
 
+## Verify
+
+The Otus you installed can be checked against this code: build the release's tag and compare.
+
+    git checkout vX.Y.Z    # the version chrome://extensions shows for Otus
+    (cd ../otus-sdk && git checkout <the commit in the release notes> && npm ci && npm run build)
+    npm ci
+    npm run verify -- <path>
+
+`<path>` is the release's `otus.zip`, the store's `.crx`, or the folder Chrome installed Otus in: the Profile Path that
+`chrome://version` shows, then `Extensions/gciljmcmgcigmoakpmdcbefjabcnhekl/X.Y.Z_0`. It says THE SAME when every file
+matches, byte for byte. Left out is only what the store adds: its signature of the files (`_metadata/`) and the
+manifest's `key` and `update_url`. With the same `zip`, `npm run package` gives the release's `otus.zip` byte for byte
+too. Releases up to v0.2.0 carry the time they were built, and can't be matched.
+
 ## Test
 
     npm test
