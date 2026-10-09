@@ -22,8 +22,7 @@ Until the SDK is on npm, clone it next to this repo:
     npm ci
     npm run build      # or: npm run watch
 
-In `chrome://extensions`: Developer mode, "Load unpacked", pick `dist`. A build from source has its own
-extension ID, which Otus's RPC doesn't serve: set your own RPC in Settings (a Helius one for Activity).
+In `chrome://extensions`: Developer mode, "Load unpacked", pick `apps/extension/dist`.
 
 ## Test
 

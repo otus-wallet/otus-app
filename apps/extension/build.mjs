@@ -2,6 +2,8 @@
 // on every change to the code; then reload the extension there.
 import { execFileSync, spawn } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname } from 'node:path';
 
 import { context } from 'esbuild';
 
@@ -26,17 +28,18 @@ function copy() {
     cpSync('assets/licenses', `${out}/licenses`, { recursive: true });
 }
 
-// Every package bundled into the extension, with its license, in one file: what their licenses ask of a copy.
+// Every package bundled into the extension, with its license, in one file: what their licenses ask of a copy. A package
+// sits in whichever node_modules npm put it, this workspace's or the repo's.
 function notices(metafile) {
-    const packages = new Set();
+    const packages = new Map(); // name → its folder
     for (const input of Object.keys(metafile.inputs)) {
         const at = input.lastIndexOf('node_modules/');
         if (at < 0) continue;
         const [first, second] = input.slice(at + 'node_modules/'.length).split('/');
-        packages.add(first.startsWith('@') ? `${first}/${second}` : first);
+        const name = first.startsWith('@') ? `${first}/${second}` : first;
+        packages.set(name, `${input.slice(0, at)}node_modules/${name}`);
     }
-    const text = [...packages].sort().map((name) => {
-        const dir = `node_modules/${name}`;
+    const text = [...packages].sort(([a], [b]) => (a < b ? -1 : 1)).map(([name, dir]) => {
         const { version, license } = JSON.parse(readFileSync(`${dir}/package.json`, 'utf8'));
         const file = readdirSync(dir).find((f) => /^(licen[cs]e|copying)(\.|$)/i.test(f));
         return `${name} ${version} (${license ?? 'see below'})\n\n${file ? readFileSync(`${dir}/${file}`, 'utf8').trim() : 'No license file in the package; its license is named above.'}`;
@@ -46,7 +49,7 @@ function notices(metafile) {
 }
 
 // The pages' styles: Tailwind, from what the pages' code uses.
-const TAILWIND = ['node_modules/.bin/tailwindcss', ['-i', 'src/ui/app.css', '-o', `${out}/app.css`]];
+const TAILWIND = [process.execPath, [`${dirname(createRequire(import.meta.url).resolve('@tailwindcss/cli/package.json'))}/dist/index.mjs`, '-i', 'src/ui/app.css', '-o', `${out}/app.css`]];
 
 rmSync(out, { recursive: true, force: true });
 const build = await context({
