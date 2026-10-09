@@ -32,24 +32,24 @@ import {
 } from '@solana/kit';
 
 import { LIGHTHOUSE } from '@otus-wallet/sdk/programs/addresses';
-import { Refused, type Reply } from '../src/protocol.ts';
+import { Refused, type Reply } from '@otus-wallet/core/protocol.ts';
 import { decode } from '@otus-wallet/sdk/review/decode';
-import { transfer as sendTransfer } from '../src/send/transfer.ts';
-import { send } from '../src/send/send.ts';
-import { DEFAULT_SETTINGS, OTUS_RPC } from '../src/settings.ts';
+import { transfer as sendTransfer } from '@otus-wallet/core/send/transfer.ts';
+import { send } from '@otus-wallet/core/send/send.ts';
+import { DEFAULT_SETTINGS, OTUS_RPC } from '@otus-wallet/core/settings.ts';
 import type { Answer } from '../src/shell/approvals.ts';
-import { fix } from '../src/send/fix.ts';
+import { fix } from '@otus-wallet/core/send/fix.ts';
 import { own, serve, stakeOwn, takeBack, type Shell } from '../src/shell/serve.ts';
-import { staking, stakeAt } from '../src/send/stake.ts';
+import { staking, stakeAt } from '@otus-wallet/core/send/stake.ts';
 import { getCompiledTransactionMessageDecoder, getCompiledTransactionMessageEncoder } from '@solana/kit';
 import { followed } from '../src/shell/transaction.ts';
 import type { Review } from '@otus-wallet/sdk/review/review';
 import type { Status } from '@otus-wallet/sdk/chain';
 import { getSetComputeUnitPriceInstruction } from '@solana-program/compute-budget';
 import type { Chain } from '@otus-wallet/sdk/chain';
-import type { State } from '../src/shell/state.ts';
-import type { Approval, Outcome } from '../src/ui/view.ts';
-import { account, fakeChain, key, SYSTEM, tokenAccountData } from './helpers.ts';
+import type { State } from '@otus-wallet/core/state.ts';
+import type { Approval, Outcome } from '@otus-wallet/core/view.ts';
+import { account, fakeChain, key, SYSTEM, tokenAccountData } from '@otus-wallet/core/test/helpers.ts';
 
 const ORIGIN = 'https://jup.ag';
 const base64 = (b: Uint8Array) => getBase64Decoder().decode(b);

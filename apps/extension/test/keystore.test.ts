@@ -19,7 +19,7 @@ Object.assign(globalThis, { chrome: { storage: { local: area(), session: area() 
 
 await import('../src/shell/chrome.ts'); // the platform, over the chrome above
 const { keysCall, prune } = await import('../src/shell/keys.ts');
-const { edited, load, update } = await import('../src/shell/state.ts');
+const { edited, load, update } = await import('@otus-wallet/core/state.ts');
 const { readSecrets, bytes } = await import('../src/keys/vault.ts');
 
 const A = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';

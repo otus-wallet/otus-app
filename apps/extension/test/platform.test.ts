@@ -30,7 +30,7 @@ const chrome = {
 };
 Object.assign(globalThis, { chrome });
 
-const at = await import('../src/platform.ts');
+const at = await import('@otus-wallet/core/platform.ts');
 await import('../src/shell/chrome.ts');
 const { platform } = at;
 const last = () => calls.at(-1);

@@ -1,6 +1,6 @@
 // Sign In With Solana: the fields in the order its message writes them, under the words it writes them with; the
 // approval shows them the same way.
-import { SIGN_IN_FIELDS, type SignInField, type SignInInput } from './protocol.ts';
+import { SIGN_IN_FIELDS, type SignInField, type SignInInput } from '@otus-wallet/core/protocol.ts';
 
 const LABELS: Record<SignInField, string> = {
     domain: 'Domain',

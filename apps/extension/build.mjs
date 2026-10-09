@@ -12,22 +12,24 @@ process.chdir(fileURLToPath(new URL('.', import.meta.url))); // the paths below 
 const watch = process.argv.includes('--watch');
 const store = process.argv.includes('--store'); // for the Chrome Web Store: see KEY
 const out = store ? 'dist-store' : 'dist'; // apart, so that packaging never takes the unpacked build's key away
-const BUILD = new Date().toISOString(); // pages and background compare it: see src/build.ts
+const BUILD = new Date().toISOString(); // pages and background compare it: see packages/core/src/build.ts
 
 // Unpacked builds carry this public key, so Chrome gives them one id wherever dist/ is: lnjbhokdddhjacnfbogccinlneabfodn,
 // the id otus-server lets through. A store build goes without it: the store gives Otus its own id.
 const KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArbC4f2kefR7h3YG/uO86+2D7N9pyaqA3PE8VXNrteRJlcJAoOKRTM1lTsxjnsMhRT0Jl1MMmroAuLJjdLOZ4jwYvRCfS2PqLJgvpVXtX3/JGZIfeHs6lLjLfoR6+43Gd+HTIwTwmyezRX94IJbcnKimZechhJg27xT0ni6J0JrXCeyflUY9ZQGTjquz94b+VlvIvUl6hriGjZ/C0PhNnFx7a9kAnU37IpHLCoUC7BYlVoz9pb61r9vj0LYkzm/FUIM7Gt7F3vX1Hmul3N5954r3ehxigFT8UEk6/043M8N9oBBkkJmxAroGeDRf9g1LE3+VuSXlOlqf1Y5TTUhdcpQIDAQAB';
+
+const UI = '../../packages/ui'; // the screens: their styles, fonts and icons, which the build takes from there
 
 // The files esbuild does not bundle, copied after every build that worked.
 function copy() {
     const manifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
     if ('key' in manifest) throw new Error('manifest.json has a key: only unpacked builds get one, from KEY');
     writeFileSync(`${out}/manifest.json`, `${JSON.stringify(store ? manifest : { ...manifest, key: KEY }, null, 4)}\n`);
-    for (const page of ['approve.html', 'home.html', 'welcome.html']) cpSync(`src/ui/${page}`, `${out}/${page}`);
+    for (const page of ['approve.html', 'home.html', 'welcome.html']) cpSync(`src/pages/${page}`, `${out}/${page}`);
     cpSync('assets/icons', `${out}/icons`, { recursive: true });
-    for (const font of ['Silkscreen.woff2', 'JetBrainsMono.woff2', 'Silkscreen-OFL.txt', 'JetBrainsMono-OFL.txt']) cpSync(`assets/fonts/${font}`, `${out}/fonts/${font}`);
-    cpSync('assets/icons/ui/LICENSE-lucide.txt', `${out}/licenses/LICENSE-lucide.txt`);
-    cpSync('assets/logos/LICENSE-cryptocurrency-icons.md', `${out}/licenses/LICENSE-cryptocurrency-icons.md`);
+    for (const font of ['Silkscreen.woff2', 'JetBrainsMono.woff2', 'Silkscreen-OFL.txt', 'JetBrainsMono-OFL.txt']) cpSync(`${UI}/assets/fonts/${font}`, `${out}/fonts/${font}`);
+    cpSync(`${UI}/assets/icons/LICENSE-lucide.txt`, `${out}/licenses/LICENSE-lucide.txt`);
+    cpSync(`${UI}/assets/logos/LICENSE-cryptocurrency-icons.md`, `${out}/licenses/LICENSE-cryptocurrency-icons.md`);
     cpSync('assets/licenses', `${out}/licenses`, { recursive: true });
 }
 
@@ -38,7 +40,7 @@ function notices(metafile) {
     for (const input of Object.keys(metafile.inputs)) {
         const at = input.lastIndexOf('node_modules/');
         if (at < 0) {
-            if (!/^(src|assets)\//.test(input)) throw new Error(`Bundled from outside this extension and node_modules: ${input}`);
+            if (!/^(src|assets)\/|^\.\.\/\.\.\/packages\//.test(input)) throw new Error(`Bundled from outside this repo's code and node_modules: ${input}`);
             continue;
         }
         const [first, second] = input.slice(at + 'node_modules/'.length).split('/');
@@ -57,24 +59,24 @@ function notices(metafile) {
 // Every bundle that uses the platform sets it, with Chrome's: a page would break at its first call otherwise.
 function platformSet(metafile) {
     for (const [file, { inputs }] of Object.entries(metafile.outputs)) {
-        if ('src/platform.ts' in inputs && !('src/shell/chrome.ts' in inputs)) throw new Error(`${file} uses the platform but does not set it`);
+        if ('../../packages/core/src/platform.ts' in inputs && !('src/shell/chrome.ts' in inputs)) throw new Error(`${file} uses the platform but does not set it`);
     }
 }
 
 // The pages' styles: Tailwind, from what the pages' code uses. Its CLI is the one locked here, never one found further up.
 const CLI = createRequire(import.meta.url).resolve('@tailwindcss/cli/package.json');
 if (!['node_modules/', '../../node_modules/'].some((d) => CLI.startsWith(fileURLToPath(new URL(d, import.meta.url))))) throw new Error(`Tailwind's CLI is not this repo's: ${CLI}`);
-const TAILWIND = [process.execPath, [`${dirname(CLI)}/dist/index.mjs`, '-i', 'src/ui/app.css', '-o', `${out}/app.css`]];
+const TAILWIND = [process.execPath, [`${dirname(CLI)}/dist/index.mjs`, '-i', `${UI}/src/app.css`, '-o', `${out}/app.css`]];
 
 rmSync(out, { recursive: true, force: true });
 const build = await context({
     entryPoints: {
-        page: 'src/shell/page.ts',
+        page: '../../packages/provider/src/page.ts',
         content: 'src/shell/content.ts',
         background: 'src/shell/background.ts',
-        approve: 'src/ui/review/main.tsx',
-        home: 'src/ui/popup/main.tsx',
-        welcome: 'src/ui/setup/main.tsx',
+        approve: 'src/pages/approve.ts',
+        home: 'src/pages/home.ts',
+        welcome: 'src/pages/welcome.ts',
     },
     outdir: out,
     bundle: true,

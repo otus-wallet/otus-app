@@ -4,9 +4,9 @@ import { createKeyPairFromPrivateKeyBytes, getAddressEncoder, getAddressFromPubl
 
 import { newPhrase, phraseOf, privateKeyFromText, privateKeyOf, privateKeysOf } from '../keys/derive.ts';
 import { base64, bytes, createVault, openVault, readSecrets, writeSecrets, WrongPassword, type Bytes, type Secret, type Vault } from '../keys/vault.ts';
-import { NO_KEY, Refused } from '../protocol.ts';
-import type { KeysCall, KeysReply, KeyStatus } from '../keystore.ts';
-import { load, named, update, type Account } from './state.ts';
+import { NO_KEY, Refused } from '@otus-wallet/core/protocol.ts';
+import type { KeysCall, KeysReply, KeyStatus } from '@otus-wallet/core/keystore.ts';
+import { load, named, update, type Account } from '@otus-wallet/core/state.ts';
 
 export const LOCK_ALARM = 'lock'; // the background sets it from how long Otus has been closed
 const MIN_PASSWORD = 8;

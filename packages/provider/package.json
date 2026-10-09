@@ -1,0 +1,25 @@
+{
+  "name": "@otus-wallet/provider",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Otus Wallet as sites see it: its Wallet Standard provider, put into each page",
+  "license": "Apache-2.0",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@otus-wallet/core": "0.0.0",
+    "@solana/kit": "8.3.0",
+    "@solana/wallet-standard-features": "1.5.0",
+    "@wallet-standard/base": "1.1.1",
+    "@wallet-standard/features": "1.1.1",
+    "@wallet-standard/wallet": "1.1.1"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

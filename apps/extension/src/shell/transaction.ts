@@ -25,8 +25,8 @@ import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 
 import type { Chain } from '@otus-wallet/sdk/chain';
 import { toldByIdl, type IdlInstruction } from '@otus-wallet/sdk/idl/idl';
-import type { Cluster } from '../intake.ts';
-import { Refused } from '../protocol.ts';
+import type { Cluster } from '@otus-wallet/core/intake.ts';
+import { Refused } from '@otus-wallet/core/protocol.ts';
 import { LIGHTHOUSE } from '@otus-wallet/sdk/programs/addresses';
 import { isMint, type Context } from '@otus-wallet/sdk/review/assess';
 import { read, type State } from '@otus-wallet/sdk/review/changes';
@@ -35,12 +35,12 @@ import { review, type Review } from '@otus-wallet/sdk/review/review';
 import { notice, squadsTold, type Inside, type ProposalTold } from '@otus-wallet/sdk/review/squads';
 import { SQUADS_V4 } from '@otus-wallet/sdk/programs/squads';
 import { prepare, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
-import type { Sent } from '../send/send.ts';
-import { networkOf, rpcFor, type Settings } from '../settings.ts';
-import { accountView, describe, LEDGER_CLEAR, type Known, type Life, type Outcome, type Signer, type SiteView, type TransactionView } from '../ui/view.ts';
+import type { Sent } from '@otus-wallet/core/send/send.ts';
+import { networkOf, rpcFor, type Settings } from '@otus-wallet/core/settings.ts';
+import { accountView, describe, LEDGER_CLEAR, type Known, type Life, type Outcome, type Signer, type SiteView, type TransactionView } from '@otus-wallet/core/view.ts';
 import type { Answer } from './approvals.ts';
 import type { Shell } from './serve.ts';
-import type { Account } from './state.ts';
+import type { Account } from '@otus-wallet/core/state.ts';
 
 /** The user said no. */
 export class Rejected extends Error {}

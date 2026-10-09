@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { gate } from '../src/gate.ts';
-import type { Request } from '../src/intake.ts';
-import { Refused } from '../src/protocol.ts';
-import { DEFAULT_SETTINGS } from '../src/settings.ts';
-import { key } from './helpers.ts';
+import type { Request } from '@otus-wallet/core/intake.ts';
+import { Refused } from '@otus-wallet/core/protocol.ts';
+import { DEFAULT_SETTINGS } from '@otus-wallet/core/settings.ts';
+import { key } from '@otus-wallet/core/test/helpers.ts';
 
 const request = (count: number): Request => ({
     kind: 'transaction',

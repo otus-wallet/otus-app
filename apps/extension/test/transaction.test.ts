@@ -6,7 +6,7 @@ import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { read } from '@otus-wallet/sdk/review/changes';
 import type { Review } from '@otus-wallet/sdk/review/review';
 import { decimalsOf } from '../src/shell/transaction.ts';
-import { account, fakeChain, key } from './helpers.ts';
+import { account, fakeChain, key } from '@otus-wallet/core/test/helpers.ts';
 
 // A mint's 82 bytes: what matters here are its decimals (byte 44) and whether it is initialized (byte 45).
 const mint = (decimals: number, initialized = true) => {

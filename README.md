@@ -13,6 +13,13 @@ it in as much detail as you want.
 The review, the guards and the decoders are [@otus-wallet/sdk](https://github.com/otus-wallet/otus-sdk), usable on
 their own.
 
+## Layout
+
+- `packages/core`: the logic every app shares: what Otus keeps, builds and says. No platform's API.
+- `packages/ui`: the screens, in React, the same everywhere; each app gives them its platform (`core/src/platform.ts`).
+- `packages/provider`: Otus as sites see it, through Wallet Standard.
+- `apps/extension`: the Chrome extension: its background, keystore and review of sites' requests.
+
 ## Build
 
 Until the SDK is on npm, clone it next to this repo:

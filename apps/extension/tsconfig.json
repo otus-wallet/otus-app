@@ -1,17 +1,7 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "es2024",
-    "lib": ["es2024", "dom"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "strict": true,
-    "noEmit": true,
-    "allowImportingTsExtensions": true,
-    "erasableSyntaxOnly": true,
-    "verbatimModuleSyntax": true,
-    "skipLibCheck": true,
-    "jsx": "react-jsx",
     "types": ["node", "chrome"]
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "../../packages/ui/src/svg.d.ts"]
 }

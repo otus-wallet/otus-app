@@ -1,7 +1,7 @@
 import { getBase64Encoder, isAddress, type Address, type SignatureBytes } from '@solana/kit';
 
-import { Refused } from '../protocol.ts';
-import type { Approval, Life, Outcome } from '../ui/view.ts';
+import { Refused } from '@otus-wallet/core/protocol.ts';
+import type { Approval, Life, Outcome } from '@otus-wallet/core/view.ts';
 import { shielded } from './keys.ts';
 
 const PAGE = 'approve.html';

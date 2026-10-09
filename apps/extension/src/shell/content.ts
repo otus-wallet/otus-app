@@ -1,6 +1,6 @@
 // Runs beside the site's page, in the extension's own world. It carries calls from the page script to the background
 // and answers back; it adds nothing and decides nothing. The background learns the site's origin from the browser.
-import { CHANNEL, type PageMessage, type Reply } from '../protocol.ts';
+import { CHANNEL, type PageMessage, type Reply } from '@otus-wallet/core/protocol.ts';
 
 const toPage = (message: PageMessage) => window.postMessage(message, window.location.origin);
 

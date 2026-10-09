@@ -1,7 +1,7 @@
 // The platform in Chrome: the background over runtime messages and ports, chrome.storage, and tabs. Each page imports
 // this first, so it is set before any module of the page uses it. Chrome's objects are read on each call, as an
 // extension reloaded under a page takes them away.
-import { install } from '../platform.ts';
+import { install } from '@otus-wallet/core/platform.ts';
 
 install({
     send: (call) => chrome.runtime.sendMessage(call),

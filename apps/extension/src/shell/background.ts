@@ -3,18 +3,18 @@
 import './chrome.ts'; // the platform, set before any module below uses it
 import { getBase64Encoder, type Signature } from '@solana/kit';
 
-import { BUILD } from '../build.ts';
-import type { KeysCall, KeysReply } from '../keystore.ts';
+import { BUILD } from '@otus-wallet/core/build.ts';
+import type { KeysCall, KeysReply } from '@otus-wallet/core/keystore.ts';
 import { rpcChain, type Chain } from '@otus-wallet/sdk/chain';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
-import { send } from '../send/send.ts';
-import { lockMinutes, walletRpc } from '../settings.ts';
-import { tokens } from '../tokens.ts';
-import type { Approval, Life } from '../ui/view.ts';
+import { send } from '@otus-wallet/core/send/send.ts';
+import { lockMinutes, walletRpc } from '@otus-wallet/core/settings.ts';
+import { tokens } from '@otus-wallet/core/tokens.ts';
+import type { Approval, Life } from '@otus-wallet/core/view.ts';
 import { answerOf, approve, kept, type Answer } from './approvals.ts';
 import { keysCall, lock, LOCK_ALARM, locked, prune, shielded, sign } from './keys.ts';
 import { own, serve, stakeOwn, takeBack } from './serve.ts';
-import { edited, load, update, type Edit, type State } from './state.ts';
+import { edited, load, update, type Edit, type State } from '@otus-wallet/core/state.ts';
 
 const shell = { load, update, approve, sign, chain: (rpc: string) => rpcChain(rpcAt(rpc)), send: async (signed: Uint8Array, chain: Chain) => send(signed, chain, undefined, (await load()).settings.preflight !== false), tokens, now: Date.now };
 const PAGES = new URL(chrome.runtime.getURL('')).origin;

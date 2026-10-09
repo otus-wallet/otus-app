@@ -10,8 +10,8 @@ import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
 import type { Chain } from '@otus-wallet/sdk/chain';
 import { gate } from '../gate.ts';
-import { intake, type Cluster, type Request } from '../intake.ts';
-import { NO_KEY, Refused, type Reply } from '../protocol.ts';
+import { intake, type Cluster, type Request } from '@otus-wallet/core/intake.ts';
+import { NO_KEY, Refused, type Reply } from '@otus-wallet/core/protocol.ts';
 import { cap } from '@otus-wallet/sdk/format';
 import { decode } from '@otus-wallet/sdk/review/decode';
 import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
@@ -20,14 +20,14 @@ import { programsCalled } from '@otus-wallet/sdk/review/sites';
 import { delegatesGiven, waitingOn } from '@otus-wallet/sdk/access/access';
 import { isTokenProgram } from '@otus-wallet/sdk/programs/addresses';
 import { timedOut } from '@otus-wallet/sdk/rpc';
-import type { Sent } from '../send/send.ts';
-import { STAKE_SPACE } from '../send/stake.ts';
-import { explorerOf, networkOf, rpcFor } from '../settings.ts';
+import type { Sent } from '@otus-wallet/core/send/send.ts';
+import { STAKE_SPACE } from '@otus-wallet/core/send/stake.ts';
+import { explorerOf, networkOf, rpcFor } from '@otus-wallet/core/settings.ts';
 import { signInFields, signInText } from '../siws.ts';
-import type { TokenInfo } from '../tokens.ts';
-import { accountView, siteView, type Approval, type Life, type Outcome, type SiteView } from '../ui/view.ts';
+import type { TokenInfo } from '@otus-wallet/core/tokens.ts';
+import { accountView, siteView, type Approval, type Life, type Outcome, type SiteView } from '@otus-wallet/core/view.ts';
 import type { Answer } from './approvals.ts';
-import { onDevice, sentTo, signs, type Account, type State } from './state.ts';
+import { onDevice, sentTo, signs, type Account, type State } from '@otus-wallet/core/state.ts';
 import { approved, channel, clusterOf, followed, landed, messageOf, Rejected, signerOf, unexpired, withSignature } from './transaction.ts';
 
 /** What serve needs from the extension: its state, the user's answer (behind Otus's lock), the keystore, the network

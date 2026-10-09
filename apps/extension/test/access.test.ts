@@ -6,9 +6,9 @@ import type { Address } from '@solana/kit';
 import type { Grant } from '@otus-wallet/sdk/access/access';
 import type { Review } from '@otus-wallet/sdk/review/review';
 import { usable } from '../src/shell/serve.ts';
-import type { State } from '../src/shell/state.ts';
-import { accessRows, accessWords, freezable, others, type AccessNaming } from '../src/ui/view/access.ts';
-import { key } from './helpers.ts';
+import type { State } from '@otus-wallet/core/state.ts';
+import { accessRows, accessWords, freezable, others, type AccessNaming } from '@otus-wallet/core/view/access.ts';
+import { key } from '@otus-wallet/core/test/helpers.ts';
 
 const ME = key(1);
 const naming = (o: Partial<AccessNaming> = {}): AccessNaming => ({
