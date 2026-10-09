@@ -1,5 +1,6 @@
 // What the popup shows before a wallet: nothing set up yet, or its background from another build. Otus locked is
 // the shield's, over every page.
+import { platform } from '../../platform.ts';
 import { Initial } from '../components/shield.tsx';
 import { Button } from '../components/ui/button.tsx';
 
@@ -28,7 +29,7 @@ export function Stale() {
                 <h1 className="pixel text-base">Otus was updated</h1>
                 <p className="text-[10.5px] text-ink-2">Reload it to use the new version, then unlock it again.</p>
             </div>
-            <Button variant="default" className="w-full" onClick={() => chrome.runtime.reload()}>
+            <Button variant="default" className="w-full" onClick={() => platform.reload()}>
                 Reload Otus
             </Button>
         </main>

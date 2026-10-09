@@ -23,14 +23,7 @@ export type Screen = 'lobby' | 'activity' | 'access' | 'wallet' | 'wallets' | 's
 
 // The setup tab, for a new wallet or one to import: the one already open, if any, rather than another.
 async function setUp(hash = '') {
-    const page = chrome.runtime.getURL('welcome.html');
-    const [tab] = await chrome.runtime.getContexts({ contextTypes: ['TAB' as chrome.runtime.ContextType], documentUrls: [page, `${page}#add`] }).catch(() => []);
-    if (tab && tab.tabId >= 0) {
-        await chrome.tabs.update(tab.tabId, { active: true });
-        await chrome.windows.update(tab.windowId, { focused: true });
-    } else {
-        await chrome.tabs.create({ url: `${page}${hash}` });
-    }
+    await platform.showSetup(hash);
     window.close();
 }
 

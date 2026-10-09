@@ -1,5 +1,6 @@
 // A site's transaction once approved, in its window: on its way, then how it ended, as the background tells it. It
 // shows nothing secret, so Otus's lock does not cover it; closing the window changes nothing. Done opens Activity.
+import { platform } from '../../platform.ts';
 import { Icon } from '../components/icons.tsx';
 import type { AccountView, Outcome, SiteView, Tone } from '../view.ts';
 import { Answer, Frame } from './Frame.tsx';
@@ -31,7 +32,7 @@ export function Settled({ site, account, outcome }: { site: SiteView; account: A
 }
 
 // Done: this window goes on to Activity, where the transaction now shows.
-const activity = () => location.replace(chrome.runtime.getURL('home.html#activity'));
+const activity = () => location.replace(platform.url('home.html#activity'));
 
 // What an outcome says: its tone, its title and its words.
 function told(outcome: Outcome | null): [Tone, string, string] {

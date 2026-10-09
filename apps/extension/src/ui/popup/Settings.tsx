@@ -4,6 +4,7 @@ import { isAddress } from '@solana/kit';
 import { useState, type ReactNode } from 'react';
 
 import { rpcAt } from '@otus-wallet/sdk/rpc';
+import { platform } from '../../platform.ts';
 import { clusterOfGenesis, EXPLORERS, explorerOf, LOCK_CHOICES, MAX_LOCK_AFTER, networkName, networkOf, type Explorer, type Settings } from '../../settings.ts';
 import type { KeyStatus } from '../../shell/keys.ts';
 import { lookalike, named, nameTaken, type State } from '../../shell/state.ts';
@@ -54,7 +55,7 @@ export function Settings({ state, keys, go }: { state: State; keys: KeyStatus; g
                 </Button>
             )}
             <footer className="mt-auto flex items-center justify-end gap-2.5">
-                <span className="version text-[10.5px] font-bold text-ok">v{chrome.runtime.getManifest().version}</span>
+                <span className="version text-[10.5px] font-bold text-ok">v{platform.version()}</span>
                 <a href={REPO} target="_blank" rel="noreferrer" aria-label="Otus Wallet on GitHub" className="text-ink-3 hover:text-ink">
                     <Icon name="github" size={15} />
                 </a>

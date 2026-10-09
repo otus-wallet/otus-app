@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { onPlug } from '../ledger/devices.ts';
+import { platform } from '../platform.ts';
 import { LedgerError, type Trouble } from '../ledger/hid.ts';
 
 /** `looking`: finding the Ledger that holds the account; `confirming`: it asks the user, on its screen. */
@@ -55,4 +56,4 @@ export function useLedger<T>(work: (signal: AbortSignal, confirming: () => void)
 }
 
 /** The setup tab, where Chrome lets Otus be granted a Ledger. */
-export const pairInTab = () => void chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html#ledger') });
+export const pairInTab = () => void platform.openTab('welcome.html#ledger');

@@ -308,7 +308,7 @@ function Watch({ state, go, finished }: { state: State; go: (to: Page) => void; 
 }
 
 function Done({ made, go }: { made: Account | null; go: (to: Page) => void }) {
-    const close = () => chrome.tabs.getCurrent((t) => void (t?.id !== undefined && chrome.tabs.remove(t.id)));
+    const close = () => platform.closeTab();
     return (
         <>
             <Lead>Ready</Lead>

@@ -39,7 +39,7 @@ function useKeys(): [KeyStatus | null, () => void] {
         const read = (again = true) => {
             const mine = ++latest;
             const set = (k: KeyStatus) => void (live && mine === latest && setKeys(k));
-            if (!chrome.runtime?.id) return set(SHUT);
+            if (!platform.alive()) return set(SHUT);
             Promise.resolve()
                 .then(() => ask({ keys: 'status' }))
                 .then((reply) => set(statusOf(reply)))
