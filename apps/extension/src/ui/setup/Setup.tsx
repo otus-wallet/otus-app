@@ -3,6 +3,7 @@
 import { isAddress } from '@solana/kit';
 import { useEffect, useState } from 'react';
 
+import { platform } from '../../platform.ts';
 import type { KeyStatus } from '../../shell/keys.ts';
 import { load, type Account, type State } from '../../shell/state.ts';
 import { PasswordInput } from '../components/password.tsx';
@@ -281,7 +282,7 @@ function Watch({ state, go, finished }: { state: State; go: (to: Page) => void; 
         if (!isAddress(a)) return setError('That is not a Solana address');
         const now = await load();
         if (now.accounts.some((x) => x.address === a)) return setError('That account is in Otus already');
-        const reply = (await chrome.runtime.sendMessage({ edit: 'watch', address: a, label: name.trim() })) as { ok: boolean } | undefined; // the background writes accounts, and names one left unnamed
+        const reply = (await platform.send({ edit: 'watch', address: a, label: name.trim() })) as { ok: boolean } | undefined; // the background writes accounts, and names one left unnamed
         if (!reply?.ok) return setError(name.trim() ? 'Otus did not add it: it looks like an address you have, or that name is taken' : 'Otus did not add it: it looks like an address you have');
         finished((await load()).accounts.find((x) => x.address === a) ?? { address: a, label: name.trim() });
     };

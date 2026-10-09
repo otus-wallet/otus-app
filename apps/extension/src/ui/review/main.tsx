@@ -1,6 +1,7 @@
 // The approval window's page: it connects back to the background by the id in its address, shows what comes behind
 // Otus's lock, and answers. Escape says no, locked or not; a window closed says no too, in the background. A transaction
 // approved stays, saying how it goes.
+import '../../shell/chrome.ts'; // the platform, set before any module below uses it
 import { StrictMode, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 

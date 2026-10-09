@@ -11,6 +11,7 @@ import { Lobby } from './Lobby.tsx';
 import { Receive } from './Receive.tsx';
 import { Send } from './Send.tsx';
 import { Settings } from './Settings.tsx';
+import { platform } from '../../platform.ts';
 import type { KeyStatus } from '../../shell/keys.ts';
 import type { State } from '../../shell/state.ts';
 import { useOtus } from './store.ts';
@@ -37,8 +38,8 @@ async function setUp(hash = '') {
 function useStale(): boolean {
     const [stale, setStale] = useState(false);
     useEffect(() => {
-        chrome.runtime.sendMessage({ build: true }).then(
-            (reply: { build?: unknown } | undefined) => setStale(reply?.build !== BUILD),
+        platform.send({ build: true }).then(
+            (reply) => setStale((reply as { build?: unknown } | undefined)?.build !== BUILD),
             () => setStale(true),
         );
     }, []);

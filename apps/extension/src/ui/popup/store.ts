@@ -9,6 +9,7 @@ import { historyPage, NoHistory } from '@otus-wallet/sdk/activity/history';
 import { summarize, type Activity } from '@otus-wallet/sdk/activity/summary';
 import { access } from '@otus-wallet/sdk/access/access';
 import { rpcAt, timedOut } from '@otus-wallet/sdk/rpc';
+import { platform } from '../../platform.ts';
 import type { KeyStatus } from '../../shell/keys.ts';
 import { load, save, type Edit, type State } from '../../shell/state.ts';
 import { ask } from '../ask.ts';
@@ -176,7 +177,7 @@ export function said(e: unknown): string {
 }
 
 /** Accounts and sites change in the background, their one writer, as other things change them too. */
-export const edit = (e: Edit) => chrome.runtime.sendMessage(e);
+export const edit = (e: Edit) => platform.send(e);
 
 /** Settings are the popup's alone: written from the state as it is now. */
 export const setSettings = async (change: (s: State['settings']) => Partial<State['settings']>) => {

@@ -1,5 +1,6 @@
 // The popup's page: React, with its query cache and shadcn/ui's tooltips around it, and the beat that keeps Otus open
 // while it is. It draws once the session's last balances are in the cache, so they show at once.
+import '../../shell/chrome.ts'; // the platform, set before any module below uses it
 import { QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

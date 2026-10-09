@@ -9,6 +9,7 @@ import { LedgerError } from '../../ledger/hid.ts';
 import { address, solanaApp } from '../../ledger/solana.ts';
 import { sol } from '@otus-wallet/sdk/format';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
+import { platform } from '../../platform.ts';
 import { walletRpc } from '../../settings.ts';
 import { load, nameTaken, signs, type Account, type State } from '../../shell/state.ts';
 import { Checkbox } from '../components/ui/checkbox.tsx';
@@ -108,7 +109,7 @@ export function LedgerAccounts({ state, go, finished }: { state: State; go: (to:
             for (const r of found!.filter((f) => picked.has(f.address) && !had(f.address))) {
                 const now = await load();
                 if (!now.accounts.some((a) => a.address === r.address && signs(a))) {
-                    const reply = (await chrome.runtime.sendMessage({ edit: 'ledger', address: r.address, path: r.path, label: freeName(now) })) as { ok: boolean } | undefined;
+                    const reply = (await platform.send({ edit: 'ledger', address: r.address, path: r.path, label: freeName(now) })) as { ok: boolean } | undefined;
                     if (!reply?.ok) return setError(`Otus did not add ${short(r.address)}: it looks like an address you have`);
                 }
                 last = (await load()).accounts.find((a) => a.address === r.address);
