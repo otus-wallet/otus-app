@@ -14,6 +14,7 @@
   "scripts": {
     "build": "npm run build -w @otus-wallet/extension",
     "package": "npm run package -w @otus-wallet/extension",
+    "verify": "npm run verify -w @otus-wallet/extension --",
     "watch": "npm run watch -w @otus-wallet/extension",
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"

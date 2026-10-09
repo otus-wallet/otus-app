@@ -12,7 +12,9 @@ process.chdir(fileURLToPath(new URL('.', import.meta.url))); // the paths below 
 const watch = process.argv.includes('--watch');
 const store = process.argv.includes('--store'); // for the Chrome Web Store: see KEY
 const out = store ? 'dist-store' : 'dist'; // apart, so that packaging never takes the unpacked build's key away
-const BUILD = new Date().toISOString(); // pages and background compare it: see packages/core/src/build.ts
+// Pages and background compare it: see packages/core/src/build.ts. A store build takes its version, so that the same
+// commit always builds the same bytes; every store upload has a version of its own.
+const BUILD = store ? JSON.parse(readFileSync('manifest.json', 'utf8')).version : new Date().toISOString();
 
 // Unpacked builds carry this public key, so Chrome gives them one id wherever dist/ is: lnjbhokdddhjacnfbogccinlneabfodn,
 // the id otus-server lets through. A store build goes without it: the store gives Otus its own id.
