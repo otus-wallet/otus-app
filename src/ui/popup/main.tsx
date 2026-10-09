@@ -9,7 +9,9 @@ import { stayOpen } from '../open.ts';
 import { App } from './App.tsx';
 import { forgetActivity, queries, restore } from './query.ts';
 
-stayOpen();
+// The toolbar popup counts as open while it is; in a window (a review window gone on to Activity), only while that has
+// the focus, as a window, unlike the popup, stays when the user turns away.
+void chrome.tabs.getCurrent().then((tab) => stayOpen({ whileFocused: tab !== undefined }), () => stayOpen());
 void restore().finally(() => {
     // Opened on Activity from a review window, once its transaction landed: what was kept of it is behind.
     if (location.hash === '#activity') {

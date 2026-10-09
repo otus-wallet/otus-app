@@ -1,8 +1,8 @@
 /**
  * Tells the background a page of Otus's is open: Otus stays unlocked while it is, and counts its lock time from
- * when it closes. The popup counts while open, as Chrome closes it once it loses the focus; the setup tab
- * (`whileFocused`), only while it has the focus, as the popup would be. Approval windows do not count, since a site
- * opens them. The beat keeps the background awake, and its count.
+ * when it closes. The popup counts while open, as Chrome closes it once it loses the focus; the setup tab and a review
+ * window gone on to Activity (`whileFocused`), only while they have the focus, as the popup would be. Approval windows
+ * do not count, since a site opens them. The beat keeps the background awake, and its count.
  */
 export function stayOpen({ whileFocused = false } = {}) {
     let shut: (() => void) | null = null;
