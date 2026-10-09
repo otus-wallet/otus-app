@@ -3,6 +3,7 @@
 // the way to its activity and to settings.
 import { useEffect, useState } from 'react';
 
+import { platform } from '../../platform.ts';
 import { explorerOf, networkName, networkOf, walletRpc, type Settings } from '../../settings.ts';
 import { signs, type State } from '../../shell/state.ts';
 import { Button } from '../components/ui/button.tsx';
@@ -163,11 +164,11 @@ function bannerOf(last: Last): ['ok' | 'danger' | 'plain', 'check' | 'bang' | 'r
 function Banner({ settings }: { settings: Settings }) {
     const [last, setLast] = useState<Last | null>(null);
     useEffect(() => {
-        const read = () => chrome.storage.session.get('lastTransfer').then(({ lastTransfer }) => setLast((lastTransfer as Last | undefined) ?? null));
+        const read = () => platform.storage.session.get('lastTransfer').then(({ lastTransfer }) => setLast((lastTransfer as Last | undefined) ?? null));
         const changed = (changes: Record<string, unknown>, area: string) => void (area === 'session' && 'lastTransfer' in changes && read());
         read();
-        chrome.storage.onChanged.addListener(changed);
-        return () => chrome.storage.onChanged.removeListener(changed);
+        platform.storage.onChanged.addListener(changed);
+        return () => platform.storage.onChanged.removeListener(changed);
     }, []);
     if (!last || Date.now() - last.at > 30 * 60_000) return null;
     const signature = typeof last.result?.signature === 'string' && /^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(last.result.signature) ? last.result.signature : null;
@@ -188,7 +189,7 @@ function Banner({ settings }: { settings: Settings }) {
                     </>
                 )}
             </span>
-            <IconButton name="cross" label="Dismiss" className="size-[26px]" onClick={() => void chrome.storage.session.remove('lastTransfer')} />
+            <IconButton name="cross" label="Dismiss" className="size-[26px]" onClick={() => void platform.storage.session.remove('lastTransfer')} />
         </div>
     );
 }

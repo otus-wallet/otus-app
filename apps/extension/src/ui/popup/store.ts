@@ -32,10 +32,10 @@ export function useOtus(): Otus | null {
         };
         const changed = (_: unknown, area: string) => void ((area === 'local' || area === 'session') && read());
         read();
-        chrome.storage.onChanged.addListener(changed);
+        platform.storage.onChanged.addListener(changed);
         return () => {
             live = false;
-            chrome.storage.onChanged.removeListener(changed);
+            platform.storage.onChanged.removeListener(changed);
         };
     }, []);
     return now;
@@ -45,7 +45,7 @@ const REFRESH = 30_000; // ms between reads of what a wallet holds, while it is 
 
 // A transfer made here that landed (or failed) changed what the wallet holds: the balances are read again then, and the
 // activity from its first page.
-chrome.storage.onChanged.addListener((changes, area) => {
+platform.storage.onChanged.addListener((changes, area) => {
     const last = changes.lastTransfer?.newValue as { pending?: boolean } | undefined;
     if (area !== 'session' || !last || last.pending) return;
     void queries.invalidateQueries({ queryKey: ['holdings'] });
@@ -150,13 +150,13 @@ export const useValidators = (rpc: string, cluster: string, epoch: bigint | unde
 type KeptNames = Record<string, { at: number; names: [string, string][] }>; // by network
 
 async function namesFor(rpc: string, cluster: string, nodes: Set<string>): Promise<Map<string, string>> {
-    const kept = (((await chrome.storage.local.get('validatorNames')).validatorNames ?? {}) as KeptNames) || {};
+    const kept = (((await platform.storage.local.get('validatorNames')).validatorNames ?? {}) as KeptNames) || {};
     const mine = kept[cluster];
     if (mine && Date.now() - mine.at < NAMES_FOR && Array.isArray(mine.names)) {
         return new Map(mine.names.filter((e) => Array.isArray(e) && typeof e[0] === 'string' && typeof e[1] === 'string' && named(e[1])).map(([node, name]) => [node, named(name)]));
     }
     const names = [...(await validatorNames(rpcAt(rpc)))].filter(([node]) => nodes.has(node));
-    if (names.length > 0) await chrome.storage.local.set({ validatorNames: { ...kept, [cluster]: { at: Date.now(), names } } }).catch(() => {}); // none: read again next time
+    if (names.length > 0) await platform.storage.local.set({ validatorNames: { ...kept, [cluster]: { at: Date.now(), names } } }).catch(() => {}); // none: read again next time
     return new Map(names);
 }
 

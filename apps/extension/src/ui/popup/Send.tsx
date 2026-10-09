@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { cap } from '@otus-wallet/sdk/format';
 import { isTokenProgram, TOKEN_2022_PROGRAM_ADDRESS } from '@otus-wallet/sdk/programs/addresses';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
-import { platform, type Port } from '../../platform.ts';
+import { platform, type Changes, type Port } from '../../platform.ts';
 import { SIGN_WITHIN } from '../../send/lifetime.ts';
 import { feeOn, transfer, unplain, units as unitsOf, type Asset, type Lifetime, type Recipient } from '../../send/transfer.ts';
 import { explorerOf, networkOf, walletRpc, type Settings } from '../../settings.ts';
@@ -72,12 +72,12 @@ export function Send({ state, go }: { state: State; go: (to: Screen) => void }) 
     const unsure = shown?.outcome && shown.outcome !== 'sending' && shown.outcome.ok && shown.outcome.result?.outcome === 'unknown' ? shown.outcome.result.signature : null;
     useEffect(() => {
         if (typeof unsure !== 'string') return;
-        const heard = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+        const heard = (changes: Changes, area: string) => {
             const last = changes.lastTransfer?.newValue as Reply | undefined;
             if (area === 'session' && last?.ok === true && last.result?.signature === unsure && last.result.outcome !== 'unknown') setShown((s) => s && { ...s, outcome: last });
         };
-        chrome.storage.onChanged.addListener(heard);
-        return () => chrome.storage.onChanged.removeListener(heard);
+        platform.storage.onChanged.addListener(heard);
+        return () => platform.storage.onChanged.removeListener(heard);
     }, [unsure]);
     const address = typed.to.trim();
     const settled = useSettled(address, LOOK_AFTER);
@@ -133,7 +133,7 @@ export function Send({ state, go }: { state: State; go: (to: Screen) => void }) 
                 if (waiting.current === port) return back('Otus stopped before you answered: nothing was sent');
                 if (sending.current !== port) return;
                 sending.current = null;
-                void chrome.storage.session.get('lastTransfer').then(({ lastTransfer }) => setShown((s) => s && { ...s, outcome: stopped(lastTransfer, approvedAt.current) }));
+                void platform.storage.session.get('lastTransfer').then(({ lastTransfer }) => setShown((s) => s && { ...s, outcome: stopped(lastTransfer, approvedAt.current) }));
             });
             port.postMessage({ own: getBase64Decoder().decode(bytes), account: account.address, to: request.to });
         } catch (e) {
@@ -164,7 +164,7 @@ export function Send({ state, go }: { state: State; go: (to: Screen) => void }) 
             // Seen here, the outcome needs no banner in the lobby; one still on its way, or not confirmed yet, keeps it.
             const leave = (sent: boolean) => {
                 const unknown = outcome === 'sending' || (outcome.ok && outcome.result?.outcome === 'unknown');
-                if (!unknown) void chrome.storage.session.remove('lastTransfer');
+                if (!unknown) void platform.storage.session.remove('lastTransfer');
                 if (sent) draft = { account: account.address, asset: 'native', amount: '', to: '' };
                 if (sent) go('activity'); // where it now shows
                 else if (outcome === 'sending') go('lobby');

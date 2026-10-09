@@ -3,6 +3,7 @@
 // and goes as soon as Otus locks again, from wherever it is locked: a button, the timer, another page.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
+import { platform } from '../../platform.ts';
 import type { KeyStatus, KeysReply } from '../../shell/keys.ts';
 import { ask } from '../ask.ts';
 import { PasswordInput } from './password.tsx';
@@ -51,12 +52,12 @@ function useKeys(): [KeyStatus | null, () => void] {
         const back = () => void (document.visibilityState === 'visible' && read());
         recheck.current = () => read();
         read();
-        chrome.storage.onChanged.addListener(changed);
+        platform.storage.onChanged.addListener(changed);
         addEventListener('focus', back);
         document.addEventListener('visibilitychange', back);
         return () => {
             live = false;
-            chrome.storage.onChanged.removeListener(changed);
+            platform.storage.onChanged.removeListener(changed);
             removeEventListener('focus', back);
             document.removeEventListener('visibilitychange', back);
         };

@@ -4,6 +4,7 @@
 // the browser session, so the popup opens with them and reads them again.
 import { QueryClient, type InfiniteData } from '@tanstack/react-query';
 
+import { platform } from '../../platform.ts';
 import type { Holdings } from '../holdings.ts';
 import type { ActivityPage } from './store.ts';
 
@@ -19,7 +20,7 @@ export const accessKey = (rpc: string, address: string, stamp: number) => ['acce
 /** A wallet's activity as read, a page at a time. */
 export type ActivityPages = InfiniteData<ActivityPage, string | null>;
 
-const KEPT = 'held'; // chrome.storage.session: in memory only, gone with the browser, out of content scripts' reach
+const KEPT = 'held'; // in session storage: in memory only, gone with the browser, out of content scripts' reach
 const KEEP = 24; // queries: holdings, activity and access of the last few wallets
 type Kept = Record<string, { at: number; packed: string }>; // by query key; bigints as strings, as storage takes JSON
 
@@ -32,13 +33,13 @@ let kept: Kept = {};
 /** Drops the activity kept this session: a transfer landed, so what was read is behind. */
 export function forgetActivity() {
     kept = Object.fromEntries(Object.entries(kept).filter(([key]) => !key.startsWith('["activity"')));
-    void chrome.storage.session.set({ [KEPT]: kept });
+    void platform.storage.session.set({ [KEPT]: kept });
 }
 
 /** Puts what each wallet held, as last read this session, into the cache: before the popup draws. */
 export async function restore() {
     try {
-        kept = (((await chrome.storage.session.get(KEPT))[KEPT] ?? {}) as Kept) || {};
+        kept = (((await platform.storage.session.get(KEPT))[KEPT] ?? {}) as Kept) || {};
         for (const [key, { at, packed }] of Object.entries(kept)) {
             const queryKey = JSON.parse(key);
             const data = unpack(packed);
@@ -53,6 +54,6 @@ export async function restore() {
         const first = event.query.queryKey[0] === 'activity' ? (event.query.state.data as ActivityPages).pages[0] : null;
         kept[JSON.stringify(event.query.queryKey)] = first ? { at: first.at, packed: pack(first) } : { at: event.query.state.dataUpdatedAt, packed: pack(event.query.state.data) };
         kept = Object.fromEntries(Object.entries(kept).toSorted(([, a], [, b]) => b.at - a.at).slice(0, KEEP));
-        void chrome.storage.session.set({ [KEPT]: kept });
+        void platform.storage.session.set({ [KEPT]: kept });
     });
 }
