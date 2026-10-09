@@ -1,5 +1,5 @@
 {
-  "name": "otus-extension",
+  "name": "otus-app",
   "private": true,
   "type": "module",
   "description": "Otus's browser wallet: a Chrome extension that reviews every transaction before you sign, on @solana/kit",
@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "node build.mjs",
-    "package": "node build.mjs && cd dist && rm -f ../otus.zip && zip -qrX ../otus.zip .",
+    "package": "node build.mjs --store && cd dist && rm -f ../otus.zip && zip -qrX ../otus.zip .",
     "watch": "node build.mjs --watch",
     "test": "node --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
