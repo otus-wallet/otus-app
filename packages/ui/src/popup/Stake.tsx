@@ -183,7 +183,7 @@ function NewStake({ state, terms, validators, error, back, start }: { state: Sta
                 {!validators && !error && <p className="text-[11px] text-ink-3">Reading the validators</p>}
                 {!validators && error && <p className="text-[11px] text-warn">{`The RPC did not answer: ${said(error)}`}</p>}
                 {validators && listed.length === 0 && <p className="text-[11px] text-ink-3">No validator by that name or address</p>}
-                {validators && !query.trim() && <p className="text-[10.5px] text-ink-3">Ranked by the highest rewards in the last 3 epochs.</p>}
+                {validators && !query.trim() && <p className="mt-1.5 text-[10.5px] text-ink-3">Ranked by the highest rewards in the last 3 epochs.</p>}
                 <ul className="flex flex-col gap-1.5">
                     {listed.map((v) => (
                         <li key={v.vote}>
