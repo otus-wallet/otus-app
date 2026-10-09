@@ -7,11 +7,17 @@ import { context } from 'esbuild';
 
 const out = 'dist';
 const watch = process.argv.includes('--watch');
+const store = process.argv.includes('--store'); // for the Chrome Web Store: see KEY
 const BUILD = new Date().toISOString(); // pages and background compare it: see src/build.ts
+
+// Unpacked builds carry this public key, so Chrome gives them one id wherever dist/ is: lnjbhokdddhjacnfbogccinlneabfodn,
+// the id otus-server lets through. A store build goes without it: the store gives Otus its own id.
+const KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArbC4f2kefR7h3YG/uO86+2D7N9pyaqA3PE8VXNrteRJlcJAoOKRTM1lTsxjnsMhRT0Jl1MMmroAuLJjdLOZ4jwYvRCfS2PqLJgvpVXtX3/JGZIfeHs6lLjLfoR6+43Gd+HTIwTwmyezRX94IJbcnKimZechhJg27xT0ni6J0JrXCeyflUY9ZQGTjquz94b+VlvIvUl6hriGjZ/C0PhNnFx7a9kAnU37IpHLCoUC7BYlVoz9pb61r9vj0LYkzm/FUIM7Gt7F3vX1Hmul3N5954r3ehxigFT8UEk6/043M8N9oBBkkJmxAroGeDRf9g1LE3+VuSXlOlqf1Y5TTUhdcpQIDAQAB';
 
 // The files esbuild does not bundle, copied after every build that worked.
 function copy() {
-    cpSync('manifest.json', `${out}/manifest.json`);
+    const manifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
+    writeFileSync(`${out}/manifest.json`, `${JSON.stringify(store ? manifest : { ...manifest, key: KEY }, null, 4)}\n`);
     for (const page of ['approve.html', 'home.html', 'welcome.html']) cpSync(`src/ui/${page}`, `${out}/${page}`);
     cpSync('assets/icons', `${out}/icons`, { recursive: true });
     for (const font of ['Silkscreen.woff2', 'JetBrainsMono.woff2', 'Silkscreen-OFL.txt', 'JetBrainsMono-OFL.txt']) cpSync(`assets/fonts/${font}`, `${out}/fonts/${font}`);
