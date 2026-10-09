@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { OTUS_RPC } from '../src/settings.ts';
-import { tokens } from '../src/tokens.ts';
+import { cachedToken, search, tokens } from '../src/tokens.ts';
 
 // Jupiter, as a stub: it knows a fake "USDC" and nothing else.
 const FAKE_USDC = 'Fake1111111111111111111111111111111111111111';
@@ -39,8 +39,25 @@ test('a token named as a well-known one at another address is never verified, wh
 
 test("Otus's server is asked only while mainnet is read through it; otherwise Jupiter itself, keyless", async (t) => {
     const asked: string[] = [];
-    t.mock.method(globalThis, 'fetch', async (url: string) => (asked.push(`${new URL(url).origin}${new URL(url).pathname}`), new Response('[]')));
+    t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => (asked.push(`${init.method} ${new URL(url).origin}${new URL(url).pathname}`), new Response('[]')));
     await tokens(['Through111111111111111111111111111111111111'], true);
     await tokens(['Own11111111111111111111111111111111111111111'], false);
-    assert.deepEqual(asked, [`${OTUS_RPC}/tokens`, 'https://api.jup.ag/tokens/v2/search']);
+    await search('bonk', true);
+    // Posted to Otus's server: an extension's page sends its Origin, which the server asks for, with a POST only.
+    assert.deepEqual(asked, [`POST ${OTUS_RPC}/tokens`, 'GET https://api.jup.ag/tokens/v2/search', `POST ${OTUS_RPC}/tokens`]);
+});
+
+test('a search by words asks for them as typed, reads each answer with care, and keeps what it found', async (t) => {
+    const asked: string[] = [];
+    const FOUND = 'Found111111111111111111111111111111111111111';
+    t.mock.method(globalThis, 'fetch', async (url: string) => {
+        asked.push(new URL(url).searchParams.get('query') ?? '');
+        return new Response(JSON.stringify([{ id: FOUND, name: 'Jito‮ Staked SOL', symbol: 'JitoSOL', isVerified: true, decimals: 9 }, { name: 'no id' }, 7]));
+    });
+    assert.deepEqual(await search('   ', true), []);
+    const found = await search(' jito sol ', true);
+    assert.deepEqual(asked, ['jito sol']);
+    assert.equal(found.length, 1);
+    assert.equal(found[0].name, 'Jito Staked SOL');
+    assert.equal(cachedToken(FOUND)?.symbol, 'JitoSOL');
 });

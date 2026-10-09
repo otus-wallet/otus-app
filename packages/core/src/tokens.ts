@@ -22,7 +22,7 @@ export async function tokens(mints: string[], throughOtus: boolean): Promise<Map
     try {
         for (let i = 0; i < asking.length; i += PER_SEARCH) {
             const batch = asking.slice(i, i + PER_SEARCH);
-            const response = await fetch(`${throughOtus ? THROUGH_OTUS : JUPITER}?query=${batch.join(',')}`, { credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(WAIT) });
+            const response = await fetch(`${throughOtus ? THROUGH_OTUS : JUPITER}?query=${batch.join(',')}`, { method: methodFor(throughOtus), credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(WAIT) });
             if (!response.ok) throw new Error(`Jupiter answered ${response.status}`);
             const found = new Map((await response.json() as unknown[]).flatMap((t) => (info(t) ? [[info(t)!.id, info(t)!] as const] : [])));
             for (const m of batch) looked.set(m, found.get(m) ?? null);
@@ -30,6 +30,22 @@ export async function tokens(mints: string[], throughOtus: boolean): Promise<Map
     } catch {} // no names or prices beats no balances
     return new Map([...new Set(mints)].map((m) => [m, looked.get(m) ?? null]));
 }
+
+/** Tokens whose name or symbol matches a few words, as Jupiter finds them (the swap's picker), through Otus's server or
+ *  not; read with the same care. Each one found is kept as a lookup of its mint would keep it. */
+export async function search(words: string, throughOtus: boolean): Promise<TokenInfo[]> {
+    const query = words.trim();
+    if (!query) return [];
+    const response = await fetch(`${throughOtus ? THROUGH_OTUS : JUPITER}?query=${encodeURIComponent(query)}`, { method: methodFor(throughOtus), credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(WAIT) });
+    if (!response.ok) throw new Error(`Jupiter answered ${response.status}`);
+    const found = ((await response.json()) as unknown[]).flatMap((t) => (info(t) ? [info(t)!] : []));
+    for (const t of found) looked.set(t.id, t);
+    return found;
+}
+
+// Otus's server takes a search posted, the only way an extension's page sends its Origin to a host it may reach;
+// Jupiter itself takes it as a GET.
+const methodFor = (throughOtus: boolean) => (throughOtus ? 'POST' : 'GET');
 
 /** What Jupiter said of a mint already, this page or worker: no request. */
 export const cachedToken = (mint: string): TokenInfo | null => looked.get(mint) ?? null;

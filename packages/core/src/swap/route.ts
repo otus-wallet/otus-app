@@ -37,7 +37,8 @@ const MOST_ACCOUNTS = 255; // in one instruction's list, repeats included: its c
 /** A route for what is asked, through Otus's server; throws, in words, when there is none to build. */
 export async function routeFor(ask: Ask): Promise<Route> {
     const query = `inputMint=${ask.input}&outputMint=${ask.output}&amount=${ask.amount}&taker=${ask.taker}&slippageBps=${ask.slippageBps}&maxAccounts=${ask.maxAccounts}`;
-    const response = await fetch(`${OTUS_RPC}/swap/build?${query}`, { credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(WAIT) });
+    // Posted: an extension's page sends its Origin, which Otus's server asks for, with a POST only.
+    const response = await fetch(`${OTUS_RPC}/swap/build?${query}`, { method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(WAIT) });
     const body: unknown = await response.json().catch(() => null);
     if (!response.ok) throw new Error(said(body) ?? `no route (${response.status})`);
     return readRoute(body, ask);
