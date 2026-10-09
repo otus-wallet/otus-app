@@ -85,8 +85,8 @@ export function balances(r: Review, p: Prepared | null, wallet: Address, n: Name
             // staked SOL, an asset apart from the wallet's, so staking shows what it moves without opening the lines.
             const where = toward('SOL', c.address, moved);
             const note = [where, cap(n.who(c.address))].filter(Boolean).join(' · ');
-            // Staked SOL from your wallet, or back to it, goes without saying so: only someone else is named.
-            if ((c.after ?? c.before)?.program === STAKE_PROGRAM) row('staked', 'Staked SOL', 'sol', where && !/^(From|To) you$/.test(where) ? note : cap(n.who(c.address)), moved, SOL_DECIMALS, true);
+            // Staked SOL says itself what it is: no note. Where it goes shows on the SOL lines.
+            if ((c.after ?? c.before)?.program === STAKE_PROGRAM) row('staked', 'Staked SOL', 'sol', '', moved, SOL_DECIMALS, true);
             else solRow(note, moved);
             continue;
         }

@@ -1161,7 +1161,7 @@
         "tone": "danger",
         "lines": [
           {
-            "note": "To HAgk…Kpqk · Your stake account 3uWi…8KsQ",
+            "note": "",
             "amount": "−50",
             "tone": "danger"
           }
@@ -1335,7 +1335,7 @@
         "tone": "plain",
         "lines": [
           {
-            "note": "To HAgk…Kpqk · Your stake account 3uWi…8KsQ",
+            "note": "",
             "amount": "−50",
             "tone": "plain"
           }
