@@ -18,7 +18,7 @@ export type Port = {
 
 /** What a page keeps: `local` stays; `session` is in memory only, gone when the browser closes. */
 export type Kept = {
-    get(key: string): Promise<Record<string, unknown>>;
+    get(keys: string | Record<string, unknown>): Promise<Record<string, unknown>>; // keys with their defaults, or one key
     set(items: Record<string, unknown>): Promise<void>;
     remove(key: string): Promise<void>;
 };

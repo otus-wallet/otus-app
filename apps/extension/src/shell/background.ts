@@ -1,5 +1,6 @@
 // The service worker: every site call goes through serve, with the origin the browser reports. Otus's own pages,
 // and only they, reach the keystore.
+import './chrome.ts'; // the platform, set before any module below uses it
 import { getBase64Encoder, type Signature } from '@solana/kit';
 
 import { BUILD } from '../build.ts';

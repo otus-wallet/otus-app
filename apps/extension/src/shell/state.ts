@@ -1,6 +1,7 @@
 import { isAddress, type Address } from '@solana/kit';
 
 import { pathBytes } from '../ledger/solana.ts';
+import { platform } from '../platform.ts';
 import { DEFAULT_SETTINGS, settingsOf, type Settings } from '../settings.ts';
 
 /** An account Otus shows. `key`: where the vault keeps its key (a secret, and the account's index on a phrase).
@@ -34,7 +35,7 @@ export type Given = { account: Address; to: Address; host: string; at: number };
 /** An address you know, by the name you gave it: one to send to. */
 export type Contact = { address: Address; label: string };
 
-/** What the extension keeps in chrome.storage.local, one key each, so a write never clobbers another part. `sent`: how
+/** What Otus keeps in local storage, one key each, so a write never clobbers another part. `sent`: how
  *  many transfers made in Otus landed at each address; `removed`: accounts on a phrase that you removed, which New
  *  account never brings back; `waiting` and `given`: what sites were signed for that others can still use, the latest
  *  last. */
@@ -44,10 +45,10 @@ const DEFAULTS: State = { accounts: [], active: null, sites: {}, contacts: [], s
 const MAX_CONTACTS = 200;
 
 export async function load(): Promise<State> {
-    const state = (await chrome.storage.local.get(DEFAULTS)) as State;
+    const state = (await platform.storage.local.get(DEFAULTS)) as State;
     return { ...state, settings: settingsOf(state.settings) }; // settings saved before a newer one existed
 }
-export const save = (part: Partial<State>) => chrome.storage.local.set(part);
+export const save = (part: Partial<State>) => platform.storage.local.set(part);
 
 // Changes to accounts and sites, one after another, each made from the state as it is then, so that two never undo
 // each other. Only the background writes them: Otus's pages ask it to, with an Edit.
