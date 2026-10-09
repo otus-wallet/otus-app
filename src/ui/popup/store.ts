@@ -118,25 +118,33 @@ const STAKE_FRESH = 30_000; // ms a wallet's stake accounts, and the epoch, are 
 const VALIDATORS_FRESH = 10 * 60_000; // ms the validators are
 const NAMES_FOR = 7 * 24 * 3600_000; // ms validators' names are kept: reading them all is megabytes
 
-/** The stake accounts a wallet withdraws from. */
-export const useStakes = (rpc: string, address: Address) => useQuery({ queryKey: ['stakes', rpc, address], queryFn: () => stakesOf(rpcAt(rpc), address), staleTime: STAKE_FRESH });
+/** The stake accounts a wallet withdraws from, read again now and then while shown: what was sent lands meanwhile. */
+export const useStakes = (rpc: string, address: Address) => useQuery({ queryKey: ['stakes', rpc, address], queryFn: () => stakesOf(rpcAt(rpc), address), staleTime: STAKE_FRESH, refetchInterval: STAKE_FRESH });
 
-/** What staking hangs on now: the epoch and about how long is left of it, the network's least stake, a stake account's
- *  rent. */
+/** The epoch, and about how long is left of it. */
+export const useEpoch = (rpc: string) => useQuery({ queryKey: ['epoch', rpc], queryFn: () => epochOf(rpcAt(rpc)), staleTime: STAKE_FRESH });
+
+/** What a new stake hangs on: the network's least stake, and a stake account's rent. */
 export const useStakeTerms = (rpc: string) =>
     useQuery({
         queryKey: ['stakeTerms', rpc],
         queryFn: async () => {
             const r = rpcAt(rpc);
-            const [epoch, { value: min }, rent] = await Promise.all([epochOf(r), r.getStakeMinimumDelegation({ commitment: 'confirmed' }).send(), stakeRent(r)]);
-            return { ...epoch, min, rent };
+            const [{ value: min }, rent] = await Promise.all([r.getStakeMinimumDelegation({ commitment: 'confirmed' }).send(), stakeRent(r)]);
+            return { min, rent };
         },
         staleTime: STAKE_FRESH,
     });
 
-/** The validators of the network the wallet shows, ranked; their names kept for a week, those of validators alive. */
+/** The validators of the network the wallet shows, ranked; their names kept for a week, those of validators alive.
+ *  Names that cannot be read leave the validators by address. */
 export const useValidators = (rpc: string, cluster: string, epoch: bigint | undefined) =>
-    useQuery({ queryKey: ['validators', rpc, String(epoch)], queryFn: () => validatorsOf(rpcAt(rpc), epoch!, (nodes) => namesFor(rpc, cluster, nodes)), enabled: epoch !== undefined, staleTime: VALIDATORS_FRESH });
+    useQuery({
+        queryKey: ['validators', rpc, String(epoch)],
+        queryFn: () => validatorsOf(rpcAt(rpc), epoch!, (nodes) => namesFor(rpc, cluster, nodes).catch(() => new Map<string, string>())),
+        enabled: epoch !== undefined,
+        staleTime: VALIDATORS_FRESH,
+    });
 
 type KeptNames = Record<string, { at: number; names: [string, string][] }>; // by network
 
@@ -147,7 +155,7 @@ async function namesFor(rpc: string, cluster: string, nodes: Set<string>): Promi
         return new Map(mine.names.filter((e) => Array.isArray(e) && typeof e[0] === 'string' && typeof e[1] === 'string' && named(e[1])).map(([node, name]) => [node, named(name)]));
     }
     const names = [...(await validatorNames(rpcAt(rpc)))].filter(([node]) => nodes.has(node));
-    await chrome.storage.local.set({ validatorNames: { ...kept, [cluster]: { at: Date.now(), names } } }).catch(() => {});
+    if (names.length > 0) await chrome.storage.local.set({ validatorNames: { ...kept, [cluster]: { at: Date.now(), names } } }).catch(() => {}); // none: read again next time
     return new Map(names);
 }
 

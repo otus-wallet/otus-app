@@ -12,7 +12,7 @@ const EPOCHS = 3; // the last complete epochs a validator's votes are counted ov
 
 /** A validator to stake with. `score`: what it would have paid of late, its vote credits over the last few complete
  *  epochs times what its commission leaves; `top`: one of the largest, which together hold a third of all stake;
- *  `twin`: another validator declares the same name. */
+ *  `twin`: another validator declares the same name, or one drawn alike. */
 export type Validator = { vote: Address; node: Address; commission: number; stake: bigint; score: bigint; voting: boolean; top: boolean; name: string | null; twin: boolean };
 
 type VoteAccount = { votePubkey: Address; nodePubkey: Address; commission: number; activatedStake: bigint; epochCredits: readonly (readonly [bigint, bigint, bigint])[] };
@@ -36,10 +36,11 @@ export function ranked(current: readonly VoteAccount[], delinquent: readonly Vot
         top.add(v.votePubkey);
         held += v.activatedStake;
     }
-    const counted = new Map<string, Set<string>>(); // a name, folded → the vote accounts declaring it
+    const counted = new Map<string, Set<string>>(); // a name's skeleton → the vote accounts declaring one like it
     for (const [v] of all) {
         const name = names.get(v.nodePubkey);
-        if (name) counted.set(fold(name), (counted.get(fold(name)) ?? new Set()).add(v.votePubkey));
+        const k = name && skeleton(name);
+        if (k) counted.set(k, (counted.get(k) ?? new Set()).add(v.votePubkey));
     }
     const validators = all.map(([v, voting]): Validator => {
         const name = names.get(v.nodePubkey) ?? null;
@@ -53,22 +54,36 @@ export function ranked(current: readonly VoteAccount[], delinquent: readonly Vot
             voting,
             top: top.has(v.votePubkey),
             name,
-            twin: name !== null && (counted.get(fold(name))?.size ?? 0) > 1,
+            twin: name !== null && (counted.get(skeleton(name))?.size ?? 0) > 1,
         };
     });
     return validators.toSorted((a, b) => Number(b.voting) - Number(a.voting) || (b.score > a.score ? 1 : b.score < a.score ? -1 : 0) || (a.vote < b.vote ? -1 : 1));
 }
 
-// The vote credits earned in the last few complete epochs: each entry is an epoch, its credits, and those before it.
+// The vote credits earned in the last few complete epochs, none for one it missed: each entry is an epoch, its credits,
+// and those before it.
 function earned(credits: VoteAccount['epochCredits'], epoch: bigint): bigint {
-    return credits
-        .filter(([e]) => e < epoch)
-        .slice(-EPOCHS)
-        .reduce((n, [, now, before]) => n + (now > before ? now - before : 0n), 0n);
+    return credits.filter(([e]) => e < epoch && e >= epoch - BigInt(EPOCHS)).reduce((n, [, now, before]) => n + (now > before ? now - before : 0n), 0n);
 }
 
-// A name as compared: its compatibility forms folded, case aside.
-const fold = (name: string) => name.normalize('NFKC').toLowerCase();
+// Letters of other scripts drawn like Latin ones (as Unicode's confusables have them), and Latin ones drawn alike.
+const LOOKALIKE: Record<string, string> = Object.fromEntries(
+    [
+        ['аАαΑ', 'a'], ['вВβΒ', 'b'], ['сСϲ', 'c'], ['ԁ', 'd'], ['еЕεΕ', 'e'], ['ɡ', 'g'], ['һНΗ', 'h'], ['іІιΙıɩ1|!', 'l'],
+        ['јЈȷ', 'j'], ['кКκΚ', 'k'], ['мМΜ', 'm'], ['ΝпП', 'n'], ['оОοΟσ0', 'o'], ['рРρΡ', 'p'], ['ԛԚ', 'q'], ['ѕЅ', 's'],
+        ['тТτΤ', 't'], ['υ', 'u'], ['νѵ', 'v'], ['ԝԜ', 'w'], ['хХχΧ', 'x'], ['уУүҮΥγ', 'y'], ['Ζ', 'z'],
+    ].flatMap(([from, to]) => [...from].map((c) => [c, to])),
+);
+
+// A name as compared, so that names drawn alike match: accents and marks off, look-alike letters as Latin, case aside,
+// "i" as "l", "rn" as "m", "vv" as "w", a number at its end and everything but letters and digits dropped. Empty when
+// too little is left to tell names apart.
+export function skeleton(name: string): string {
+    const bare = name.normalize('NFKD').replace(/\p{M}/gu, '').replace(/[\s\d\p{P}\p{S}]+$/u, '');
+    const latin = [...bare].map((c) => LOOKALIKE[c] ?? c).join('').toLowerCase();
+    const k = latin.replace(/i/g, 'l').replace(/rn/g, 'm').replace(/vv/g, 'w').replace(/[^a-z0-9]/g, '');
+    return k.length >= 3 ? k : '';
+}
 
 /** Each validator identity's declared name, from the Config program's validator info accounts. */
 export async function validatorNames(rpc: Rpc<SolanaRpcApi>): Promise<Map<string, string>> {
@@ -105,6 +120,7 @@ function infoOf(data: Uint8Array): { node: string; name: string } | null {
     } catch {
         return null;
     }
-    const name = info !== null && typeof info === 'object' && typeof (info as { name?: unknown }).name === 'string' ? named((info as { name: string }).name) : '';
+    // Marks stacked on a letter, past two, are dropped: piled up, they spill over the text around.
+    const name = info !== null && typeof info === 'object' && typeof (info as { name?: unknown }).name === 'string' ? named((info as { name: string }).name.normalize('NFKC').replace(/(\p{M}{2})\p{M}+/gu, '$1')) : '';
     return name ? { node: b58.decode(data.subarray(34, 66)), name } : null;
 }

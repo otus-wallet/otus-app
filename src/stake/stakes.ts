@@ -75,11 +75,12 @@ export function stakeOf(address: Address, lamports: bigint, data: Uint8Array): S
 export function standingOf(s: StakeAccount, epoch: bigint): Standing {
     if (s.vote === null) return 'idle';
     if (s.deactivation !== NEVER) return s.deactivation >= epoch && s.activation !== s.deactivation ? 'deactivating' : 'inactive';
-    return s.activation >= epoch ? 'activating' : 'active';
+    return s.activation >= epoch && s.activation !== NEVER ? 'activating' : 'active'; // NEVER: a genesis stake, active from the start
 }
 
-/** Whether a lockup keeps the wallet from withdrawing it now (`now` in s). */
-export const lockedOf = (s: StakeAccount, epoch: bigint, now: bigint, owner: Address) => s.lockup.custodian !== owner && (s.lockup.epoch > epoch || s.lockup.time > now);
+/** Whether a lockup keeps it from being withdrawn now (`now` in s). Its custodian could, signing too; Otus's withdraw
+ *  has the wallet alone sign. */
+export const lockedOf = (s: StakeAccount, epoch: bigint, now: bigint) => s.lockup.epoch > epoch || s.lockup.time > now;
 
 /** The epoch, and about how many seconds are left of it, at the pace blocks were made of late. */
 export async function epochOf(rpc: Rpc<SolanaRpcApi>): Promise<{ epoch: bigint; left: number | null }> {
@@ -99,17 +100,19 @@ export async function stakeRent(rpc: Rpc<SolanaRpcApi>): Promise<bigint> {
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const [perByteYear, years] = [view.getBigUint64(0, true), view.getFloat64(8, true)];
     if (!(years > 0 && years <= 10)) throw new Error('the network did not say what rent is');
-    return BigInt(Math.ceil(Number((OVERHEAD + STAKE_SPACE) * perByteYear) * years));
+    return BigInt(Math.floor(Number((OVERHEAD + STAKE_SPACE) * perByteYear) * years)); // cut, as the runtime does
 }
 
-/** The first seed of Otus's whose stake account is not there: where the next stake goes. */
-export async function nextSeed(rpc: Rpc<SolanaRpcApi>, at: (seed: string) => Promise<Address>, seedOf: (n: number) => string): Promise<string> {
+/** The first seed of Otus's whose stake account is not there: where the next stake goes. Past the first hundred, which
+ *  anyone could fill (the addresses follow from the wallet's), a random one. */
+export async function nextSeed(rpc: Rpc<SolanaRpcApi>, at: (seed: string) => Promise<Address>, seedOf: (n: number) => string, skip: ReadonlySet<string> = new Set()): Promise<string> {
     for (let from = 0; from < 100; from += 10) {
         const seeds = Array.from({ length: 10 }, (_, i) => seedOf(from + i));
         const addresses = await Promise.all(seeds.map(at));
         const { value } = await rpc.getMultipleAccounts(addresses, { encoding: 'base64', dataSlice: { offset: 0, length: 0 }, commitment: 'confirmed' }).send();
-        const free = value.findIndex((a) => a === null);
+        const free = value.findIndex((a, i) => a === null && !skip.has(seeds[i]));
         if (free >= 0) return seeds[free];
     }
-    throw new Error('this wallet has 100 stake accounts of Otus already');
+    const random = crypto.getRandomValues(new Uint8Array(8));
+    return `stake:${[...random].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
 }

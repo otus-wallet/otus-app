@@ -66,7 +66,12 @@ export function Doing({ account, job, title, settings, done }: { account: Accoun
                 return stop(said(e));
             }
             if (!live) return;
-            const p = chrome.runtime.connect({ name: 'own' });
+            let p: chrome.runtime.Port;
+            try {
+                p = chrome.runtime.connect({ name: 'own' });
+            } catch {
+                return stop('Otus was reloaded: open it again'); // this page outlived the extension
+            }
             port = p;
             waiting.current = p;
             late = setTimeout(() => waiting.current === p && (p.disconnect(), stop('Otus did not answer in time: nothing was sent')), REVIEW_WAIT);
@@ -86,7 +91,12 @@ export function Doing({ account, job, title, settings, done }: { account: Accoun
                 if (waiting.current === p) return stop('Otus stopped before you answered: nothing was sent');
                 if (sending.current === p) stop(`Otus stopped while sending it: check ${job.where} again in a moment`);
             });
-            p.postMessage({ own: getBase64Decoder().decode(bytes), account: account.address, [job.kind]: true });
+            try {
+                p.postMessage({ own: getBase64Decoder().decode(bytes), account: account.address, [job.kind]: true });
+            } catch {
+                clearTimeout(late);
+                stop('Otus was reloaded: open it again');
+            }
         })();
         return () => {
             live = false;

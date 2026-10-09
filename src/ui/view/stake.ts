@@ -48,7 +48,7 @@ export function validatorWords(v: Validator): { title: string; sub: string; note
     const notes: { text: string; tone: 'warn' | 'danger' }[] = [];
     if (!v.voting) notes.push({ text: 'Not voting now: it earns no rewards', tone: 'danger' });
     if (v.commission === 100) notes.push({ text: 'It keeps all the rewards', tone: 'warn' });
-    if (v.twin) notes.push({ text: 'Another validator uses this name', tone: 'warn' });
+    if (v.twin) notes.push({ text: 'Another validator uses a name like this', tone: 'warn' });
     return { title: v.name ?? short(v.vote), sub: `${short(v.vote)} · ${v.commission}% commission · ${compact(v.stake)} SOL staked`, notes };
 }
 

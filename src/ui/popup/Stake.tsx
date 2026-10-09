@@ -20,10 +20,11 @@ import type { Screen } from './App.tsx';
 import { Bar, Choice, ErrorLine, Heading, Sheet, Tip } from './common.tsx';
 import { decimal } from './money.ts';
 import { queries } from './query.ts';
-import { current, said, useHoldings, useStakes, useStakeTerms, useValidators } from './store.ts';
+import { current, said, useEpoch, useHoldings, useStakes, useStakeTerms, useValidators } from './store.ts';
 import { Doing, type Job } from './TakeBack.tsx';
 
 const RESERVE = 2_000_000n; // lamports a new stake leaves the wallet for fees and its own rent, as Send's Max does
+const used = new Set<string>(); // seeds of stakes made while the popup is open: one may not have landed yet
 
 export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => void }) {
     const account = current(state);
@@ -32,8 +33,9 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
     const [adding, setAdding] = useState(false);
     const [doing, setDoing] = useState<{ job: Job; title: string } | null>(null);
     const stakes = useStakes(rpc, account.address);
+    const epoch = useEpoch(rpc);
     const terms = useStakeTerms(rpc);
-    const validators = useValidators(rpc, networkOf(state.settings), terms.data?.epoch);
+    const validators = useValidators(rpc, networkOf(state.settings), epoch.data?.epoch);
     const byVote = useMemo(() => new Map((validators.data ?? []).map((v) => [v.vote, v])), [validators.data]);
     const nameOf = (vote: Address | null) => (vote === null ? 'Not delegated' : (byVote.get(vote)?.name ?? short(vote)));
 
@@ -54,7 +56,12 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
     const job = (kind: 'unstake' | 'withdraw', s: StakeAccount): { job: Job; title: string } => ({
         job: {
             kind: 'stake',
-            make: (lifetime) => staking(owner, kind === 'unstake' ? { kind, stake: s.address } : { kind, stake: s.address, lamports: s.lamports }, lifetime),
+            // A withdraw takes all the account holds as it is read now: rewards may have come in since the list was read.
+            make: async (lifetime) => {
+                if (kind === 'unstake') return staking(owner, { kind, stake: s.address }, lifetime);
+                const { value } = await rpcAt(rpc).getBalance(s.address, { commitment: 'confirmed' }).send();
+                return staking(owner, { kind, stake: s.address, lamports: value }, lifetime);
+            },
             doing: kind === 'unstake' ? 'Unstaking' : 'Withdrawing',
             landed: kind === 'unstake' ? 'Unstaked' : 'Withdrawn',
             where: 'Stake',
@@ -83,7 +90,7 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
                     {!stakes.data && !stakes.error && <p className="pt-6 text-center text-[11px] text-ink-3">Reading your stake</p>}
                     {!stakes.data && stakes.error && <Failed error={stakes.error} again={() => void stakes.refetch()} />}
                     {stakes.data && (
-                        <Part title="Your stake" extra={terms.data && <span className="text-[10.5px] text-ink-3">{`Epoch ${terms.data.epoch}`}</span>}>
+                        <Part title="Your stake" extra={epoch.data && <span className="text-[10.5px] text-ink-3">{`Epoch ${epoch.data.epoch}`}</span>}>
                             {read.length === 0 ? (
                                 <p className="text-[11px] text-ink-3">No stake yet</p>
                             ) : (
@@ -98,10 +105,10 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
                                                     </Row>
                                                 );
                                             }
-                                            const standing = terms.data ? standingOf(s, terms.data.epoch) : null;
-                                            const locked = terms.data ? lockedOf(s, terms.data.epoch, now, owner) : false;
-                                            const words = standing ? standingWords(standing, terms.data!.left, locked) : '';
-                                            const action = mine && standing && !locked ? actionOf(standing) : null;
+                                            const standing = epoch.data ? standingOf(s, epoch.data.epoch) : null;
+                                            const locked = epoch.data ? lockedOf(s, epoch.data.epoch, now) : false;
+                                            const words = standing ? standingWords(standing, epoch.data!.left, locked) : '';
+                                            const action = mine && standing ? actionOf(standing, s.staker === owner, locked) : null;
                                             return (
                                                 <Row key={s.address} title={nameOf(s.vote)} sub={`${sol(s.lamports)} SOL${words ? ` · ${words}` : ''}`}>
                                                     {action && (
@@ -117,6 +124,7 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
                             )}
                         </Part>
                     )}
+                    {epoch.error && !epoch.data && <Failed error={epoch.error} again={() => void epoch.refetch()} />}
                     {terms.error && !terms.data && <Failed error={terms.error} again={() => void terms.refetch()} />}
                 </>
             )}
@@ -124,11 +132,11 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
     );
 }
 
-// What can be done with a stake where it stands: unstaked while it earns or warms up, withdrawn once off; nothing while
-// it cools down.
-function actionOf(standing: Standing): 'unstake' | 'withdraw' | null {
-    if (standing === 'active' || standing === 'activating') return 'unstake';
-    if (standing === 'inactive' || standing === 'idle') return 'withdraw';
+// What the wallet can do with a stake where it stands: unstake it while it earns or warms up, when the wallet is its
+// staker (a lockup holds back no unstaking); withdraw it once off, unless a lockup holds it; nothing while it cools down.
+function actionOf(standing: Standing, staker: boolean, locked: boolean): 'unstake' | 'withdraw' | null {
+    if (standing === 'active' || standing === 'activating') return staker ? 'unstake' : null;
+    if (standing === 'inactive' || standing === 'idle') return locked ? null : 'withdraw';
     return null;
 }
 
@@ -154,7 +162,11 @@ function NewStake({ state, terms, validators, error, back, start }: { state: Sta
         const lamports = units + terms.rent;
         const job: Job = {
             kind: 'stake',
-            make: async (lifetime) => staking(owner, { kind: 'stake', seed: await nextSeed(rpcAt(rpc), (seed) => stakeAt(owner, seed), seedOf), lamports, vote }, lifetime),
+            make: async (lifetime) => {
+                const seed = await nextSeed(rpcAt(rpc), (s) => stakeAt(owner, s), seedOf, used);
+                used.add(seed);
+                return staking(owner, { kind: 'stake', seed, lamports, vote }, lifetime);
+            },
             doing: 'Staking',
             landed: 'Staked',
             where: 'Stake',
@@ -193,7 +205,7 @@ function NewStake({ state, terms, validators, error, back, start }: { state: Sta
                 {!validators && !error && <p className="text-[11px] text-ink-3">Reading the validators</p>}
                 {!validators && error && <p className="text-[11px] text-warn">{`The RPC did not answer: ${said(error)}`}</p>}
                 {validators && listed.length === 0 && <p className="text-[11px] text-ink-3">No validator by that name or address</p>}
-                {validators && !query.trim() && <p className="text-[10.5px] text-ink-3">Those that paid most of late first: their votes, less their commission.</p>}
+                {validators && !query.trim() && <p className="text-[10.5px] text-ink-3">Ranked by the highest rewards in the last 3 epochs.</p>}
                 <ul className="flex flex-col gap-1.5">
                     {listed.map((v) => (
                         <li key={v.vote}>

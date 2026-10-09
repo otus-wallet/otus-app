@@ -771,9 +771,26 @@ test('what the popup makes for stake is reviewed as Otus’s own, signed and sen
     assert.match(((await stakeOwn(locked, w.me, w.shell)) as { error: string }).error, /does more than stake/);
     const reseeded = bent(made, 1, (d) => (d[44] = 'x'.charCodeAt(0)));
     assert.match(((await stakeOwn(reseeded, w.me, w.shell)) as { error: string }).error, /does more than stake/);
+    // A seed with a byte-order mark first is checked as its bytes, as the network derives the address: read as text,
+    // the mark would be dropped and another address derived.
+    const bom = await staking(w.me, { kind: 'stake', seed: '\uFEFFa', lamports: 1_001_666_240n, vote: key(40) }, life);
+    assert.equal(result<{ outcome: string }>(await stakeOwn(bom, w.me, w.shell)).outcome, 'confirmed');
+    // Withdrawn elsewhere, unstaked or delegated by another, paid or based elsewhere, or one instruction more.
+    const withdraw = await staking(w.me, { kind: 'withdraw', stake, lamports: 5n }, life);
+    const unstake = await staking(w.me, { kind: 'unstake', stake }, life);
+    const indexOf = async (b: Uint8Array, a: string) => getCompiledTransactionMessageDecoder().decode(getTransactionDecoder().decode(b).messageBytes).staticAccounts.indexOf(a as never);
+    const toStake = await indexOf(withdraw, stake);
+    for (const [b, ix, at] of [[withdraw, 1, 1], [withdraw, 1, 2], [unstake, 1, 1], [made, 3, 2], [made, 1, 0], [made, 1, 2]] as const) {
+        const other = b === made ? await indexOf(made, key(40)) : toStake; // another account of the same transaction
+        assert.match(((await stakeOwn(bent(b, ix, () => {}, [at, other]), w.me, w.shell)) as { error: string }).error, /does more than stake/, `${ix}:${at}`);
+    }
+    const twice = getTransactionDecoder().decode(unstake);
+    const message = getCompiledTransactionMessageDecoder().decode(twice.messageBytes) as { instructions: unknown[] };
+    const doubled = new Uint8Array(getTransactionEncoder().encode({ ...twice, messageBytes: getCompiledTransactionMessageEncoder().encode({ ...message, instructions: [...message.instructions, message.instructions[1]] } as never) } as never));
+    assert.match(((await stakeOwn(doubled, w.me, w.shell)) as { error: string }).error, /does more than stake/);
     // A transfer is no stake, nor is a stake another wallet signs.
     assert.match(((await stakeOwn(bytes(w.transfer()), w.me, w.shell)) as { error: string }).error, /does more than stake/);
     const theirs = await staking(key(5), { kind: 'unstake', stake }, life);
     assert.match(((await stakeOwn(theirs, w.me, w.shell)) as { error: string }).error, /does not sign this transaction/);
-    assert.equal(w.sent.length, 3);
+    assert.equal(w.sent.length, 4);
 });

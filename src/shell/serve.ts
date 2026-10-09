@@ -279,7 +279,8 @@ async function stakesOnly(r: Review, owner: Address): Promise<boolean> {
     const at = (ix: Ix, i: number) => r.accounts[ix.accountIndices[i]]?.address;
     const is = (ix: Ix, of: Address, n: number, accounts: number) => program(ix) === of && ix.accountIndices.length === accounts && ix.data.length >= 4 && new DataView(ix.data.buffer, ix.data.byteOffset, 4).getUint32(0, true) === n;
     const b58 = getBase58Decoder();
-    if (r.message.version === 1 || !limit || program(limit) !== COMPUTE_BUDGET_PROGRAM_ADDRESS || limit.data.length !== 5 || limit.data[0] !== 2) return false;
+    // No lookup table either: what Otus builds names every account itself, and a table read from the RPC could be told wrong.
+    if (r.message.version === 1 || r.message.lookups.length > 0 || !limit || program(limit) !== COMPUTE_BUDGET_PROGRAM_ADDRESS || limit.data.length !== 5 || limit.data[0] !== 2) return false;
     if (rest.length === 1) {
         const [ix] = rest;
         if (is(ix, STAKE_PROGRAM_ADDRESS, 5, 2)) return ix.data.length === 4 && at(ix, 1) === owner;
@@ -296,9 +297,10 @@ async function stakesOnly(r: Review, owner: Address): Promise<boolean> {
     const length = view.getBigUint64(36, true);
     if (length > 32n || d.length !== 4 + 32 + 8 + Number(length) + 8 + 8 + 32) return false;
     const after = 44 + Number(length);
-    let seed: string;
+    // The seed's very bytes derive the address, as the network does it: text decoding would drop a leading BOM.
+    const seed = d.subarray(44, after);
     try {
-        seed = new TextDecoder('utf-8', { fatal: true }).decode(d.subarray(44, after));
+        new TextDecoder('utf-8', { fatal: true }).decode(seed);
     } catch {
         return false;
     }
