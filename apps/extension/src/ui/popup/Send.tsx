@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { cap } from '@otus-wallet/sdk/format';
 import { isTokenProgram, TOKEN_2022_PROGRAM_ADDRESS } from '@otus-wallet/sdk/programs/addresses';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
+import { platform, type Port } from '../../platform.ts';
 import { SIGN_WITHIN } from '../../send/lifetime.ts';
 import { feeOn, transfer, unplain, units as unitsOf, type Asset, type Lifetime, type Recipient } from '../../send/transfer.ts';
 import { explorerOf, networkOf, walletRpc, type Settings } from '../../settings.ts';
@@ -62,8 +63,8 @@ export function Send({ state, go }: { state: State; go: (to: Screen) => void }) 
     const [failure, setFailure] = useState('');
     const [shown, setShown] = useState<Shown | null>(null);
     const attempt = useRef(0); // the build that counts: one rejected or left before its review came is dropped
-    const waiting = useRef<chrome.runtime.Port | null>(null); // the port of the review on show, until answered
-    const sending = useRef<chrome.runtime.Port | null>(null); // the port of a signed transfer, until it lands or fails
+    const waiting = useRef<Port | null>(null); // the port of the review on show, until answered
+    const sending = useRef<Port | null>(null); // the port of a signed transfer, until it lands or fails
     const approvedAt = useRef(0); // when the transfer on its way was approved: what the background kept before is another's
     useEffect(() => () => (attempt.current++, waiting.current?.disconnect()), []); // leaving says no
     // A transfer left not confirmed yet, as when Otus stopped while sending it: the background that starts again checks
@@ -114,7 +115,7 @@ export function Send({ state, go }: { state: State; go: (to: Screen) => void }) 
             const bytes = await transfer(account.address, request.recipient, request.asset, request.units, UNSET, onDevice(account) ? 0 : 1);
             if (attempt.current !== mine) return;
             setShown((s) => s && { ...s, lifetime: { from, until: from + SIGN_WITHIN } });
-            const port = chrome.runtime.connect({ name: 'own' });
+            const port = platform.connect('own');
             waiting.current = port;
             const late = setTimeout(() => waiting.current === port && (port.disconnect(), back('Otus did not answer in time: nothing was sent')), REVIEW_WAIT);
             port.onMessage.addListener((m: Heard) => {

@@ -5,13 +5,14 @@ import '../../shell/chrome.ts'; // the platform, set before any module below use
 import { StrictMode, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { platform } from '../../platform.ts';
 import { Shield } from '../components/shield.tsx';
 import { TooltipProvider } from '../components/ui/tooltip.tsx';
 import type { Approval, Life, Outcome } from '../view.ts';
 import { Approve } from './Approve.tsx';
 import { Settled } from './Settled.tsx';
 
-const port = chrome.runtime.connect({ name: `approve:${location.hash.slice(1)}` });
+const port = platform.connect(`approve:${location.hash.slice(1)}`);
 let answered = false;
 // No closes the window; yes too, unless it is a transaction's: the background then tells how it goes.
 const answer = (yes: boolean, signature?: string, account?: string) => {

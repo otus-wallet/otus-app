@@ -5,6 +5,7 @@ import { getBase64Decoder, type Blockhash } from '@solana/kit';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { cap, short } from '@otus-wallet/sdk/format';
+import { platform, type Port } from '../../platform.ts';
 import { fix, type Fix } from '../../send/fix.ts';
 import { SIGN_WITHIN } from '../../send/lifetime.ts';
 import type { Lifetime } from '../../send/transfer.ts';
@@ -45,12 +46,12 @@ export function Doing({ account, job, title, settings, done }: { account: Accoun
     const [outcome, setOutcome] = useState<'sending' | Reply | null>(null);
     const [lifetime, setLifetime] = useState<{ from: number; until: number } | null>(null);
     const [attempt, setAttempt] = useState(0); // built again with a fresh blockhash
-    const waiting = useRef<chrome.runtime.Port | null>(null); // the port of the review on show, until answered
-    const sending = useRef<chrome.runtime.Port | null>(null); // the port of what is signed, until it lands or fails
+    const waiting = useRef<Port | null>(null); // the port of the review on show, until answered
+    const sending = useRef<Port | null>(null); // the port of what is signed, until it lands or fails
 
     useEffect(() => {
         let live = true;
-        let port: chrome.runtime.Port | null = null;
+        let port: Port | null = null;
         let late: ReturnType<typeof setTimeout> | undefined;
         setApproval(null);
         setLife(undefined);
@@ -66,9 +67,9 @@ export function Doing({ account, job, title, settings, done }: { account: Accoun
                 return stop(said(e));
             }
             if (!live) return;
-            let p: chrome.runtime.Port;
+            let p: Port;
             try {
-                p = chrome.runtime.connect({ name: 'own' });
+                p = platform.connect('own');
             } catch {
                 return stop('Otus was reloaded: open it again'); // this page outlived the extension
             }

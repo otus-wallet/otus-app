@@ -1,3 +1,5 @@
+import { platform } from '../platform.ts';
+
 /**
  * Tells the background a page of Otus's is open: Otus stays unlocked while it is, and counts its lock time from
  * when it closes. The popup counts while open, as Chrome closes it once it loses the focus; the setup tab and a review
@@ -9,7 +11,7 @@ export function stayOpen({ whileFocused = false } = {}) {
     const focused = () => !whileFocused || document.hasFocus();
     const open = () => {
         try {
-            const port = chrome.runtime.connect({ name: 'open' });
+            const port = platform.connect('open');
             const beat = setInterval(() => port.postMessage(0), 20_000);
             shut = () => (clearInterval(beat), port.disconnect(), (shut = null));
             port.onDisconnect.addListener(() => {
