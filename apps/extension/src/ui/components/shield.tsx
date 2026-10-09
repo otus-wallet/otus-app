@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { platform } from '../../platform.ts';
-import type { KeyStatus, KeysReply } from '../../shell/keys.ts';
+import type { KeyStatus, KeysReply } from '../../keystore.ts';
 import { ask } from '../ask.ts';
 import { PasswordInput } from './password.tsx';
 import { Button } from './ui/button.tsx';

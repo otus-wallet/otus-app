@@ -1,7 +1,7 @@
 // What Otus's pages ask of the platform they run on: the extension's background, storage and tabs in Chrome, the app's
 // native side on a phone. The pages use no extension API but through here, so this file lists all they ask of it. Each
 // app installs its own, once, before any page module runs: its build checks every bundle that uses it sets it.
-import type { KeysCall } from './shell/keys.ts';
+import type { KeysCall } from './keystore.ts';
 import type { Edit } from './shell/state.ts';
 
 /** A message to the background, answered once: a call to the keystore, an edit of the accounts, or which build runs. */

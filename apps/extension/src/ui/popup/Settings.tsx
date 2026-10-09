@@ -6,7 +6,7 @@ import { useState, type ReactNode } from 'react';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
 import { platform } from '../../platform.ts';
 import { clusterOfGenesis, EXPLORERS, explorerOf, LOCK_CHOICES, MAX_LOCK_AFTER, networkName, networkOf, type Explorer, type Settings } from '../../settings.ts';
-import type { KeyStatus } from '../../shell/keys.ts';
+import type { KeyStatus } from '../../keystore.ts';
 import { lookalike, named, nameTaken, type State } from '../../shell/state.ts';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion.tsx';
 import { Button } from '../components/ui/button.tsx';

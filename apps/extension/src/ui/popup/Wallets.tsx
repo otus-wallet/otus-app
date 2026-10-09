@@ -4,7 +4,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from '@dnd-kit/utilities';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
-import type { KeyStatus } from '../../shell/keys.ts';
+import type { KeyStatus } from '../../keystore.ts';
 import { walletRpc } from '../../settings.ts';
 import type { Account, State } from '../../shell/state.ts';
 import { Button } from '../components/ui/button.tsx';

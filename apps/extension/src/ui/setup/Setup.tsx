@@ -4,7 +4,7 @@ import { isAddress } from '@solana/kit';
 import { useEffect, useState } from 'react';
 
 import { platform } from '../../platform.ts';
-import type { KeyStatus } from '../../shell/keys.ts';
+import type { KeyStatus } from '../../keystore.ts';
 import { load, type Account, type State } from '../../shell/state.ts';
 import { PasswordInput } from '../components/password.tsx';
 import { Button } from '../components/ui/button.tsx';

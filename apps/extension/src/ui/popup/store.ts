@@ -10,7 +10,7 @@ import { summarize, type Activity } from '@otus-wallet/sdk/activity/summary';
 import { access } from '@otus-wallet/sdk/access/access';
 import { rpcAt, timedOut } from '@otus-wallet/sdk/rpc';
 import { platform } from '../../platform.ts';
-import type { KeyStatus } from '../../shell/keys.ts';
+import type { KeyStatus } from '../../keystore.ts';
 import { load, save, type Edit, type State } from '../../shell/state.ts';
 import { ask } from '../ask.ts';
 import { holdings, type Holdings } from '../holdings.ts';

@@ -12,7 +12,7 @@ import { Receive } from './Receive.tsx';
 import { Send } from './Send.tsx';
 import { Settings } from './Settings.tsx';
 import { platform } from '../../platform.ts';
-import type { KeyStatus } from '../../shell/keys.ts';
+import type { KeyStatus } from '../../keystore.ts';
 import type { State } from '../../shell/state.ts';
 import { useOtus } from './store.ts';
 import { StakeScreen } from './Stake.tsx';

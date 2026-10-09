@@ -5,20 +5,8 @@ import { createKeyPairFromPrivateKeyBytes, getAddressEncoder, getAddressFromPubl
 import { newPhrase, phraseOf, privateKeyFromText, privateKeyOf, privateKeysOf } from '../keys/derive.ts';
 import { base64, bytes, createVault, openVault, readSecrets, writeSecrets, WrongPassword, type Bytes, type Secret, type Vault } from '../keys/vault.ts';
 import { NO_KEY, Refused } from '../protocol.ts';
+import type { KeysCall, KeysReply, KeyStatus } from '../keystore.ts';
 import { load, named, update, type Account } from './state.ts';
-
-/** What Otus's own pages ask the keystore. Sites never reach it. */
-export type KeysCall =
-    | { keys: 'status' }
-    | { keys: 'unlock'; password: string }
-    | { keys: 'lock' }
-    | { keys: 'phrase'; words: 12 | 24 } // the new phrase on show, the same until it is added, so what the user wrote down is what gets saved
-    | { keys: 'add'; from: { phrase: string } | { privateKey: string }; label: string; newPassword?: string } // newPassword: the first, when there is no vault yet; later ones need Otus unlocked
-    | { keys: 'derive'; label: string } // the next account on your phrase
-    | { keys: 'reveal'; account: string; what: 'key' | 'phrase'; password: string }; // an account's private key, or its phrase
-
-export type KeysReply = { ok: true; result: unknown } | { ok: false; error: string };
-export type KeyStatus = { vault: boolean; unlocked: boolean };
 
 export const LOCK_ALARM = 'lock'; // the background sets it from how long Otus has been closed
 const MIN_PASSWORD = 8;
