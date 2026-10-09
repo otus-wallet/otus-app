@@ -2,7 +2,7 @@
 // can be done with it (unstake, then withdraw once off), and a new stake with a validator of the network's, picked from
 // a list ranked by what each paid of late, or found by name or address. Liquid stake comes with swaps.
 import type { Address } from '@solana/kit';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { short, sol } from '@otus-wallet/sdk/format';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
@@ -142,25 +142,25 @@ function actionOf(standing: Standing, staker: boolean, locked: boolean): 'unstak
     return null;
 }
 
-// A new stake: how much, and with whom.
+// A new stake: a validator found and opened, then how much, staked from there.
 function NewStake({ state, terms, validators, error, back, start }: { state: State; terms: { min: bigint; rent: bigint }; validators: Validator[] | undefined; error: Error | null; back: () => void; start: (job: Job, title: string) => void }) {
     const account = current(state);
     const rpc = walletRpc(state.settings);
     const held = useHoldings(rpc, account.address, networkOf(state.settings) === 'solana:mainnet');
     const [text, setText] = useState('');
     const [query, setQuery] = useState('');
-    const [picked, setPicked] = useState<Validator | null>(null);
+    const [open, setOpen] = useState<Validator | null>(null);
     const units = unitsOf(text, 9);
     const balance = held && !(held instanceof Error) ? held.sol : null;
     const most = balance === null ? null : balance > terms.rent + RESERVE ? balance - terms.rent - RESERVE : 0n;
     const problem = stakeProblem({ text, units, min: terms.min, most });
     const found = useMemo(() => search(validators ?? [], query), [validators, query]);
-    const listed = picked && !found.some((v) => v.vote === picked.vote) ? [picked, ...found] : found;
-    const ready = units !== null && !problem && most !== null && picked !== null && picked.voting;
+    const listed = open && !found.some((v) => v.vote === open.vote) ? [open, ...found] : found;
+    const ready = units !== null && !problem && most !== null && open !== null && open.voting;
     const go = () => {
         if (!ready) return;
         const owner = account.address;
-        const vote = picked.vote;
+        const vote = open.vote;
         const lamports = units + terms.rent;
         const job: Job = {
             kind: 'stake',
@@ -173,37 +173,13 @@ function NewStake({ state, terms, validators, error, back, start }: { state: Sta
             landed: 'Staked',
             where: 'Stake',
         };
-        start(job, `${decimal(units, 9)} SOL with ${picked.name ?? short(vote)}`);
+        start(job, `${decimal(units, 9)} SOL with ${open.name ?? short(vote)}`);
     };
-    const foot = (
-        <div className="border-t border-dashed border-rule px-4 pt-2.5 pb-3.5">
-            <Button variant="default" className="w-full" disabled={!ready} onClick={go}>
-                Review
-            </Button>
-        </div>
-    );
     return (
-        <Sheet bar={<Bar title="Stake SOL" back={back} />} foot={foot}>
-            <div className="flex flex-col gap-1.5">
-                <Heading
-                    extra={
-                        most !== null &&
-                        most > 0n && (
-                            <Button size="xs" onClick={() => setText(decimal(most, 9))}>
-                                Max
-                            </Button>
-                        )
-                    }
-                >
-                    Amount
-                </Heading>
-                <Input inputMode="decimal" placeholder="0" autoComplete="off" spellCheck={false} aria-label="Amount" autoFocus value={text} onChange={(e) => setText(e.target.value)} />
-                <p className="text-[10.5px] text-ink-3">{`At least ${sol(terms.min)} SOL. Its account keeps ${sol(terms.rent)} SOL of rent, back when you withdraw.`}</p>
-                <ErrorLine>{problem}</ErrorLine>
-            </div>
+        <Sheet bar={<Bar title="Stake SOL" back={back} />}>
             <div className="flex flex-col gap-1.5">
                 <Heading>Validator</Heading>
-                <Input placeholder="Name or address" autoComplete="off" spellCheck={false} aria-label="Find a validator" value={query} onChange={(e) => setQuery(e.target.value)} />
+                <Input placeholder="Name or address" autoComplete="off" spellCheck={false} aria-label="Find a validator" autoFocus value={query} onChange={(e) => setQuery(e.target.value)} />
                 {!validators && !error && <p className="text-[11px] text-ink-3">Reading the validators</p>}
                 {!validators && error && <p className="text-[11px] text-warn">{`The RPC did not answer: ${said(error)}`}</p>}
                 {validators && listed.length === 0 && <p className="text-[11px] text-ink-3">No validator by that name or address</p>}
@@ -211,7 +187,28 @@ function NewStake({ state, terms, validators, error, back, start }: { state: Sta
                 <ul className="flex flex-col gap-1.5">
                     {listed.map((v) => (
                         <li key={v.vote}>
-                            <ValidatorRow v={v} on={picked?.vote === v.vote} pick={() => setPicked(v)} logos={logosShown(state)} />
+                            <ValidatorRow v={v} open={open?.vote === v.vote} flip={() => setOpen(open?.vote === v.vote ? null : v)} logos={logosShown(state)}>
+                                <div className="flex flex-col gap-1.5 border-t border-dashed border-rule px-2.5 pt-2.5 pb-3">
+                                    <Heading
+                                        extra={
+                                            most !== null &&
+                                            most > 0n && (
+                                                <Button size="xs" onClick={() => setText(decimal(most, 9))}>
+                                                    Max
+                                                </Button>
+                                            )
+                                        }
+                                    >
+                                        Amount
+                                    </Heading>
+                                    <Input inputMode="decimal" placeholder="0" autoComplete="off" spellCheck={false} aria-label="Amount" autoFocus value={text} onChange={(e) => setText(e.target.value)} />
+                                    <p className="text-[10.5px] text-ink-3">{`At least ${sol(terms.min)} SOL. Its account keeps ${sol(terms.rent)} SOL of rent, back when you withdraw.`}</p>
+                                    <ErrorLine>{problem}</ErrorLine>
+                                    <Button variant="default" className="mt-1 w-full" disabled={!ready} onClick={go}>
+                                        Stake
+                                    </Button>
+                                </div>
+                            </ValidatorRow>
                         </li>
                     ))}
                 </ul>
@@ -232,29 +229,36 @@ function ValidatorLogo({ node, shown }: { node: string | null; shown: boolean })
 }
 
 // A validator to pick: its logo, its declared name or address, the top-third mark, then its address, commission and
-// stake, and what to know first.
-function ValidatorRow({ v, on, pick, logos }: { v: Validator; on: boolean; pick: () => void; logos: boolean }) {
+// stake, and what to know first. Opened, it shows what is staked with it, brought into view whole.
+function ValidatorRow({ v, open, flip, logos, children }: { v: Validator; open: boolean; flip: () => void; logos: boolean; children: ReactNode }) {
     const { title, sub, notes } = validatorWords(v);
+    const box = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (open) box.current?.scrollIntoView({ block: 'nearest' });
+    }, [open]);
     return (
-        <button type="button" aria-pressed={on} onClick={pick} className={cn('flex w-full cursor-pointer items-start gap-2.5 rounded-[3px] border px-2.5 py-2 text-left', on ? 'border-ok-bd bg-ok-bg' : 'border-rule hover:border-ink-3')}>
-            <ValidatorLogo node={v.node} shown={logos} />
-            <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                <span className="flex items-center gap-1.5">
-                    <span className={cn('min-w-0 flex-1 truncate text-[12px] font-bold', on && 'text-ok')}>{title}</span>
-                    {v.top && (
-                        <Tip text="One of the few validators that together hold a third of all stake">
-                            <span className="pixel shrink-0 rounded-sm border border-rule px-[3px] py-px text-[8px] text-ink-3">Top third</span>
-                        </Tip>
-                    )}
-                </span>
-                <span className="text-[10.5px] text-ink-3">{sub}</span>
-                {notes.map((n) => (
-                    <span key={n.text} className={cn('text-[10.5px]', n.tone === 'danger' ? 'text-danger' : 'text-warn')}>
-                        {n.text}
+        <div ref={box} className={cn('rounded-[3px] border', open ? 'border-ok-bd' : 'border-rule hover:border-ink-3')}>
+            <button type="button" aria-expanded={open} onClick={flip} className="flex w-full cursor-pointer items-start gap-2.5 px-2.5 py-2 text-left">
+                <ValidatorLogo node={v.node} shown={logos} />
+                <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
+                    <span className="flex items-center gap-1.5">
+                        <span className={cn('min-w-0 flex-1 truncate text-[12px] font-bold', open && 'text-ok')}>{title}</span>
+                        {v.top && (
+                            <Tip text="One of the few validators that together hold a third of all stake">
+                                <span className="pixel shrink-0 rounded-sm border border-rule px-[3px] py-px text-[8px] text-ink-3">Top third</span>
+                            </Tip>
+                        )}
                     </span>
-                ))}
-            </span>
-        </button>
+                    <span className="text-[10.5px] text-ink-3">{sub}</span>
+                    {notes.map((n) => (
+                        <span key={n.text} className={cn('text-[10.5px]', n.tone === 'danger' ? 'text-danger' : 'text-warn')}>
+                            {n.text}
+                        </span>
+                    ))}
+                </span>
+            </button>
+            {open && children}
+        </div>
     );
 }
 
