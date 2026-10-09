@@ -83,8 +83,10 @@ export function balances(r: Review, p: Prepared | null, wallet: Address, n: Name
         if (!t) {
             // SOL moving in an account of yours other than the wallet: which one is said too. In a stake account it is
             // staked SOL, an asset apart from the wallet's, so staking shows what it moves without opening the lines.
-            const note = [toward('SOL', c.address, moved), cap(n.who(c.address))].filter(Boolean).join(' · ');
-            if ((c.after ?? c.before)?.program === STAKE_PROGRAM) row('staked', 'Staked SOL', 'sol', note, moved, SOL_DECIMALS, true);
+            const where = toward('SOL', c.address, moved);
+            const note = [where, cap(n.who(c.address))].filter(Boolean).join(' · ');
+            // Staked SOL from your wallet, or back to it, goes without saying so: only someone else is named.
+            if ((c.after ?? c.before)?.program === STAKE_PROGRAM) row('staked', 'Staked SOL', 'sol', where && !/^(From|To) you$/.test(where) ? note : cap(n.who(c.address)), moved, SOL_DECIMALS, true);
             else solRow(note, moved);
             continue;
         }

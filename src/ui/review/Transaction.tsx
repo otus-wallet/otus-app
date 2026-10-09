@@ -30,11 +30,12 @@ function Seal({ symbol }: { symbol: string }) {
     );
 }
 
-// A verified token's own logo, asked for without cookies; the chain's mark if it does not load.
+// A verified token's own logo, asked for without cookies; the chain's mark if it does not load. Level with the line's
+// first row of text, however many rows its note takes.
 function TokenMark({ row }: { row: AssetChange }) {
     const [failed, setFailed] = useState(false);
-    if (row.icon && !failed) return <img src={row.icon} alt="" width={18} height={18} crossOrigin="anonymous" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="size-[18px] shrink-0 self-center rounded-[3px] bg-panel object-cover" />;
-    return <Logo name={row.icon ? 'chain' : row.logo} size={18} className={cn('self-center rounded-[3px] bg-panel', (row.icon || row.logo === 'chain') && 'text-ink-3')} />;
+    if (row.icon && !failed) return <img src={row.icon} alt="" width={18} height={18} crossOrigin="anonymous" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="size-[18px] shrink-0 self-start rounded-[3px] bg-panel object-cover" />;
+    return <Logo name={row.icon ? 'chain' : row.logo} size={18} className={cn('self-start rounded-[3px] bg-panel', (row.icon || row.logo === 'chain') && 'text-ink-3')} />;
 }
 
 /** Where a transfer made in Otus goes: the address typed, whole, its ends marked. */
