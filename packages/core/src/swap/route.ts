@@ -68,9 +68,9 @@ export function readRoute(body: unknown, ask: Ask): Route {
     if (setup.some((i) => i.programAddress === ASSOCIATED_TOKEN_PROGRAM_ADDRESS && !opens(i))) throw new Error('the route opens an account otherwise');
     const swap = ix(b.swapInstruction);
     if (swap.programAddress !== JUPITER) throw new Error('the route swaps with another program');
-    const terms = termsOf(swap.data!, (i) => swap.accounts?.[i]?.address);
+    const terms = termsOf(swap.data!, (i) => swap.accounts?.[i]?.address, swap.accounts?.length ?? 0);
     const told = terms && terms.signer === ask.taker && terms.inputMint === ask.input && terms.outputMint === ask.output && terms.amount === ask.amount && terms.quoted === out && terms.slippageBps === ask.slippageBps;
-    if (!told || terms.platformFeeBps !== 0 || terms.positiveSlippageBps !== 0 || (terms.elsewhere !== undefined && terms.elsewhere !== JUPITER)) throw new Error('the swap does not carry the route’s terms');
+    if (!told || terms.platformFeeBps !== 0 || terms.positiveSlippageBps !== 0 || (terms.elsewhere !== null && terms.elsewhere !== JUPITER)) throw new Error('the swap does not carry the route’s terms');
     const cleanup = b.cleanupInstruction === null || b.cleanupInstruction === undefined ? [] : [ix(b.cleanupInstruction)];
     if (cleanup.some((i) => !TOKENS.includes(i.programAddress))) throw new Error('the route cleans up with another program');
     if (list(b.computeBudgetInstructions).some((v) => record(v, 'an instruction').programId !== COMPUTE_BUDGET_PROGRAM_ADDRESS)) throw new Error('the route sets its budget with another program');

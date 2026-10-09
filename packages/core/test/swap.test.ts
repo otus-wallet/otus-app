@@ -196,3 +196,13 @@ test('an account opened with another program as its token program, or for anothe
     many.setupInstructions = Array(7).fill((many.setupInstructions as unknown[])[0]);
     assert.throws(() => readRoute(many, ask), /not as asked/);
 });
+
+test("a swap missing accounts its IDL names is refused, never read short", () => {
+    const ask = askOf(ROUTES['sol-usdc']);
+    const cut = copy(ROUTES['sol-usdc']);
+    (cut.swapInstruction as { accounts: unknown[] }).accounts.length = 7; // route_v2 names 10
+    assert.throws(() => readRoute(cut, ask), /terms/);
+    const shared = copy(ROUTES['usdc-bonk']);
+    (shared.swapInstruction as { accounts: unknown[] }).accounts.length = 11; // the shared route names 12
+    assert.throws(() => readRoute(shared, askOf(ROUTES['usdc-bonk'])), /terms/);
+});

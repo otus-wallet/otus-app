@@ -94,7 +94,7 @@ async function landsOn(m: Message, chain: Chain): Promise<boolean> {
 /** `blockhash`: for a transaction Otus built without one, the blockhash it gets, read while it is reviewed (a
  *  simulation takes any). */
 /** `bare`: why Otus adds no guards, for what needs none (a transaction of its own that only takes access back). */
-export type Way = { cluster: Cluster; chain: Chain; site: SiteView; recipient?: Address; later?: boolean; blockhash?: Promise<string>; bare?: string; context: Pick<Context, 'signedBefore' | 'programsBefore' | 'host' | 'own' | 'to'> };
+export type Way = { cluster: Cluster; chain: Chain; site: SiteView; recipient?: Address; later?: boolean; blockhash?: Promise<string>; bare?: string; trade?: bigint; context: Pick<Context, 'signedBefore' | 'programsBefore' | 'host' | 'own' | 'to'> };
 
 /**
  * A transaction for this account → reviewed; refused by `checks` when whoever asked says so; shown as reviewed at once,
@@ -117,7 +117,7 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     const bare = clear ? LEDGER_CLEAR : way.bare;
     // Prepared and its IDLs read while it is shown as reviewed. Squads proposals first: their tokens are named with
     // the transaction's.
-    const preparing = Promise.all([prepare(r, account.address, way.chain, way.context.own === true, bare), idlTold(r, way.chain)]);
+    const preparing = Promise.all([prepare(r, account.address, way.chain, way.context.own === true, bare, way.trade), idlTold(r, way.chain)]);
     preparing.catch(() => {}); // heard through `prepared`, below
     const known = await squadsIn(r, way.chain).then(async (squads) => ({ ...(await tokenInfo(r, way, shell, mintsInside(squads))), squads }));
     // A site's transaction tells nothing of its blockhash's age, and may come with little of its minute left (a Jupiter

@@ -10,7 +10,8 @@ const ROUTE_V2 = [0xbb, 0x64, 0xfa, 0xcc, 0x31, 0xc4, 0xaf, 0x14];
 const SHARED_V2 = [0xd1, 0x98, 0x53, 0x93, 0x7c, 0xfe, 0xd8, 0xe9];
 
 /** What a swap instruction says. `destination`: where what comes out lands; `elsewhere`: route_v2's optional other
- *  destination, which Otus leaves unset (Jupiter's own address stands for none). */
+ *  destination, which Otus leaves unset (Jupiter's own address stands for none); null for the shared route, which has
+ *  none. */
 export type Terms = {
     signer: Address | undefined;
     source: Address | undefined;
@@ -19,7 +20,7 @@ export type Terms = {
     outputMint: Address | undefined;
     inputProgram: Address | undefined;
     outputProgram: Address | undefined;
-    elsewhere: Address | undefined;
+    elsewhere: Address | null | undefined;
     amount: bigint;
     quoted: bigint;
     slippageBps: number;
@@ -27,17 +28,18 @@ export type Terms = {
     positiveSlippageBps: number;
 };
 
-/** A swap instruction's data and its accounts (`at(i)`, the i-th account's address) → its terms; null when it is not
- *  one of the two routes, or too short to be. */
-export function termsOf(data: ReadonlyUint8Array, at: (i: number) => Address | undefined): Terms | null {
+/** A swap instruction's data and its accounts (`at(i)`, the i-th account's address, of `count`) → its terms; null when
+ *  it is not one of the two routes, its data too short, or its accounts fewer than its IDL names (10 for route_v2, 12
+ *  for the shared route). */
+export function termsOf(data: ReadonlyUint8Array, at: (i: number) => Address | undefined, count: number): Terms | null {
     const route = SHARED_V2.every((b, i) => data[i] === b) ? 'shared' : ROUTE_V2.every((b, i) => data[i] === b) ? 'own' : null;
-    if (route === null) return null;
+    if (route === null || count < (route === 'shared' ? 12 : 10)) return null;
     const from = route === 'shared' ? 9 : 8; // past the discriminator, and the shared route's id
     if (data.length < from + 22) return null; // its amounts and rates; the route plan follows
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const numbers = { amount: view.getBigUint64(from, true), quoted: view.getBigUint64(from + 8, true), slippageBps: view.getUint16(from + 16, true), platformFeeBps: view.getUint16(from + 18, true), positiveSlippageBps: view.getUint16(from + 20, true) };
     if (route === 'own') return { signer: at(0), source: at(1), destination: at(2), inputMint: at(3), outputMint: at(4), inputProgram: at(5), outputProgram: at(6), elsewhere: at(7), ...numbers };
-    return { signer: at(1), source: at(2), destination: at(5), inputMint: at(6), outputMint: at(7), inputProgram: at(8), outputProgram: at(9), elsewhere: undefined, ...numbers };
+    return { signer: at(1), source: at(2), destination: at(5), inputMint: at(6), outputMint: at(7), inputProgram: at(8), outputProgram: at(9), elsewhere: null, ...numbers };
 }
 
 /** What the popup asked for, which the background holds the swap's terms to: the mints, the amount in, the quote and

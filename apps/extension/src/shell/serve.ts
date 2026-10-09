@@ -286,7 +286,9 @@ export function swapOwn(bytes: Uint8Array, address: string, asked: Asked, shell:
             const cluster = networkOf(state.settings); // the network the wallet shows
             if (cluster !== 'solana:mainnet') throw new Refused('swaps are on mainnet only');
             const chain = shell.chain(rpcFor(cluster, state.settings));
-            const way = { cluster, chain, site: SWAPPING, blockhash: chain.latest(), context: { signedBefore: null, own: true } } as const;
+            // Its guards hold what it gets to the slippage asked, as Jupiter's own least does, not a site's trade's tenth: a
+            // quote set low by a bad route then costs no more than the slippage, measured against the honest simulation.
+            const way = { cluster, chain, site: SWAPPING, blockhash: chain.latest(), trade: BigInt(asked.slippageBps), context: { signedBefore: null, own: true } } as const;
             const checks = async (r: Review) => {
                 if (r.signers.some((s) => s !== account.address)) throw new Refused('another account would have to sign it');
                 if (!(await swapsOnly(r, account.address, asked))) throw new Refused('it does more than swap');
@@ -310,12 +312,12 @@ export function swapOwn(bytes: Uint8Array, address: string, asked: Asked, shell:
 // A v0 message with Compute Budget's SetComputeUnitLimit (2) first and a tip to one of Sender's accounts last (System's
 // Transfer, 2, of exactly TIP from the owner), and between them only what a Jupiter route sets up, swaps and cleans up
 // for this owner, as asked:
-// - at most three of its own token accounts opened (Associated Token's CreateIdempotent, 1, paid by it, with the System
-//   Program, a token program, and the very address the three derive);
+// - at most three of its own token accounts opened, for the swap's two tokens only (Associated Token's CreateIdempotent,
+//   1, paid by it, with the System Program, a token program, and the very address the three derive);
 // - paying SOL, that amount moved into its wrapped-SOL account (Transfer) and synced (a token program's SyncNative, 17);
 // - Jupiter's one swap (route_v2 or shared_accounts_route_v2), signed by it, with the amount, quote and slippage asked
 //   and no fee, from its own account of the mint paid into its own account of the mint asked for (see `termsOf`);
-// - its wrapped-SOL account closed back to it (CloseAccount, 9).
+// - its wrapped-SOL account closed back to it (CloseAccount, 9), when SOL is on one side.
 // The route plan is Jupiter's: the review simulates it, and the guards hold what comes of it.
 async function swapsOnly(r: Review, owner: Address, asked: Asked): Promise<boolean> {
     type Ix = Review['message']['instructions'][number];
@@ -337,19 +339,20 @@ async function swapsOnly(r: Review, owner: Address, asked: Asked): Promise<boole
         const p = program(ix);
         if (p === JUPITER) {
             swaps++;
-            const t = termsOf(ix.data, (i) => at(ix, i));
+            const t = termsOf(ix.data, (i) => at(ix, i), ix.accountIndices.length);
             const terms = t !== null && t.signer === owner && t.inputMint === asked.input && t.outputMint === asked.output && t.amount === asked.amount && t.quoted === asked.out && t.slippageBps === asked.slippageBps;
-            if (!terms || t.platformFeeBps !== 0 || t.positiveSlippageBps !== 0 || (t.elsewhere !== undefined && t.elsewhere !== JUPITER)) return false;
+            if (!terms || t.platformFeeBps !== 0 || t.positiveSlippageBps !== 0 || (t.elsewhere !== null && t.elsewhere !== JUPITER)) return false;
             if (t.source !== (await ownAccount(t.inputMint, t.inputProgram)) || t.destination !== (await ownAccount(t.outputMint, t.outputProgram))) return false;
         } else if (p === ASSOCIATED_TOKEN_PROGRAM_ADDRESS) {
             if (ix.data.length !== 1 || ix.data[0] !== 1 || ix.accountIndices.length !== 6 || at(ix, 0) !== owner || at(ix, 2) !== owner || at(ix, 4) !== SYSTEM_PROGRAM_ADDRESS) return false;
+            if (at(ix, 3) !== asked.input && at(ix, 3) !== asked.output) return false; // for the swap's own two tokens alone
             if (at(ix, 1) !== (await ownAccount(at(ix, 3), at(ix, 5))) || opened.has(at(ix, 1))) return false;
             opened.add(at(ix, 1));
         } else if (p === SYSTEM_PROGRAM_ADDRESS) {
             if (!paysSol || ++wraps > 1 || !transfer(ix, (a) => a === wrapped, asked.amount)) return false;
         } else if (isTokenProgram(p)) {
             const syncs = paysSol && ix.data.length === 1 && ix.data[0] === 17 && ix.accountIndices.length === 1 && at(ix, 0) === wrapped;
-            const closes = ix.data.length === 1 && ix.data[0] === 9 && ix.accountIndices.length === 3 && at(ix, 0) === wrapped && at(ix, 1) === owner && at(ix, 2) === owner;
+            const closes = (paysSol || asked.output === WSOL) && ix.data.length === 1 && ix.data[0] === 9 && ix.accountIndices.length === 3 && at(ix, 0) === wrapped && at(ix, 1) === owner && at(ix, 2) === owner;
             if (!syncs && !closes) return false;
         } else return false;
     }
