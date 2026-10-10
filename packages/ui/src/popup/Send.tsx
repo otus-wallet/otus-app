@@ -336,7 +336,7 @@ function Recipients({ accounts, contacts, pick }: { accounts: Account[]; contact
             </SelectTrigger>
             <SelectContent position="popper" align="end">
                 {group('Your wallets', accounts)}
-                {group('Known addresses', contacts)}
+                {group('Contacts', contacts)}
             </SelectContent>
         </Select>
     );

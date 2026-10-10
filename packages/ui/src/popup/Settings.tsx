@@ -44,7 +44,7 @@ export function Settings({ state, keys, go }: { state: State; keys: KeyStatus; g
                 <Section id="apps" icon="shield" title="Trusted apps" value={apps === 0 ? 'None' : String(apps)}>
                     <TrustedApps sites={state.sites} />
                 </Section>
-                <Section id="known" icon="book" title="Known addresses" value={state.contacts.length === 0 ? 'None' : String(state.contacts.length)}>
+                <Section id="known" icon="book" title="Contacts" value={state.contacts.length === 0 ? 'None' : String(state.contacts.length)}>
                     <KnownAddresses state={state} />
                 </Section>
             </Accordion>
