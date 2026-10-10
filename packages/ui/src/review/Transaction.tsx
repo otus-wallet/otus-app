@@ -52,17 +52,22 @@ export function To({ address }: { address: string }) {
     );
 }
 
-// A balance line as the window lists it: the asset's mark and symbol, where it goes or comes from, by how much.
+// A balance line as the window lists it: the asset's mark and symbol, by how much; under them, where it goes or comes
+// from, or how much is guaranteed, on a line of its own so that it reads whole.
 function Line({ change, note, amount, tone, className }: { change: AssetChange; note: string; amount: string; tone: Tone; className?: string }) {
     return (
-        <span className={cn('flex min-w-0 flex-1 items-baseline gap-2.5', className)}>
+        <span className={cn('flex min-w-0 flex-1 items-start gap-2.5', className)}>
             <TokenMark row={change} />
-            <span className="inline-flex max-w-[96px] min-w-9 shrink-0 items-center gap-1.5 truncate font-bold">
-                {change.asset}
-                {change.verified && <Seal symbol={change.asset} />}
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex items-baseline justify-between gap-2.5">
+                    <span className="inline-flex max-w-[96px] min-w-9 shrink-0 items-center gap-1.5 truncate font-bold">
+                        {change.asset}
+                        {change.verified && <Seal symbol={change.asset} />}
+                    </span>
+                    <span className={cn('amount shrink-0 text-base font-bold', text(tone))}>{amount}</span>
+                </span>
+                {note && <span className="note text-xs text-ink-3 [overflow-wrap:anywhere]">{note}</span>}
             </span>
-            <span className="min-w-0 flex-1 text-xs text-ink-3">{note}</span>
-            <span className={cn('amount shrink-0 text-base font-bold', text(tone))}>{amount}</span>
         </span>
     );
 }
