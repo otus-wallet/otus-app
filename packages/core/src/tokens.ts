@@ -86,26 +86,30 @@ function info(t: unknown): TokenInfo | null {
 
 const SOLANA_BEGAN = Date.UTC(2020, 2, 16); // mainnet's first block: no pool opened before it
 
+const MOST_USD = 1e15; // past any token's cap or liquidity: an answer saying more is wrong
+const MOST_HOLDERS = 1e10;
+const MOST_SUPPLY = 2 ** 64; // no token has more units than a u64 holds
+
 // Each count only when it is one: a whole number of holders, a share between 0 and 100, a cap and liquidity not below
-// 0, and a pool opened between Solana's start and now.
+// 0, and a pool opened between Solana's start and now; none past what any token reaches.
 function marketOf(v: { mcap?: unknown; holderCount?: unknown; liquidity?: unknown; audit?: { topHoldersPercentage?: unknown }; firstPool?: { createdAt?: unknown } }): Market | null {
-    const holders = Number.isSafeInteger(v.holderCount) && (v.holderCount as number) >= 0 ? (v.holderCount as number) : null;
+    const holders = Number.isSafeInteger(v.holderCount) && (v.holderCount as number) >= 0 && (v.holderCount as number) <= MOST_HOLDERS ? (v.holderCount as number) + 0 : null;
     const share = finite(v.audit?.topHoldersPercentage);
     const [cap, liquidity] = [finite(v.mcap), finite(v.liquidity)];
     const opened = typeof v.firstPool?.createdAt === 'string' ? Date.parse(v.firstPool.createdAt) : NaN;
     const market: Market = {
-        cap: cap !== null && cap >= 0 ? cap : null,
+        cap: cap !== null && cap >= 0 && cap <= MOST_USD ? cap : null,
         holders,
         topHolders: share !== null && share >= 0 && share <= 100 ? share : null,
-        liquidity: liquidity !== null && liquidity >= 0 ? liquidity : null,
+        liquidity: liquidity !== null && liquidity >= 0 && liquidity <= MOST_USD ? liquidity : null,
         firstPool: opened >= SOLANA_BEGAN && opened <= Date.now() ? opened : null,
     };
     return Object.values(market).some((x) => x !== null) ? market : null;
 }
 
-// All of it and what circulates, both counted, and no more circulating than there is.
+// All of it and what circulates, both counted, and no more circulating than there is (but for float noise).
 function supplyOf(total: number | null, circulating: number | null): Supply | null {
-    return total !== null && circulating !== null && circulating >= 0 && circulating <= total ? { total, circulating } : null;
+    return total !== null && circulating !== null && total <= MOST_SUPPLY && circulating >= 0 && circulating <= total * (1 + 1e-9) ? { total, circulating: Math.min(circulating, total) } : null;
 }
 
 // The real mints of the symbols scams like most to borrow, checked with Jupiter: a token by one of these
@@ -133,7 +137,7 @@ const forged = (mint: string, symbol: string) => {
     return Object.hasOwn(REAL, read) && REAL[read] !== mint;
 };
 
-const finite = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? n : null);
+const finite = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? n + 0 : null); // -0 as 0
 
 // No control or invisible characters, which could reorder or hide what is shown; and short.
 const clean = (s: unknown) => (typeof s === 'string' ? s.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, '').slice(0, 40) : '');

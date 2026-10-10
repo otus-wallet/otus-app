@@ -55,10 +55,12 @@ export const clusterOfGenesis = (hash: string): Cluster => (Object.hasOwn(GENESI
 export const networkName = (cluster: Cluster) => ({ 'solana:mainnet': 'Mainnet', 'solana:devnet': 'Devnet', 'solana:testnet': 'Testnet', 'solana:localnet': 'Localnet' })[cluster];
 
 /** The explorers a transaction or a token can open in, by name, and the page each gives one on mainnet. */
+// Each in its path encoded: base58 is unchanged, anything else stays in its segment.
+const segment = (s: string) => encodeURIComponent(s);
 export const EXPLORERS = {
-    solscan: { name: 'Solscan', tx: (signature: string) => `https://solscan.io/tx/${signature}`, token: (mint: string) => `https://solscan.io/token/${mint}` },
-    solana: { name: 'Solana Explorer', tx: (signature: string) => `https://explorer.solana.com/tx/${signature}`, token: (mint: string) => `https://explorer.solana.com/address/${mint}` },
-    orb: { name: 'Orb', tx: (signature: string) => `https://orbmarkets.io/tx/${signature}`, token: (mint: string) => `https://orbmarkets.io/address/${mint}` },
+    solscan: { name: 'Solscan', tx: (signature: string) => `https://solscan.io/tx/${segment(signature)}`, token: (mint: string) => `https://solscan.io/token/${segment(mint)}` },
+    solana: { name: 'Solana Explorer', tx: (signature: string) => `https://explorer.solana.com/tx/${segment(signature)}`, token: (mint: string) => `https://explorer.solana.com/address/${segment(mint)}` },
+    orb: { name: 'Orb', tx: (signature: string) => `https://orbmarkets.io/tx/${segment(signature)}`, token: (mint: string) => `https://orbmarkets.io/address/${segment(mint)}` },
 } as const;
 export type Explorer = keyof typeof EXPLORERS;
 

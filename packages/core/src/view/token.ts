@@ -8,32 +8,35 @@ import { TOKEN_2022_PROGRAM_ADDRESS } from '@otus-wallet/sdk/programs/addresses'
 import type { Market, Supply } from '../tokens.ts';
 
 /** One line: its name, what it says (a large number in short, `full` saying it whole), the address it names (to copy),
- *  and `warn` when someone else can take yours, it is stopped now, or Otus cannot tell. What can stop it later (a freeze
- *  or pause authority, a hook) is said plainly: most tokens come with some. */
-export type TokenFact = { name: string; value: string; full?: string; address?: Address; warn?: boolean };
+ *  `you` when that address is your wallet's, and `warn` when someone else can take yours, it is stopped now, or Otus
+ *  cannot tell. What can stop it later (a freeze or pause authority, a hook) is said plainly: most tokens come with some. */
+export type TokenFact = { name: string; value: string; full?: string; address?: Address; you?: boolean; warn?: boolean };
 
 // A large number in short, as 3.8B; and dollars so.
 const short = (n: number) => n.toLocaleString('en-US', { notation: 'compact', maximumFractionDigits: 1 });
 const shortUsd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 });
 const fullUsd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+// Past a thousand, in short and whole on hover; below, whole: in short a small amount would read as 0.
+const large = (n: number, whole: string, compact: (n: number) => string) => (Math.abs(n) >= 1000 ? { value: compact(n), full: whole } : { value: whole });
+const day = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
-/** How a token's facts are read: who an address is (its name, or the address in short), the token's symbol, the epoch
- *  (when its transfer fee is changing), and now (Unix seconds). */
-export type TokenNaming = { who(a: Address): string; symbol: string; epoch: bigint | null; now: number };
+/** How a token's facts are read: who an address is (its name, or the address in short), your wallet's address, the
+ *  token's symbol, the epoch (when its transfer fee is changing), and now (Unix seconds). */
+export type TokenNaming = { who(a: Address): string; wallet: Address; symbol: string; epoch: bigint | null; now: number };
 
 const U64_MAX = 2n ** 64n - 1n;
 const METADATA: Record<MetadataState, TokenFact> = {
-    mutable: { name: 'Metadata', value: 'Mutable' },
-    immutable: { name: 'Metadata', value: 'Immutable' },
-    unreadable: { name: 'Metadata', value: 'Unreadable', warn: true },
+    mutable: { name: 'Onchain metadata', value: 'Mutable' },
+    immutable: { name: 'Onchain metadata', value: 'Immutable' },
+    unreadable: { name: 'Onchain metadata', value: 'Unreadable', warn: true },
 };
 
 /** A mint's terms, whether its metadata can change, and its market when known, in lines. */
 export function tokenFacts(terms: MintTerms, metadata: MetadataState | null, n: TokenNaming, market: Market | null = null): TokenFact[] {
-    const { who } = n;
     const facts: TokenFact[] = [];
+    const named = (name: string, a: Address, warn = false): TokenFact => ({ name, value: n.who(a), address: a, ...(a === n.wallet && { you: true }), ...(warn && { warn }) });
     // An address's line, when there is one; `none`: what it says without.
-    const by = (name: string, a: Address | null, none?: string) => void (a ? facts.push({ name, value: who(a), address: a }) : none && facts.push({ name, value: none }));
+    const by = (name: string, a: Address | null, none?: string) => void (a ? facts.push(named(name, a)) : none && facts.push({ name, value: none }));
     by('Mint authority', terms.mintAuthority, 'None');
     by('Freeze authority', terms.freezeAuthority, 'None');
     if (metadata) facts.push(METADATA[metadata]);
@@ -41,7 +44,7 @@ export function tokenFacts(terms: MintTerms, metadata: MetadataState | null, n: 
     for (const e of terms.extensions) {
         switch (e.kind) {
             case 'permanentDelegate':
-                if (e.delegate) facts.push({ name: 'Permanent delegate', value: who(e.delegate), address: e.delegate, warn: true });
+                if (e.delegate) facts.push(named('Permanent delegate', e.delegate, true));
                 break;
             case 'transferFee':
                 facts.push({ name: 'Transfer fee', value: feeWords(e.older, e.newer, terms.decimals, n) });
@@ -72,7 +75,7 @@ export function tokenFacts(terms: MintTerms, metadata: MetadataState | null, n: 
                 by('Rate authority', e.authority);
                 break;
             case 'scaledUiAmount':
-                facts.push({ name: 'Amount multiplier', value: `×${n.now >= e.nextAt ? e.next : e.multiplier}` });
+                facts.push({ name: 'Amount multiplier', value: multiplierWords(e, n.now) });
                 by('Multiplier authority', e.authority);
                 break;
             case 'other':
@@ -82,7 +85,7 @@ export function tokenFacts(terms: MintTerms, metadata: MetadataState | null, n: 
     }
     if (others.length) facts.push({ name: 'Extensions', value: others.join(', ') });
     if (terms.unknown.length) facts.push({ name: 'Unreadable', value: terms.unknown.length === 1 ? 'An extension' : `${terms.unknown.length} extensions`, warn: true });
-    facts.push({ name: 'Supply', value: `${short(Number(terms.supply) / 10 ** terms.decimals)} ${n.symbol}`, full: `${amount(terms.supply, terms.decimals, false)} ${n.symbol}` });
+    facts.push({ name: 'Supply', ...large(Number(terms.supply) / 10 ** terms.decimals, `${amount(terms.supply, terms.decimals, false)} ${n.symbol}`, (x) => `${short(x)} ${n.symbol}`) });
     if (market) facts.push(...marketFacts(market));
     facts.push({ name: 'Program', value: terms.program === TOKEN_2022_PROGRAM_ADDRESS ? 'Token-2022' : 'Token' });
     return facts;
@@ -92,21 +95,29 @@ export function tokenFacts(terms: MintTerms, metadata: MetadataState | null, n: 
  *  first pool opened. */
 export function marketFacts(m: Market): TokenFact[] {
     const facts: TokenFact[] = [];
-    if (m.cap !== null) facts.push({ name: 'Market cap', value: shortUsd(m.cap), full: fullUsd(m.cap) });
+    if (m.cap !== null) facts.push({ name: 'Market cap', ...large(m.cap, fullUsd(m.cap), shortUsd) });
     if (m.holders !== null) facts.push({ name: 'Holders', value: m.holders.toLocaleString('en-US') });
     if (m.topHolders !== null) facts.push({ name: 'Top holders', value: `${m.topHolders.toLocaleString('en-US', { maximumFractionDigits: 1 })}% of supply` });
-    if (m.liquidity !== null) facts.push({ name: 'Liquidity', value: shortUsd(m.liquidity), full: fullUsd(m.liquidity) });
-    if (m.firstPool !== null) facts.push({ name: 'First pool', value: new Date(m.firstPool).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) });
+    if (m.liquidity !== null) facts.push({ name: 'Liquidity', ...large(m.liquidity, fullUsd(m.liquidity), shortUsd) });
+    if (m.firstPool !== null) facts.push({ name: 'First pool', value: day(m.firstPool) });
     return facts;
 }
 
 /** SOL's own facts: it has no mint, only a wrapped one for token programs; its supply and what circulates, when known. */
 export function solFacts(supply: Supply | null): TokenFact[] {
     const facts: TokenFact[] = [{ name: 'Type', value: 'Native token' }];
-    const sol = (n: number) => ({ value: `${short(n)} SOL`, full: `${n.toLocaleString('en-US', { maximumFractionDigits: 9 })} SOL` });
+    const sol = (n: number) => large(n, `${n.toLocaleString('en-US', { maximumFractionDigits: 9 })} SOL`, (x) => `${short(x)} SOL`);
     if (supply) facts.push({ name: 'Supply', ...sol(supply.total) }, { name: 'Circulating', ...sol(supply.circulating) });
     facts.push({ name: 'Program', value: 'System' });
     return facts;
+}
+
+// The multiplier in force, and the next one while it is still to come (from a date a calendar can say).
+function multiplierWords({ multiplier, next, nextAt }: { multiplier: number; next: number; nextAt: bigint }, now: number): string {
+    const x = (m: number) => `×${m.toLocaleString('en-US', { maximumSignificantDigits: 6 })}`;
+    if (now >= nextAt) return x(next);
+    const from = Number(nextAt) * 1000;
+    return next === multiplier || Number.isNaN(new Date(from).getTime()) ? x(multiplier) : `${x(multiplier)}; ${x(next)} from ${day(from)}`;
 }
 
 // The fee in force, its cap when it has one, and the one to come: the older holds until the newer's epoch.

@@ -11,10 +11,9 @@ import type { Holding } from '@otus-wallet/core/holdings.ts';
 import { explorerOf, networkOf, walletRpc } from '@otus-wallet/core/settings.ts';
 import { cachedToken } from '@otus-wallet/core/tokens.ts';
 import type { State } from '@otus-wallet/core/state.ts';
-import { YOU } from '@otus-wallet/core/view/names.ts';
 import { solFacts, tokenFacts, type TokenFact } from '@otus-wallet/core/view/token.ts';
 import { Icon } from '../components/icons.tsx';
-import { Tagged } from '../components/you.tsx';
+import { YouTag } from '../components/you.tsx';
 import { cn } from '../lib/cn.ts';
 import { CopyAddress, Fact, Tip } from './common.tsx';
 import { current, said, useTokenTerms } from './store.ts';
@@ -29,12 +28,13 @@ function MintDetails({ asset, state }: { asset: Holding; state: State }) {
     const market = networkOf(state.settings) === 'solana:mainnet' ? (cachedToken(mint)?.market ?? null) : null; // from the answer that priced it
     const wallet = current(state).address;
     const names = new Map<string, string>([...state.contacts, ...state.accounts].map((k) => [k.address, k.label]));
-    const who = (a: Address) => (a === wallet ? `${short(a)}${YOU}` : (names.get(a) ?? PROGRAM_NAMES.get(a) ?? short(a)));
+    const who = (a: Address) => (a === wallet ? short(a) : (names.get(a) ?? PROGRAM_NAMES.get(a) ?? short(a))); // yours tagged by the fact
     return (
         <Details label="Mint" address={mint} state={state}>
-            {read.data?.terms && <Facts facts={tokenFacts(read.data.terms, read.data.metadata, { who, symbol: asset.symbol || short(mint), epoch: read.data.epoch, now: Date.now() / 1000 }, market)} />}
+            {read.data?.terms && <Facts facts={tokenFacts(read.data.terms, read.data.metadata, { who, wallet, symbol: asset.symbol || short(mint), epoch: read.data.epoch, now: Date.now() / 1000 }, market)} />}
             {read.data && !read.data.terms && <span className="text-warn">Otus could not read this mint</span>}
-            {!read.data && read.error && <span className="text-warn">{`The RPC did not answer: ${said(read.error)}`}</span>}
+            {/* Shown under what was read before, too: that may be behind. */}
+            {read.error && <span className="text-warn">{`The RPC did not answer: ${said(read.error)}`}</span>}
         </Details>
     );
 }
@@ -70,7 +70,8 @@ function Details({ label, address, state, children }: { label: string; address: 
     );
 }
 
-// Each line; one naming an address has it to copy, and a number in short says it whole on hover.
+// Each line; one naming an address has it to copy (yours tagged), and a number in short says it whole on hover. Words
+// are shown as they are: a token's symbol is its maker's, so nothing in them is read as a tag.
 function Facts({ facts }: { facts: TokenFact[] }) {
     return (
         <dl className="flex flex-col gap-1">
@@ -82,8 +83,9 @@ function Facts({ facts }: { facts: TokenFact[] }) {
                                 <span className="cursor-default">{f.value}</span>
                             </Tip>
                         ) : (
-                            <Tagged text={f.value} />
+                            f.value
                         )}
+                        {f.you && <YouTag />}
                         {f.address && <CopyAddress address={f.address} label={`Copy ${f.name.toLowerCase()}`} className="-my-1.5 size-6 shrink-0" />}
                     </span>
                 </Fact>

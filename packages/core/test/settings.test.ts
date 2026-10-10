@@ -49,4 +49,8 @@ test('an endpoint\'s network, by the genesis hash it gives; explorer pages on th
     const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
     assert.equal(explorerOf(DEFAULT_SETTINGS).token(USDC), `https://solscan.io/token/${USDC}`);
     assert.equal(explorerOf({ ...DEFAULT_SETTINGS, explorer: 'orb', network: 'devnet' }).token(USDC), `https://orbmarkets.io/address/${USDC}?cluster=devnet`);
+    // What is no address stays in its path: it cannot move the network into a fragment, nor climb out of the page.
+    assert.equal(explorerOf({ ...DEFAULT_SETTINGS, network: 'devnet' }).token('x#'), 'https://solscan.io/token/x%23?cluster=devnet');
+    assert.equal(explorerOf(DEFAULT_SETTINGS).token('../../tx/y?z'), 'https://solscan.io/token/..%2F..%2Ftx%2Fy%3Fz');
+    assert.equal(explorerOf({ ...DEFAULT_SETTINGS, network: 'devnet' }).tx('s#'), 'https://solscan.io/tx/s%23?cluster=devnet');
 });

@@ -111,6 +111,8 @@ export function useAccess(rpc: string, address: Address, state: State) {
 }
 
 const MINT_FRESH = 10 * 60_000; // ms a token's terms are taken as current: its authorities hardly ever change
+// Kept as long, though nothing shows them yet: read ahead, they wait for their details to open.
+queries.setQueryDefaults(['mintTerms'], { gcTime: MINT_FRESH });
 
 const AHEAD = 50; // tokens whose details are read ahead: their mints and metadata accounts fill one request
 

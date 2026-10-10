@@ -35,12 +35,13 @@ let kept: Kept = {};
 const LANDED_WAIT = 1_500;
 let soon: ReturnType<typeof setTimeout> | undefined;
 
-/** A transaction Otus signed landed: what each wallet holds, its stake, who else has access and its activity are read
- *  again in a moment, and the activity kept this session is dropped. */
+/** A transaction Otus signed landed: what each wallet holds, its stake, who else has access, its tokens' terms (it may
+ *  have changed an authority) and its activity are read again in a moment, and the activity kept this session is
+ *  dropped. */
 export function landed() {
     clearTimeout(soon);
     soon = setTimeout(() => {
-        for (const key of ['holdings', 'stakes', 'access']) void queries.invalidateQueries({ queryKey: [key] });
+        for (const key of ['holdings', 'stakes', 'access', 'mintTerms', 'mintTermsAhead']) void queries.invalidateQueries({ queryKey: [key] });
         void queries.resetQueries({ queryKey: ['activity'] });
         forgetActivity();
     }, LANDED_WAIT);

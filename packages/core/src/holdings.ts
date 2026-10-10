@@ -1,5 +1,5 @@
 // What a wallet holds: SOL and its token accounts from the RPC, names, icons and prices from Jupiter.
-import { address, type Address } from '@solana/kit';
+import { address, isAddress, type Address } from '@solana/kit';
 
 import { TOKEN_PROGRAMS, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
@@ -93,6 +93,6 @@ function parsed(data: unknown): { mint: string; units: bigint; decimals: number 
     const info = (data as { parsed?: { info?: { mint?: unknown; tokenAmount?: { amount?: unknown; decimals?: unknown } } } })?.parsed?.info;
     const amount = info?.tokenAmount?.amount;
     const decimals = info?.tokenAmount?.decimals;
-    if (typeof info?.mint !== 'string' || typeof amount !== 'string' || !/^\d+$/.test(amount) || typeof decimals !== 'number') return null;
+    if (typeof info?.mint !== 'string' || !isAddress(info.mint) || typeof amount !== 'string' || !/^\d+$/.test(amount) || typeof decimals !== 'number') return null;
     return { mint: info.mint, units: BigInt(amount), decimals };
 }

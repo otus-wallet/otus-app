@@ -98,3 +98,37 @@ test('a market is kept count by count: a cap not below 0, whole holders, a share
     assert.equal(read.get(ids[1])?.market, null); // none of it fits
     assert.equal(read.get(ids[2])?.market, null);
 });
+
+test('a market or supply past what any token reaches, -0, or odd shapes: dropped field by field, the price and name kept', async (t) => {
+    const ids = [key(55), key(56), key(57), key(58), key(59), key(60)];
+    // As raw text: JSON.stringify would send Infinity as null and -0 as 0.
+    const answers = [
+        `{ "mcap": 1e308, "holderCount": 9e15, "liquidity": 1e400, "audit": { "topHoldersPercentage": 100 }, "firstPool": { "createdAt": "2099-01-01T00:00:00Z" }, "totalSupply": 1e30, "circSupply": 1 }`,
+        `{ "mcap": -0, "holderCount": -1, "liquidity": -0, "audit": { "topHoldersPercentage": 0 }, "totalSupply": 10, "circSupply": -0 }`,
+        `{ "audit": null, "firstPool": [], "totalSupply": 10, "circSupply": 10.000000001 }`,
+        `{ "audit": { "__proto__": { "topHoldersPercentage": 5 } }, "firstPool": { "constructor": { "createdAt": "2024-01-01T00:00:00Z" } } }`,
+        `{ "holderCount": 5, "totalSupply": 10, "circSupply": 10 }`,
+        `{ "mcap": "1", "holderCount": null }`,
+    ];
+    const body = `[${answers.map((a, i) => `{ "id": "${ids[i]}", "symbol": "T${i}", "isVerified": true, "usdPrice": 2, ${a.slice(1)}`).join(',')}]`;
+    t.mock.method(globalThis, 'fetch', async () => new Response(body));
+    const read = await tokens(ids, true);
+    assert.deepEqual(read.get(ids[0])?.market, { cap: null, holders: null, topHolders: 100, liquidity: null, firstPool: null });
+    assert.equal(read.get(ids[0])?.supply, null);
+    const zero = read.get(ids[1]);
+    assert.deepEqual(zero?.market, { cap: 0, holders: null, topHolders: 0, liquidity: 0, firstPool: null });
+    assert.ok(Object.is(zero?.market?.cap, 0) && Object.is(zero?.market?.liquidity, 0), 'no -0');
+    assert.ok(Object.is(zero?.supply?.circulating, 0));
+    assert.deepEqual(read.get(ids[2])?.supply, { total: 10, circulating: 10 }); // float noise past the total: the total
+    assert.equal(read.get(ids[2])?.market, null);
+    assert.equal(read.get(ids[3])?.market, null);
+    assert.deepEqual(read.get(ids[4])?.supply, { total: 10, circulating: 10 });
+    assert.equal(read.get(ids[5])?.market, null);
+    for (const [i, id] of ids.entries()) assert.deepEqual([read.get(id)?.usdPrice, read.get(id)?.symbol], [2, `T${i}`], `price and name of ${i}`);
+});
+
+test('an answer that is not a list of tokens prices none', async (t) => {
+    t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ tokens: [{ id: key(61), usdPrice: 1 }] })));
+    const read = await tokens([key(61)], true).catch(() => null);
+    assert.equal(read?.get(key(61))?.usdPrice ?? null, null);
+});
