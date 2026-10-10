@@ -30,7 +30,7 @@ import { exactJson, NoHistory, readPage, type Landed } from '@otus-wallet/sdk/ac
 import { summarize, type Activity, type Told } from '@otus-wallet/sdk/activity/summary';
 import { short } from '@otus-wallet/sdk/format';
 import { SQUADS_V4 } from '@otus-wallet/sdk/programs/squads';
-import { apart, rows, text, type Naming } from '../src/view/activity.ts';
+import { apart, cuts, rows, text, type Naming } from '../src/view/activity.ts';
 import { key, MINT } from './helpers.ts';
 
 // The wallet: a key's address, on the curve, as a wallet that signs has; a program's address never signs.
@@ -108,7 +108,7 @@ test('address poisoning: dust from a copy is caught against an address you know,
     );
     const dust = summarize(t, WALLET);
     assert.deepEqual([dust.kind, dust.other], ['receive', copy]);
-    const naming = (known: Address[]): Naming => ({ wallet: WALLET, symbol: () => 'USDT', who: short, program: short, known });
+    const naming = (known: Address[]): Naming => ({ wallet: WALLET, symbol: () => 'USDT', who: (a) => a, program: (a) => a, known });
     const flagged = (list: Activity[], known: Address[]) => rows(list, naming(known)).map((r) => r.address?.copy);
     assert.deepEqual(flagged([dust], [FRIEND, real]), [true]); // a known address it copies
     assert.deepEqual(flagged([dust], [FRIEND, copy]), [false]); // the very address, known: not a copy
@@ -116,12 +116,15 @@ test('address poisoning: dust from a copy is caught against an address you know,
     // Not known: 30,000 from the real one, then dust from its copy, as the user's history shows.
     const paid: Activity = { ...dust, signature: 'paid', other: real, payer: real, moves: [{ mint: MINT, units: 30_000_000_000n, decimals: 6 }] };
     assert.deepEqual(flagged([dust, paid], []), [true, false]);
-    assert.equal(text(rows([dust, paid], naming([]))[0].sub), `from ${apart(copy, real)} · copies ${apart(real, copy)}`);
+    assert.equal(text(rows([dust, paid], naming([]))[0].sub), `from ${copy} · copies ${real}`); // whole: the page cuts them
+    const cut = cuts([dust, paid], []);
+    assert.deepEqual([cut(copy), cut(real), cut(FRIEND)], [apart(copy, real), apart(real, copy), short(FRIEND)]); // as far as where they part
+    assert.equal(cuts([dust], [real])(copy), apart(copy, real)); // like one known
 });
 
 test('rows: each in a line, opened for all it told; a copy of an address you sent to on the page caught', () => {
     const base = { time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], instructions: [] as Told[], held: [], fresh: [] as Address[], staked: 0n, signed: true, programs: [] as Address[], main: null, squads: [], memo: null };
-    const naming: Naming = { wallet: WALLET, symbol: (m) => (m === MINT ? 'USDC' : short(m)), who: (a) => (a === WALLET ? `${short(a)} (you)` : a === FRIEND ? 'Fio' : short(a)), program: (a) => (a === JUPITER ? 'Jupiter v6' : short(a)), known: [] };
+    const naming: Naming = { wallet: WALLET, symbol: (m) => (m === MINT ? 'USDC' : m), who: (a) => (a === WALLET ? `${a} (you)` : a === FRIEND ? 'Fio' : a), program: (a) => (a === JUPITER ? 'Jupiter v6' : a), known: [] };
     const real = key(60);
     const copy = Array.from({ length: 30 }, (_, i) => `${real.slice(0, 4)}${key(61 + i).slice(4, -4)}${real.slice(-4)}`).find((a) => a !== real && isAddress(a)) as Address;
     const [swap, sent, dust, failed, unread] = rows(
@@ -136,14 +139,16 @@ test('rows: each in a line, opened for all it told; a copy of an address you sen
     );
     assert.deepEqual([swap.icon, text(swap.title), text(swap.sub)], ['swap', 'Swap 1 SOL → 120.58 USDC', 'Jupiter v6']);
     assert.deepEqual(swap.title.filter((p) => p.way), [{ text: '1 SOL', way: 'out' }, { text: '120.58 USDC', way: 'in' }]); // coloured apart
-    assert.deepEqual([text(sent.title), text(sent.sub), sent.address], ['Sent 12 USDC', `to ${apart(real, copy)}`, { label: 'To', address: real, name: null, copy: false }]); // its copy on the page
-    assert.deepEqual(sent.details.map((d) => d.text), ['−12 USDC', '0.00203928 SOL to open their token account', `Fee 0.000005 SOL, paid by ${short(WALLET)} (you)`]); // your address, tagged
-    const [it, was] = [apart(copy, real), apart(real, copy)];
+    assert.deepEqual([text(sent.title), text(sent.sub), sent.address], ['Sent 12 USDC', `to ${real}`, { label: 'To', address: real, name: null, copy: false }]);
+    assert.deepEqual(sent.details.map((d) => d.text), ['−12 USDC', '0.00203928 SOL to open their token account', `Fee 0.000005 SOL, paid by ${WALLET} (you)`]); // your address, tagged
+    const cut = cuts([{ ...base, signature: 's2', kind: 'send', other: real, moves: [] }, { ...base, signature: 's3', kind: 'receive', other: copy, moves: [] }], []);
+    const [it, was] = [cut(copy), cut(real)]; // its copy on the page: both cut where they part
     assert.notEqual(it, was); // where short() gives both the same
     assert.equal(short(copy), short(real));
-    assert.deepEqual([dust.tone, text(dust.title), text(dust.sub)], ['warn', 'Received 0.0001 USDC', `from ${it} · copies ${was}`]);
-    assert.equal(dust.details[1].text, `Dust from ${it}, made to look like ${was}: never send to it`);
-    assert.equal(dust.details.find((d) => d.text.startsWith('Fee'))?.text, `Fee 0.000005 SOL, paid by ${it}`);
+    assert.deepEqual([it, was], [apart(copy, real), apart(real, copy)]);
+    assert.deepEqual([dust.tone, text(dust.title), text(dust.sub)], ['warn', 'Received 0.0001 USDC', `from ${copy} · copies ${real}`]);
+    assert.equal(dust.details[1].text, `Dust from ${copy}, made to look like ${real}: never send to it`);
+    assert.equal(dust.details.find((d) => d.text.startsWith('Fee'))?.text, `Fee 0.000005 SOL, paid by ${copy}`);
     assert.equal(dust.address?.copy, true);
     assert.deepEqual([failed.icon, failed.tone, text(failed.title), failed.details[0].text], ['cross', 'danger', 'Failed · Jupiter v6', 'Failed: instruction 2: error 6001']);
     assert.deepEqual([text(unread.title), unread.signature], ["Otus couldn't read this one", null]);

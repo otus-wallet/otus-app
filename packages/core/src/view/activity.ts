@@ -1,7 +1,7 @@
 // A wallet's transactions as Activity shows them: each in a line ("Swap 1 SOL → 120.58 USDC", "Minted 1,000 BONK", to
 // whom, when), what came in and what went out told apart; opened, everything its transaction told: every balance it
 // moved, the rent and the fee apart, the other side whole, its programs, memo and failure. A copy of an address, the
-// kind dust is sent from, is told as one.
+// kind dust is sent from, is told as one. Addresses go in the words whole: the page cuts them short (cuts()).
 import type { Address } from '@solana/kit';
 
 import { COMPUTE_BUDGET_PROGRAM_ADDRESS } from '@solana-program/compute-budget';
@@ -33,8 +33,9 @@ export type Row = {
     address: { label: string; address: Address; name: string | null; copy: boolean } | null;
 };
 
-/** What the words need: a token's symbol (a verified one's, else the mint in short), a name for an address (the wallet's
- *  own address marked yours, another wallet's or a contact's name, a program's), and the addresses you know. */
+/** What the words need: a token's symbol (a verified one's, else its mint), a name for an address (the wallet's own
+ *  address marked yours, another wallet's or a contact's name, a program's, else the address), and the addresses you
+ *  know. An address goes in whole. */
 export type Naming = {
     wallet: Address;
     symbol(mint: Address): string;
@@ -48,18 +49,22 @@ export const text = (parts: Part[]) => parts.map((p) => p.text).join('');
 
 const VERBS: Record<Step, string> = { setup: 'new multisig', create: 'create', propose: 'propose', activate: 'activate', approve: 'approve', reject: 'reject', cancel: 'cancel', execute: 'execute', spend: 'spend', close: 'close' };
 
-/** Each transaction read → its row; one Otus could not read says so. An address like another, on the page or known, is
- *  cut short where they part, and the copy of the two told as one. */
+/** Each transaction read → its row; one Otus could not read says so. The copy of an address, of two alike on the page or
+ *  known, is told as one. */
 export function rows(read: (Activity | { unreadable: string })[], n: Naming): Row[] {
     const done = read.filter((a): a is Activity => 'kind' in a);
     const copies = copiesOn(done, n.known);
-    const seen = [...new Set([...n.known, ...done.flatMap((a) => (a.other ? [a.other] : []))])];
-    const who = (a: Address) => {
-        const named = n.who(a);
-        const twin = named === short(a) ? seen.find((x) => x !== a && alike(x, a)) : undefined;
-        return twin ? apart(a, twin) : named;
+    return read.map((a) => ('unreadable' in a ? unreadable(a.unreadable) : row(a, n, a.other ? (copies.get(a.other) ?? null) : null)));
+}
+
+/** How the page cuts an address short: four characters a side, or, for one like another on the page or known, as far as
+ *  where they part (apart()). */
+export function cuts(read: (Activity | { unreadable: string })[], known: Address[]): (a: string) => string {
+    const seen = [...new Set([...known, ...read.flatMap((a) => ('kind' in a && a.other ? [a.other] : []))])];
+    return (a) => {
+        const twin = seen.find((x) => x !== a && alike(x, a));
+        return twin ? apart(a, twin) : short(a);
     };
-    return read.map((a) => ('unreadable' in a ? unreadable(a.unreadable) : row(a, { ...n, who }, a.other ? (copies.get(a.other) ?? null) : null)));
 }
 
 /**
@@ -101,7 +106,7 @@ function row(a: Activity, n: Naming, copies: Address | null): Row {
         icon: head.icon,
         tone: a.error || head.danger ? 'danger' : copies || taken ? 'warn' : 'plain',
         title: head.title,
-        sub: copies && a.other ? [{ text: `${side} ${n.who(a.other)} · copies ${apart(copies, a.other)}` }] : head.sub,
+        sub: copies && a.other ? [{ text: `${side} ${n.who(a.other)} · copies ${copies}` }] : head.sub,
         details: details(a, n, copies),
         address: a.other ? { label: a.kind === 'send' ? 'To' : 'From', address: a.other, name: named(n, a.other), copy: !!copies } : null,
     };
@@ -217,8 +222,8 @@ function namesFor(a: Activity, n: Naming): Names {
     };
 }
 
-// A name for an address when Otus has one: yours, a contact's, a program's.
-const named = (n: Naming, a: Address) => (/…/.test(n.who(a)) ? null : n.who(a));
+// A name for an address when Otus has one: a contact's, a program's (yours goes by its address, tagged).
+const named = (n: Naming, a: Address) => (n.who(a).includes(a) ? null : n.who(a));
 
 /** An address cut short where it parts from one made to look like it, not just at four characters a side: the ones a
  *  copy matches. "EhPya…mBFDX" against "EhPyS…7BFDX". */
@@ -237,10 +242,7 @@ const quantity = (m: Move, n: Naming) => `${amount(m.units < 0n ? -m.units : m.u
 // Opened: every balance it moved, the rent and the fee apart, the warnings, its programs, memo and failure.
 function details(a: Activity, n: Naming, copies: Address | null): Detail[] {
     const out: Detail[] = a.moves.map((m) => ({ text: `${m.units < 0n ? '−' : '+'}${quantity(m, n)}`, tone: m.units > 0n ? 'ok' : 'danger' }));
-    if (copies && a.other) {
-        const [it, real] = [apart(a.other, copies), apart(copies, a.other)];
-        out.push({ text: a.kind === 'send' ? `${it} looks like ${real}: one of them may be forged` : `Dust from ${it}, made to look like ${real}: never send to it`, tone: 'warn' });
-    }
+    if (copies && a.other) out.push({ text: a.kind === 'send' ? `${a.other} looks like ${copies}: one of them may be forged` : `Dust from ${a.other}, made to look like ${copies}: never send to it`, tone: 'warn' });
     // What moved no balance, as the review words each instruction of Solana's own.
     if (a.kind === 'other') {
         const names = namesFor(a, n);

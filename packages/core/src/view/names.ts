@@ -1,7 +1,7 @@
 // How the transaction's accounts and tokens read in the window: names for addresses, symbols and decimals for mints,
 // and what happened to each account, in words.
 import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
-import type { Address } from '@solana/kit';
+import { isAddress, type Address } from '@solana/kit';
 
 import { amount, cap, quantity, short, SOL_DECIMALS } from '@otus-wallet/sdk/format';
 import { STAKE_PROGRAM, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
@@ -19,6 +19,20 @@ const SYMBOLS: Record<string, string> = { [USDC]: 'USDC', [USDT]: 'USDT' };
 // for a verified token: anyone can call a token "USDC", so any other goes by its address.
 /** How a line marks an address as yours, for the window to tag: "FioY…KWv1 (you)". */
 export const YOU = ' (you)';
+
+// A whole address in words: base58, 32 to 44 characters, a word of its own (not the start of a signature).
+const WHOLE = /(?<![1-9A-HJ-NP-Za-km-z])([1-9A-HJ-NP-Za-km-z]{32,44})(?![1-9A-HJ-NP-Za-km-z])/;
+
+/** Words split around each whole address in them, for the window to cut short: the addresses at the odd places. A word
+ *  that only looks like one (not 32 bytes) stays in the words. */
+export function atAddresses(words: string): string[] {
+    const out = [''];
+    for (const [i, w] of words.split(WHOLE).entries()) {
+        if (i % 2 && isAddress(w)) out.push(w, '');
+        else out[out.length - 1] += w;
+    }
+    return out;
+}
 
 /** `tagged`: you named by your address, marked yours, where the window has room for no more than a line. */
 export function names(r: Review, known: Known, wallet: Address, mainnet: boolean, tagged = false): Names {

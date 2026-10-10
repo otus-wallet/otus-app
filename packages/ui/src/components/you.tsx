@@ -1,19 +1,26 @@
-// Your address, marked yours: the words give it, then a green "you" tag, wherever Otus names you by address.
-import { YOU } from '@otus-wallet/core/view/names.ts';
+// Words as Otus writes them, each address in them whole: here cut short, and yours marked with a green "you" tag.
+import { atAddresses, YOU } from '@otus-wallet/core/view/names.ts';
+import { ShortAddress, type Cut } from './address.tsx';
 
-/** Words with each address of yours marked: the address as the words give it, then a "you" tag. */
-export function Tagged({ text: words }: { text: string }) {
+/**
+ * Words with each address in them cut short (whole on hover, copied on a click), and each of yours marked: the
+ * address, then a "you" tag. `still`: inside something a click already opens, so the addresses are only cut short.
+ */
+export function Tagged({ text: words, cut, still = false }: { text: string; cut?: Cut; still?: boolean }) {
     return (
         <>
             {words.split(YOU).map((part, i) => (
                 <span key={i}>
                     {i > 0 && <YouTag />}
-                    <Unsplit text={part} />
+                    <Addressed text={part} cut={cut} still={still} />
                 </span>
             ))}
         </>
     );
 }
+
+const Addressed = ({ text, cut, still }: { text: string; cut?: Cut; still: boolean }) =>
+    atAddresses(text).map((w, i) => (i % 2 ? <ShortAddress key={i} address={w} cut={cut} still={still} /> : <Unsplit key={i} text={w} />));
 
 // A short address (its ends, an ellipsis between) on one line: a line may break after an ellipsis, and its two halves
 // read apart as two words.

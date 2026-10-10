@@ -6,7 +6,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { NoHistory } from '@otus-wallet/sdk/activity/history';
 import type { Activity } from '@otus-wallet/sdk/activity/summary';
-import { short } from '@otus-wallet/sdk/format';
 import { USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
 import { explorerOf, networkOf, walletRpc } from '@otus-wallet/core/settings.ts';
@@ -14,11 +13,12 @@ import type { State } from '@otus-wallet/core/state.ts';
 import { cachedToken } from '@otus-wallet/core/tokens.ts';
 import { Button } from '../components/ui/button.tsx';
 import { Icon } from '../components/icons.tsx';
+import type { Cut } from '../components/address.tsx';
 import { Tagged } from '../components/you.tsx';
 import { YOU } from '@otus-wallet/core/view/names.ts';
 import { cn } from '../lib/cn.ts';
 import { accessWords, others } from '@otus-wallet/core/view/access.ts';
-import { rows, type Naming, type Part, type Row } from '@otus-wallet/core/view/activity.ts';
+import { cuts, rows, type Naming, type Part, type Row } from '@otus-wallet/core/view/activity.ts';
 import type { Screen } from './App.tsx';
 import { TabBar, Tip } from './common.tsx';
 import { WalletBar } from './Lobby.tsx';
@@ -38,13 +38,15 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
         const mainnet = networkOf(state.settings) === 'solana:mainnet';
         return {
             wallet: account.address,
-            symbol: (mint) => (!mainnet ? short(mint) : (KNOWN_SYMBOLS[mint] ?? verified.get(mint) ?? (cachedToken(mint)?.verified ? cachedToken(mint)!.symbol : short(mint)))),
-            who: (a) => (a === account.address ? `${short(a)}${YOU}` : (names.get(a) ?? PROGRAM_NAMES.get(a) ?? short(a))),
-            program: (a) => PROGRAM_NAMES.get(a) ?? short(a),
+            symbol: (mint) => (!mainnet ? mint : (KNOWN_SYMBOLS[mint] ?? verified.get(mint) ?? (cachedToken(mint)?.verified ? cachedToken(mint)!.symbol : mint))),
+            who: (a) => (a === account.address ? `${a}${YOU}` : (names.get(a) ?? PROGRAM_NAMES.get(a) ?? a)),
+            program: (a) => PROGRAM_NAMES.get(a) ?? a,
             known: [...state.accounts.map((k) => k.address), ...state.contacts.map((k) => k.address), ...(Object.keys(state.sent) as Address[])],
         };
     }, [account.address, held, state.accounts, state.contacts, state.sent, state.settings]);
-    const list = useMemo(() => rows(once(read.data?.pages.flatMap((p) => p.rows) ?? []), naming), [read.data, naming]);
+    const history = useMemo(() => once(read.data?.pages.flatMap((p) => p.rows) ?? []), [read.data]);
+    const list = useMemo(() => rows(history, naming), [history, naming]);
+    const cut = useMemo(() => cuts(history, naming.known), [history, naming]);
     const [open, setOpen] = useState<string | null>(null);
     const explorer = explorerOf(state.settings);
 
@@ -76,7 +78,7 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
                         <ul>
                             {items.map((row, i) => {
                                 const id = row.signature ?? `${day}#${i}`;
-                                return <Item key={id} row={row} open={open === id} flip={() => setOpen(open === id ? null : id)} explorer={explorer} />;
+                                return <Item key={id} row={row} open={open === id} flip={() => setOpen(open === id ? null : id)} explorer={explorer} cut={cut} />;
                             })}
                         </ul>
                     </div>
@@ -144,11 +146,12 @@ const TONE = { plain: '', warn: 'text-warn', danger: 'text-danger' } as const;
 const WAY = { in: 'text-ok', out: 'text-danger' } as const;
 
 // A line's words, what came in green and what went out red: in a plain row; a warning's colour holds over all of one.
-const Parts = ({ parts, plain }: { parts: Part[]; plain: boolean }) => (
+// The line opens the row, so its addresses are only cut short.
+const Parts = ({ parts, plain, cut }: { parts: Part[]; plain: boolean; cut: Cut }) => (
     <>
         {parts.map((p, i) => (
             <span key={i} className={cn(plain && p.way && WAY[p.way])}>
-                <Tagged text={p.text} />
+                <Tagged text={p.text} cut={cut} still />
             </span>
         ))}
     </>
@@ -156,7 +159,7 @@ const Parts = ({ parts, plain }: { parts: Part[]; plain: boolean }) => (
 const DETAIL = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', dim: 'text-ink-3' } as const;
 
 // One transaction: its line, and opened, all it told.
-function Item({ row, open, flip, explorer }: { row: Row; open: boolean; flip: () => void; explorer: ReturnType<typeof explorerOf> }) {
+function Item({ row, open, flip, explorer, cut }: { row: Row; open: boolean; flip: () => void; explorer: ReturnType<typeof explorerOf>; cut: Cut }) {
     const when = row.time === null ? null : new Date(row.time * 1000);
     return (
         <li className="activity-row border-t border-dashed border-rule-2">
@@ -166,11 +169,11 @@ function Item({ row, open, flip, explorer }: { row: Row; open: boolean; flip: ()
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className={cn('text-sm font-bold [overflow-wrap:anywhere]', TONE[row.tone])}>
-                        <Parts parts={row.title} plain={row.tone === 'plain'} />
+                        <Parts parts={row.title} plain={row.tone === 'plain'} cut={cut} />
                     </span>
                     {row.sub.length > 0 && (
                         <span className={cn('text-xs', row.tone === 'warn' ? 'text-warn [overflow-wrap:anywhere]' : 'truncate text-ink-3')}>
-                            <Parts parts={row.sub} plain={row.tone === 'plain'} />
+                            <Parts parts={row.sub} plain={row.tone === 'plain'} cut={cut} />
                         </span>
                     )}
                 </span>
@@ -180,7 +183,7 @@ function Item({ row, open, flip, explorer }: { row: Row; open: boolean; flip: ()
                 <div className="details flex flex-col gap-1 pb-3 pl-11 text-xs">
                     {row.details.map((d, i) => (
                         <span key={i} className={cn('[overflow-wrap:anywhere]', d.tone ? DETAIL[d.tone] : 'font-bold')}>
-                            <Tagged text={d.text} />
+                            <Tagged text={d.text} cut={cut} />
                         </span>
                     ))}
                     {row.address && (
