@@ -41,6 +41,7 @@ import { accountView, describe, LEDGER_CLEAR, type Known, type Life, type Outcom
 import type { Answer } from './approvals.ts';
 import type { Shell } from './serve.ts';
 import type { Account } from '@otus-wallet/core/state.ts';
+import type { Kept } from '@otus-wallet/core/view/names.ts';
 
 /** The user said no. */
 export class Rejected extends Error {}
@@ -106,8 +107,8 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     // A Ledger's Solana app misreads v1: shown all the same, so the user hears why it cannot be signed.
     const unsignable = account.ledger !== undefined && (await decode(bytes)).message.version === 1;
     // Yours, and the addresses you keep: what lands with them is not someone else's.
-    const { accounts, contacts, settings } = await shell.load();
-    const yours = { wallets: accounts.map((a) => a.address), contacts: new Map(contacts.map((c) => [c.address, c.label])) };
+    const { accounts, contacts, sent, settings } = await shell.load();
+    const yours = { wallets: accounts.map((a) => a.address), contacts: new Map(contacts.map((c) => [c.address, c.label])), sent: Object.keys(sent) as Address[] };
     const [reviewed, blockhash] = await Promise.all([review(bytes, { ...way.context, ...yours, wallet: account.address }, way.chain), way.blockhash]);
     const r = blockhash === undefined ? reviewed : await stamped(reviewed, blockhash);
     await notMainnet(r, way.cluster, settings, shell);
@@ -123,7 +124,8 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     // A site's transaction tells nothing of its blockhash's age, and may come with little of its minute left (a Jupiter
     // order, about half): the network is asked instead, while the user decides.
     const away = way.cluster !== networkOf(settings); // for another network than the wallet shows: said in the window
-    const kept = [...accounts, ...contacts].map(({ address, label }) => ({ address, label })); // your wallets, watched ones too, and contacts, to tag
+    // Your wallets, watched ones too, and contacts, to tag; the addresses you sent to, to cut a copy apart from.
+    const kept: Kept[] = [...accounts.map(({ address, label }) => ({ address, label, kind: 'wallet' as const })), ...contacts.map(({ address, label }) => ({ address, label, kind: 'contact' as const })), ...yours.sent.map((address) => ({ address, label: '', kind: 'sent' as const }))];
     const shown = { site: way.site, account: accountView(account), signer: signerOf(account), cluster: way.cluster, known, expiry: null, recipient: way.recipient, later: way.later, away, kept };
     const blocked = unsignable ? LEDGER_V1 : undefined;
     const prepared = preparing.then(([p, told]): { p: Prepared; approval: TransactionView } => {

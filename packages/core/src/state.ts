@@ -194,7 +194,5 @@ export function lookalike(state: State, address: string): { address: string; lab
     return known.find((k) => k.address !== address && alike(k.address, address)) ?? null;
 }
 
-export { alike }; // the SDK's: how the review tells a copy of an address from the address
-
 /** A transfer made in Otus landed at this address: one more. */
 export const sentTo = (state: State, address: Address): Partial<State> => ({ sent: { ...state.sent, [address]: (Object.hasOwn(state.sent, address) ? state.sent[address] : 0) + 1 } });

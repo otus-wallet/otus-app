@@ -5,7 +5,7 @@ import { getBase64Decoder, type Address } from '@solana/kit';
 import { plural, sol } from '@otus-wallet/sdk/format';
 import type { IdlInstruction } from '@otus-wallet/sdk/idl/idl';
 import type { Cluster } from './intake.ts';
-import { described, ranked, type Finding, type Level, type Tone, type Verdict } from '@otus-wallet/sdk/review/assess';
+import { described, lookalikes, ranked, type Finding, type Level, type Tone, type Verdict } from '@otus-wallet/sdk/review/assess';
 import type { Effect } from '@otus-wallet/sdk/review/effects';
 import type { Review } from '@otus-wallet/sdk/review/review';
 import { lookalike } from '@otus-wallet/sdk/review/sites';
@@ -17,7 +17,7 @@ import { balances } from './view/balances.ts';
 import { imitations, noteOf } from './view/findings.ts';
 import { keptIn, names, type Kept } from './view/names.ts';
 import { programs, selfNamed } from './view/programs.ts';
-import { proposalViews, type ProposalView } from './view/squads.ts';
+import { partiesOf, proposalViews, type ProposalView } from './view/squads.ts';
 
 export type { Tone };
 
@@ -120,7 +120,7 @@ export type Known = { tokens: Map<string, TokenInfo | null>; decimals: Map<strin
 export type Shown = { site: SiteView; account: AccountView; signer: Signer; cluster: Cluster; known: Known; expiry?: Expiry | null; recipient?: string; later?: boolean; away?: boolean; kept?: Kept[] };
 
 // Findings shown on the first step, before anything else: what you would lose, and a transaction that would fail.
-const FIRST = new Set(['simulation-failed', 'wallet-change', 'owner-change', 'token-owner-change', 'authority-change', 'delegate', 'close-authority', 'program-change']);
+const FIRST = new Set(['simulation-failed', 'wallet-change', 'owner-change', 'token-owner-change', 'authority-change', 'delegate', 'close-authority', 'program-change', 'lookalike-address']);
 
 export function siteView(origin: string, site: Site | undefined): SiteView {
     const host = new URL(origin).host;
@@ -139,8 +139,9 @@ export function describe(r: Review, p: Prepared | null, { site, account, signer,
     const told = known.told ?? new Map();
     const named = selfNamed(r, told);
     const held = p !== null && p.unguarded === null && !later; // guards hold what it does, and it lands now
-    const { verdict, findings } = ranked([...described(r.assessment.findings, named, r.assessment.programs, held), ...(p?.findings ?? []), ...imitations(known.tokens, mainnet)]);
     const n = names(r, known, wallet, mainnet);
+    const proposals = proposalViews(known.squads ?? [], n);
+    const { verdict, findings } = ranked([...described(r.assessment.findings, named, r.assessment.programs, held), ...(p?.findings ?? []), ...imitations(known.tokens, mainnet), ...proposedTo(proposals, r, wallet, kept)]);
     const note = (f: Finding) => noteOf(f, r, p, n);
     const view: Omit<TransactionView, 'kept'> = {
         kind: 'transaction',
@@ -151,7 +152,7 @@ export function describe(r: Review, p: Prepared | null, { site, account, signer,
         signer,
         network: mainnet && !away ? null : cluster.slice('solana:'.length),
         balances: balances(r, p, wallet, n, verdict),
-        proposals: proposalViews(known.squads ?? [], n),
+        proposals,
         changes: findings.filter((f) => FIRST.has(f.code) && f.level !== 'ok').map((f) => ({ title: f.text, note: note(f), tone: f.level })),
         accounts: r.assessment.kinds.size,
         hash: p ? (p.hash.match(/.{1,4}/g)?.join(' ') ?? p.hash) : '', // of the message signed: the site's, with guards and fees when prepared
@@ -168,6 +169,15 @@ export function describe(r: Review, p: Prepared | null, { site, account, signer,
         ...(p === null && { preparing: true as const }),
     };
     return { ...view, kept: keptIn(view, kept.filter((k) => k.address !== wallet)) }; // yours in use is "you"
+}
+
+// Who a Squads proposal you vote on would pay, or make a member or a spender, when that one only looks like an address you
+// keep, one of your wallets or one you sent to: the review reads proposals apart, so it is checked here, before the vote.
+function proposedTo(proposals: ProposalView[], r: Review, wallet: Address, kept: Kept[]): Finding[] {
+    const said = new Set(r.assessment.findings.filter((f) => f.code === 'lookalike-address').map((f) => f.subject));
+    const parties = proposals.flatMap((p) => p.lines.flatMap((l) => partiesOf(l.text).parties)).filter((a) => !said.has(a as Address)) as Address[];
+    const of = (kind: Kept['kind']) => kept.filter((k) => k.kind === kind);
+    return lookalikes(parties, { wallet, wallets: of('wallet').map((k) => k.address as Address), contacts: new Map(of('contact').map((k) => [k.address as Address, k.label])), sent: of('sent').map((k) => k.address as Address) });
 }
 
 // The verdict in words: its title, what the findings come to, and the chip beside the steps.

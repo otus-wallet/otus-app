@@ -28,7 +28,7 @@ export function Approve({ approval, answers, expiry, life }: { approval: Approva
     const died = life !== undefined && 'expired' in life;
     // Your other wallets and contacts it names, tagged by your names; addresses that look alike in what it asks, yours
     // and theirs among them, cut as far as where they part.
-    const kept = approval.kind === 'transaction' ? approval.kept : [];
+    const kept = approval.kind === 'transaction' ? (approval.kept ?? []) : []; // none in a view kept from before
     const names = useMemo(() => new Map(kept.map((k) => [k.address, k.label])), [kept]);
     const cut = useMemo(() => cutAmong([approval.account.address, ...kept.map((k) => k.address), ...addressesIn(approval, NOT_WORDS)]), [approval, kept]);
     return (

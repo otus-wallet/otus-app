@@ -126,7 +126,7 @@ function Yours({ text: line }: { text: string }) {
                     <span className="text-ok">{address.slice(0, 4)}</span>
                     {address.slice(4, -4)}
                     <span className="text-ok">{address.slice(-4)}</span>
-                    {address === wallet ? <YouTag /> : names.has(address) && <NameTag label={names.get(address)!} />}
+                    {address === wallet ? <YouTag /> : names.get(address) && <NameTag label={names.get(address)!} />}
                 </span>
             ))}
         </>

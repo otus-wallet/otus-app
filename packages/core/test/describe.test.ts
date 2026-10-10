@@ -9,18 +9,20 @@ import type { Simulation } from '@otus-wallet/sdk/chain';
 import type { Cluster } from '../src/intake.ts';
 import { review } from '@otus-wallet/sdk/review/review';
 import { prepare } from '@otus-wallet/sdk/prepare/prepare';
+import type { ProposalTold } from '@otus-wallet/sdk/review/squads';
 import { describe, siteView, type Signer } from '../src/view.ts';
+import type { Kept } from '../src/view/names.ts';
 import { golden } from './golden.ts';
 import { account, DRAIN, DRAIN_AFTER, DRAIN_BEFORE, fakeChain, key, PAYER, RECIPIENT, SYSTEM, transaction, transferV1 } from './helpers.ts';
 
 // What the window shows for a transaction, on a cluster, for a signer, from a site you signed for before or never.
-async function view(bytes: Uint8Array, before: MaybeEncodedAccount[], after: MaybeEncodedAccount[], o: { cluster?: Cluster; signer?: Signer; signedBefore?: number | null; simulation?: Partial<Simulation>; kept?: { address: string; label: string }[] } = {}) {
+async function view(bytes: Uint8Array, before: MaybeEncodedAccount[], after: MaybeEncodedAccount[], o: { cluster?: Cluster; signer?: Signer; signedBefore?: number | null; simulation?: Partial<Simulation>; kept?: Kept[]; squads?: ProposalTold[] } = {}) {
     const chain = fakeChain(before, after, o.simulation);
-    const contacts = new Map((o.kept ?? []).map((k) => [k.address as Address, k.label])); // as the extension passes them
+    const contacts = new Map((o.kept ?? []).filter((k) => k.kind !== 'wallet' && k.kind !== 'sent').map((k) => [k.address as Address, k.label])); // as the extension passes them
     const r = await review(bytes, { wallet: PAYER, signedBefore: o.signedBefore === undefined ? 0 : o.signedBefore, host: 'app.example.com', contacts }, chain);
     const p = await prepare(r, PAYER, chain);
     const site = siteView('https://app.example.com', { account: PAYER, signatures: 3 });
-    return describe(r, p, { site, account: { label: 'Me', address: PAYER }, signer: o.signer ?? 'ready', cluster: o.cluster ?? 'solana:mainnet', known: { tokens: new Map(), decimals: new Map() }, kept: o.kept });
+    return describe(r, p, { site, account: { label: 'Me', address: PAYER }, signer: o.signer ?? 'ready', cluster: o.cluster ?? 'solana:mainnet', known: { tokens: new Map(), decimals: new Map(), squads: o.squads }, kept: o.kept });
 }
 
 const SOL = 1_000_000_000n;
@@ -84,4 +86,17 @@ test('your SOL to a copy of a contact\'s address: critical, said whole, and the 
     assert.equal(t.verdict, 'danger');
     assert.deepEqual(t.findings.find((f) => f.title === "This address looks like Bob's"), { tone: 'danger', title: "This address looks like Bob's", note: `${copy} is not Bob's` });
     assert.deepEqual(t.kept, [{ address: bob, label: 'Bob' }]); // not in it, but its copy is
+});
+
+test("a Squads proposal you vote on that adds a copy of a contact's address: critical, on the first step, before the vote", async () => {
+    const bob = key(2);
+    const copy = Array.from({ length: 60 }, (_, i) => `${bob.slice(0, 5)}${key(80 + i).slice(5, -5)}${bob.slice(-5)}`).find((x) => x !== bob && isAddress(x)) as Address;
+    const send = transaction([getTransferSolInstruction({ source: createNoopSigner(PAYER), destination: key(3), amount: SOL / 10n })]);
+    const proposal: ProposalTold = { instructions: [0], steps: ['approve'], multisig: key(4), number: 7n, threshold: 2, approved: 1, rejected: 0, status: 'active', inside: { kind: 'setup', threshold: 1, members: [{ key: copy, permissions: 7 }], timeLock: 0 } };
+    const shown = (kept: Kept[]) => view(send, [account(PAYER, SYSTEM, 2n * SOL)], [account(PAYER, SYSTEM, 2n * SOL - SOL / 10n - 5_000n), account(key(3), SYSTEM, SOL / 10n)], { kept, squads: [proposal] });
+    const t = await shown([{ address: bob, label: 'Bob', kind: 'contact' }]);
+    assert.equal(t.verdict, 'danger');
+    assert.deepEqual(t.changes.find((c) => c.title === "This address looks like Bob's"), { title: "This address looks like Bob's", note: `${copy} is not Bob's`, tone: 'danger' });
+    assert.equal((await shown([{ address: copy, label: 'Bob', kind: 'contact' }])).findings.some((f) => f.title.startsWith('This address looks like')), false); // Bob's own
+    assert.deepEqual((await shown([{ address: bob, label: '', kind: 'sent' }])).changes.map((c) => c.title), ['This address looks like one you sent to']);
 });

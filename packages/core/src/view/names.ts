@@ -3,7 +3,7 @@
 import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 import { isAddress, type Address } from '@solana/kit';
 
-import { amount, cap, quantity, short, SOL_DECIMALS, told } from '@otus-wallet/sdk/format';
+import { alike, amount, cap, quantity, short, SOL_DECIMALS, told } from '@otus-wallet/sdk/format';
 import { STAKE_PROGRAM, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
 import { SYSVARS } from '@otus-wallet/sdk/review/assess';
@@ -11,7 +11,6 @@ import { defaultUnits, lamportsFor, unitLimit, unitPrice } from '@otus-wallet/sd
 import { read } from '@otus-wallet/sdk/review/changes';
 import type { Names } from '@otus-wallet/sdk/review/effects';
 import type { Review } from '@otus-wallet/sdk/review/review';
-import { alike } from '@otus-wallet/sdk/format';
 import type { Known } from '../view.ts';
 
 const SYMBOLS: Record<string, string> = { [USDC]: 'USDC', [USDT]: 'USDT' };
@@ -68,8 +67,8 @@ export function cutAmong(addresses: Iterable<string>): (a: string) => string {
 /** What a view to sign holds that is not words: the transaction's bytes, its hash, what a Ledger signs. */
 export const NOT_WORDS: ReadonlySet<string> = new Set(['wire', 'hash', 'ledger']);
 
-/** An address of yours or one you keep, by your name for it. */
-export type Kept = { address: string; label: string };
+/** An address of yours, one you keep or one you sent to, by your name for it (none for one you sent to). */
+export type Kept = { address: string; label: string; kind?: 'wallet' | 'contact' | 'sent' };
 
 /** Of your wallets and contacts, the ones a view names, for the window to tag, and the ones like an address it names,
  *  for the window to cut that one apart from: a copy of a contact's address reads as one. Each named as you wrote it,
