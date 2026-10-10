@@ -11,7 +11,6 @@ import type { Review } from '@otus-wallet/sdk/review/review';
 import type { Names } from '@otus-wallet/sdk/review/effects';
 import { explain } from '@otus-wallet/sdk/review/explain';
 import { notice, squadsTold, type ProposalTold } from '@otus-wallet/sdk/review/squads';
-import { short } from '@otus-wallet/sdk/format';
 import { proposalViews } from '../src/view/squads.ts';
 import { fakeChain, key } from './helpers.ts';
 
@@ -45,15 +44,15 @@ function review(...names: (string | null)[]) {
     return { r, chain: fakeChain(all, all) };
 }
 
-// The names the review gives: none for these accounts, so each shows short, as the review does; SOL and USDC known.
+// The names the review gives: none for these accounts, so each goes whole, as the review gives it; SOL and USDC known.
 const names: Names = {
     wallet: 'FioYZC5CZHVQ7KsWDH6FRU5gMZV1hAgn3ykwsdGGKWv1' as Address,
-    who: (a) => (a === names.wallet ? 'you' : short(a)),
+    who: (a) => (a === names.wallet ? 'you' : a),
     mine: () => false,
     existed: () => true,
     mintOf: () => null,
     token: (mint) => (mint ? { symbol: 'USDC', decimals: 6, verified: true } : { symbol: 'tokens', decimals: null, verified: false }),
-    program: (a) => short(a),
+    program: (a) => a,
     priorityFee: null,
     payer: 'FioYZC5CZHVQ7KsWDH6FRU5gMZV1hAgn3ykwsdGGKWv1' as Address,
     changes: () => [],

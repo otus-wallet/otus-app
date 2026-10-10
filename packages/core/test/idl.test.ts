@@ -31,7 +31,7 @@ async function unknownCall(o: { cosigned?: boolean; told?: string; calls?: Addre
 
 test('a program Otus doesn’t know: a warning, a notice once its own IDL describes it; critical only for what it does', async () => {
     const said = (v: Awaited<ReturnType<typeof unknownCall>>) => [v.verdict, ...v.findings.filter((f) => f.tone === 'danger' || / not a program Otus knows$/.test(f.title)).map((f) => `${f.tone}: ${f.title}`)];
-    const unknown = `${SOME.slice(0, 4)}…${SOME.slice(-4)} is not a program Otus knows`;
+    const unknown = `${SOME} is not a program Otus knows`; // whole: the window cuts it short
     assert.deepEqual(said(await unknownCall()), ['warn', `warn: ${unknown}`]);
     assert.deepEqual(said(await unknownCall({ told: 'evil' })), ['ok', 'notice: Evil is not a program Otus knows']);
     // What it calls inside with your signature: moving SOL, itself, another program, all as they are; but Kamino Lend,

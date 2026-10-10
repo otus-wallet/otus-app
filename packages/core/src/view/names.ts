@@ -3,7 +3,7 @@
 import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 import { isAddress, type Address } from '@solana/kit';
 
-import { amount, cap, quantity, short, SOL_DECIMALS } from '@otus-wallet/sdk/format';
+import { amount, cap, quantity, SOL_DECIMALS } from '@otus-wallet/sdk/format';
 import { STAKE_PROGRAM, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
 import { SYSVARS } from '@otus-wallet/sdk/review/assess';
@@ -49,19 +49,19 @@ export function names(r: Review, known: Known, wallet: Address, mainnet: boolean
         if (!mint) return { symbol: 'tokens', decimals: null, verified: false };
         const t = known.tokens.get(mint);
         const verified = mint === WSOL || (mainnet && (SYMBOLS[mint] !== undefined || t?.verified === true));
-        const symbol = mint === WSOL ? 'wSOL' : verified ? t?.symbol || SYMBOLS[mint] || short(mint) : short(mint);
+        const symbol = mint === WSOL ? 'wSOL' : verified ? t?.symbol || SYMBOLS[mint] || mint : mint;
         const places = known.decimals.get(mint) ?? t?.decimals ?? null;
         return { symbol, decimals: places !== null && Number.isInteger(places) && places >= 0 && places <= 255 ? places : null, verified };
     };
     const who = (a: Address): string => {
-        if (a === wallet) return tagged ? `${short(wallet)}${YOU}` : 'you';
+        if (a === wallet) return tagged ? `${wallet}${YOU}` : 'you';
         const t = tokenOf(a);
         if (mine.has(a)) {
             if (t) return `your ${t.native ? 'wrapped SOL' : token(t.mint).symbol} account`;
             const s = stateOf(a);
-            return `your ${s?.program === STAKE_PROGRAM ? 'stake account' : s?.program === SYSTEM_PROGRAM_ADDRESS && s.space === 80 ? 'nonce account' : 'account'} ${short(a)}`;
+            return `your ${s?.program === STAKE_PROGRAM ? 'stake account' : s?.program === SYSTEM_PROGRAM_ADDRESS && s.space === 80 ? 'nonce account' : 'account'} ${a}`;
         }
-        return PROGRAM_NAMES.get(a) ?? (SYSVARS.has(a) ? 'a sysvar' : short(a));
+        return PROGRAM_NAMES.get(a) ?? (SYSVARS.has(a) ? 'a sysvar' : a);
     };
     // What happened to an account, in words: its tokens, its SOL, a new owner or delegate, a close.
     const changesOf = (a: Address): string[] => {
@@ -74,13 +74,13 @@ export function names(r: Review, known: Known, wallet: Address, mainnet: boolean
             const delta = (to?.amount ?? 0n) - (from?.amount ?? 0n);
             const t = token(held.mint);
             if (delta !== 0n) out.push(`${quantity(delta, t.decimals)} ${t.symbol} ${delta < 0n ? 'from' : 'to'} ${who(a)}`);
-            if (from && to && from.owner !== to.owner) out.push(`${cap(who(a))} now belongs to ${short(to.owner)}`);
-            if (to?.delegate && to.delegate !== from?.delegate) out.push(`${short(to.delegate)} may move the tokens in ${who(a)}`);
+            if (from && to && from.owner !== to.owner) out.push(`${cap(who(a))} now belongs to ${to.owner}`);
+            if (to?.delegate && to.delegate !== from?.delegate) out.push(`${to.delegate} may move the tokens in ${who(a)}`);
         } else {
             const lamports = (c.after?.lamports ?? 0n) - (c.before?.lamports ?? 0n);
             if (lamports !== 0n) out.push(`${amount(lamports, SOL_DECIMALS)} SOL ${lamports < 0n ? 'from' : 'to'} ${who(a)}`);
         }
-        if (c.before && c.after && c.before.program !== c.after.program) out.push(`${cap(who(a))} now belongs to ${PROGRAM_NAMES.get(c.after.program) ?? short(c.after.program)}`);
+        if (c.before && c.after && c.before.program !== c.after.program) out.push(`${cap(who(a))} now belongs to ${PROGRAM_NAMES.get(c.after.program) ?? c.after.program}`);
         if (c.before && !c.after) out.push(`${cap(who(a))} is closed`);
         return out;
     };
@@ -92,7 +92,7 @@ export function names(r: Review, known: Known, wallet: Address, mainnet: boolean
         existed: (a) => loaded.get(a)?.exists === true,
         mintOf: (a) => tokenOf(a)?.mint ?? null,
         token,
-        program: (a) => PROGRAM_NAMES.get(a) ?? short(a),
+        program: (a) => PROGRAM_NAMES.get(a) ?? a,
         priorityFee: price === null ? null : lamportsFor(price, unitLimit(r.message) ?? defaultUnits(r.message)),
         payer: r.signers[0],
         changes: changesOf,

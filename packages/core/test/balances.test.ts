@@ -5,7 +5,6 @@ import { getTransferSolInstruction } from '@solana-program/system';
 import { getCloseAccountInstruction, getSyncNativeInstruction, getTransferCheckedInstruction, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { AccountRole, address, createNoopSigner, getAddressEncoder, getProgramDerivedAddress, getU32Encoder, getU64Encoder, type Address, type Instruction, type MaybeEncodedAccount } from '@solana/kit';
 
-import { short } from '@otus-wallet/sdk/format';
 import { TOKEN_2022_PROGRAM_ADDRESS } from '@otus-wallet/sdk/programs/core';
 import { review } from '@otus-wallet/sdk/review/review';
 import { prepare } from '@otus-wallet/sdk/prepare/prepare';
@@ -63,7 +62,7 @@ test('wrapping your own SOL is no gain, and SOL sent alongside shows where it go
         [account(PAYER, SYSTEM, 3n * SOL - FEE), account(wsol, TOKEN_PROGRAM_ADDRESS, RENT + SOL, tokenAccountData({ mint: WSOL, owner: PAYER, amount: SOL, native: RENT })), account(THIEF, SYSTEM, 7n * SOL)],
     );
     assert.deepEqual(r.assessment.flows.map((f) => [f.asset, f.change]), [['SOL', -6n * SOL]]);
-    assert.deepEqual(rows, ['SOL −7 To HAgk…Kpqk +1', 'SOL −0.000005 Network fee', 'wSOL +1 Wrapped from wallet']);
+    assert.deepEqual(rows, [`SOL −7 To ${THIEF} +1`, 'SOL −0.000005 Network fee', 'wSOL +1 Wrapped from wallet']);
     assert.ok(!view.balances.some((b) => b.lines.some((l) => /Via/.test(l.note))));
 });
 
@@ -95,9 +94,8 @@ test('a token that is not verified goes by its address, is never "guaranteed", a
         ],
         { tokens },
     );
-    const short = `${fake.slice(0, 4)}…${fake.slice(-4)}`;
-    assert.ok(rows.includes(`${short} +900 Unverified · ≥ 810`), rows.join('\n'));
-    assert.ok(rows.includes('USDC −900 To HAgk…Kpqk'), rows.join('\n'));
+    assert.ok(rows.includes(`${fake} +900 Unverified · ≥ 810`), rows.join('\n')); // whole: the window cuts it short
+    assert.ok(rows.includes(`USDC −900 To ${THIEF}`), rows.join('\n'));
     assert.deepEqual(view.balances.filter((b) => b.asset === 'USDC').map((b) => b.verified), [true]);
     assert.ok(codes.includes('warn:A token calls itself USDC, and it is not the real one'), codes.join());
 });
@@ -105,7 +103,7 @@ test('a token that is not verified goes by its address, is never "guaranteed", a
 test('a wallet whose address starts with "Sysvar" is a wallet', async () => {
     const vanity = address('SysvarC1ock111111111111111111111111113JRtQt');
     const { r, rows } = await shown([getTransferSolInstruction({ source: me, destination: vanity, amount: 3n * SOL })], [account(PAYER, SYSTEM, 10n * SOL)], [account(PAYER, SYSTEM, 7n * SOL - FEE), account(vanity, SYSTEM, 3n * SOL)]);
-    assert.equal(rows[0], 'SOL −3 To Sysv…RtQt'); // no "(program)": a wallet
+    assert.equal(rows[0], `SOL −3 To ${vanity}`); // no "(program)": a wallet
     assert.equal(r.assessment.kinds.get(vanity), 'new');
 });
 
@@ -123,7 +121,7 @@ test('rent comes back only when it does: a token account closed to you, and wrap
         [account(PAYER, SYSTEM, SOL), account(wsol, TOKEN_PROGRAM_ADDRESS, 10n * SOL + RENT, tokenAccountData({ mint: WSOL, owner: PAYER, amount: 10n * SOL, native: RENT })), account(THIEF, SYSTEM, SOL)],
         [account(PAYER, SYSTEM, SOL - FEE), account(THIEF, SYSTEM, 11n * SOL + RENT)],
     );
-    assert.deepEqual(away.rows, ['wSOL −10.00203928 To HAgk…Kpqk', 'SOL −0.000005 Network fee']);
+    assert.deepEqual(away.rows, [`wSOL −10.00203928 To ${THIEF}`, 'SOL −0.000005 Network fee']);
     assert.ok(away.codes.includes('warn:You send almost all your SOL'), away.codes.join());
 });
 
@@ -191,7 +189,7 @@ test('your stake’s SOL to a wallet: critical through a program Otus can’t re
     assert.ok(!codes.includes('danger:An asset of yours goes to someone else'), codes.join());
     assert.match(rows[0], /^Staked SOL −50/);
     const effect = view.programs.find((p) => p.address === STAKE)?.instructions[0];
-    assert.deepEqual([effect?.name, effect?.effects[0].text], ['Withdraw', `50 SOL from your stake account ${short(stake)} to ${short(THIEF)}`]);
+    assert.deepEqual([effect?.name, effect?.effects[0].text], ['Withdraw', `50 SOL from your stake account ${stake} to ${THIEF}`]);
 });
 
 test('a site is known a day after the first transaction you signed for it', async () => {

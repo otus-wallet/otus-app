@@ -30,7 +30,7 @@
         "tone": "plain",
         "lines": [
           {
-            "note": "To 36VA…AKzv (program)",
+            "note": "To 36VASLSKLFD2KokjXG7V28veZvXEsyHRKefLonPaAKzv (program)",
             "amount": "−4.9",
             "tone": "plain"
           },
@@ -67,23 +67,23 @@
           {
             "number": 1,
             "name": "TransferSol",
-            "args": "4.9 SOL → 36VA…AKzv",
+            "args": "4.9 SOL → 36VASLSKLFD2KokjXG7V28veZvXEsyHRKefLonPaAKzv",
             "source": "core",
             "accounts": [
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "source · signer · writable",
                 "tone": "plain"
               },
               {
-                "name": "36VA…AKzv",
+                "name": "36VASLSKLFD2KokjXG7V28veZvXEsyHRKefLonPaAKzv",
                 "role": "destination · writable",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "4.9 SOL from 4vJ9…kLKi (you) to 36VA…AKzv",
+                "text": "4.9 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) to 36VASLSKLFD2KokjXG7V28veZvXEsyHRKefLonPaAKzv",
                 "tone": "plain"
               }
             ]
@@ -166,7 +166,7 @@
         "tone": "plain",
         "lines": [
           {
-            "note": "To HAgk…Kpqk +1",
+            "note": "To HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk +1",
             "amount": "−7",
             "tone": "plain"
           },
@@ -222,7 +222,7 @@
             "source": "core",
             "accounts": [
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "source · signer · writable",
                 "tone": "plain"
               },
@@ -234,7 +234,7 @@
             ],
             "effects": [
               {
-                "text": "1 SOL from 4vJ9…kLKi (you) to your wrapped SOL account",
+                "text": "1 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) to your wrapped SOL account",
                 "tone": "plain"
               }
             ]
@@ -242,23 +242,23 @@
           {
             "number": 3,
             "name": "TransferSol",
-            "args": "6 SOL → HAgk…Kpqk",
+            "args": "6 SOL → HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "source": "core",
             "accounts": [
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "source · signer · writable",
                 "tone": "plain"
               },
               {
-                "name": "HAgk…Kpqk",
+                "name": "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "role": "destination · writable",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "6 SOL from 4vJ9…kLKi (you) to HAgk…Kpqk",
+                "text": "6 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) to HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "tone": "plain"
               }
             ]
@@ -365,7 +365,7 @@
     "network": null,
     "balances": [
       {
-        "asset": "3EKk…ezeL",
+        "asset": "3EKkiwNLWqoUbzFkPrmKbtUB4EweE6f4STzevYUmezeL",
         "logo": "chain",
         "icon": null,
         "verified": false,
@@ -388,7 +388,7 @@
         "tone": "plain",
         "lines": [
           {
-            "note": "To HAgk…Kpqk",
+            "note": "To HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "amount": "−900",
             "tone": "plain"
           }
@@ -435,33 +435,33 @@
           {
             "number": 1,
             "name": "TransferChecked",
-            "args": "900 3EKk…ezeL → your 3EKk…ezeL account",
+            "args": "900 3EKkiwNLWqoUbzFkPrmKbtUB4EweE6f4STzevYUmezeL → your 3EKkiwNLWqoUbzFkPrmKbtUB4EweE6f4STzevYUmezeL account",
             "source": "core",
             "accounts": [
               {
-                "name": "3NAM…9fHk",
+                "name": "3NAM1YJMhSPvtAkmGTRABe1hYZN3aE2hZHKy3JZy9fHk",
                 "role": "source · writable",
                 "tone": "plain"
               },
               {
-                "name": "3EKk…ezeL",
+                "name": "3EKkiwNLWqoUbzFkPrmKbtUB4EweE6f4STzevYUmezeL",
                 "role": "mint · new",
                 "tone": "plain"
               },
               {
-                "name": "Your 3EKk…ezeL account",
+                "name": "Your 3EKkiwNLWqoUbzFkPrmKbtUB4EweE6f4STzevYUmezeL account",
                 "role": "destination · writable",
                 "tone": "plain"
               },
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "authority · signer · writable",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "900 3EKk…ezeL from 3NAM…9fHk to your 3EKk…ezeL account",
+                "text": "900 3EKkiwNLWqoUbzFkPrmKbtUB4EweE6f4STzevYUmezeL from 3NAM1YJMhSPvtAkmGTRABe1hYZN3aE2hZHKy3JZy9fHk to your 3EKkiwNLWqoUbzFkPrmKbtUB4EweE6f4STzevYUmezeL account",
                 "tone": "ok"
               }
             ]
@@ -469,7 +469,7 @@
           {
             "number": 2,
             "name": "TransferChecked",
-            "args": "900 USDC → 3Vzw…eKwA",
+            "args": "900 USDC → 3VzwJ9ENt2zPAMFn944zmPZE2snSvMQLg6fHA4fAeKwA",
             "source": "core",
             "accounts": [
               {
@@ -478,24 +478,24 @@
                 "tone": "plain"
               },
               {
-                "name": "EPjF…Dt1v",
+                "name": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
                 "role": "mint · new",
                 "tone": "plain"
               },
               {
-                "name": "3Vzw…eKwA",
+                "name": "3VzwJ9ENt2zPAMFn944zmPZE2snSvMQLg6fHA4fAeKwA",
                 "role": "destination · writable",
                 "tone": "plain"
               },
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "authority · signer · writable",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "900 USDC from your USDC account to 3Vzw…eKwA",
+                "text": "900 USDC from your USDC account to 3VzwJ9ENt2zPAMFn944zmPZE2snSvMQLg6fHA4fAeKwA",
                 "tone": "plain"
               }
             ]
@@ -507,12 +507,12 @@
       {
         "tone": "warn",
         "title": "A token calls itself USDC, and it is not the real one",
-        "note": "3EKk…ezeL is not verified: anyone can name a token USDC"
+        "note": "3EKkiwNLWqoUbzFkPrmKbtUB4EweE6f4STzevYUmezeL is not verified: anyone can name a token USDC"
       },
       {
         "tone": "ok",
         "title": "Changes",
-        "note": "+900 3EKk…ezeL · −900 USDC"
+        "note": "+900 3EKkiwNLWqoUbzFkPrmKbtUB4EweE6f4STzevYUmezeL · −900 USDC"
       },
       {
         "tone": "ok",
@@ -578,7 +578,7 @@
         "tone": "plain",
         "lines": [
           {
-            "note": "To Sysv…RtQt",
+            "note": "To SysvarC1ock111111111111111111111111113JRtQt",
             "amount": "−3",
             "tone": "plain"
           },
@@ -615,23 +615,23 @@
           {
             "number": 1,
             "name": "TransferSol",
-            "args": "3 SOL → Sysv…RtQt",
+            "args": "3 SOL → SysvarC1ock111111111111111111111111113JRtQt",
             "source": "core",
             "accounts": [
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "source · signer · writable",
                 "tone": "plain"
               },
               {
-                "name": "Sysv…RtQt",
+                "name": "SysvarC1ock111111111111111111111111113JRtQt",
                 "role": "destination · writable · new",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "3 SOL from 4vJ9…kLKi (you) to Sysv…RtQt",
+                "text": "3 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) to SysvarC1ock111111111111111111111111113JRtQt",
                 "tone": "plain"
               }
             ]
@@ -746,7 +746,7 @@
           {
             "number": 1,
             "name": "CloseAccount",
-            "args": "Your USDC account → 4vJ9…kLKi (you)",
+            "args": "Your USDC account → 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
             "source": "core",
             "accounts": [
               {
@@ -755,19 +755,19 @@
                 "tone": "plain"
               },
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "destination · signer · writable",
                 "tone": "plain"
               },
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "owner · signer · writable",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "Closes your USDC account; its SOL goes to 4vJ9…kLKi (you)",
+                "text": "Closes your USDC account; its SOL goes to 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "tone": "plain"
               }
             ]
@@ -845,7 +845,7 @@
         "tone": "plain",
         "lines": [
           {
-            "note": "To HAgk…Kpqk",
+            "note": "To HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "amount": "−10.00203928",
             "tone": "plain"
           }
@@ -892,7 +892,7 @@
           {
             "number": 1,
             "name": "CloseAccount",
-            "args": "Your wrapped SOL account → HAgk…Kpqk",
+            "args": "Your wrapped SOL account → HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "source": "core",
             "accounts": [
               {
@@ -901,19 +901,19 @@
                 "tone": "plain"
               },
               {
-                "name": "HAgk…Kpqk",
+                "name": "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "role": "destination · writable",
                 "tone": "plain"
               },
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "owner · signer · writable",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "Closes your wrapped SOL account; its SOL goes to HAgk…Kpqk",
+                "text": "Closes your wrapped SOL account; its SOL goes to HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "tone": "warn"
               }
             ]
@@ -1057,7 +1057,7 @@
             "source": "unknown",
             "accounts": [
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "account 1 · signer · writable",
                 "tone": "plain"
               },
@@ -1067,19 +1067,19 @@
                 "tone": "plain"
               },
               {
-                "name": "3hkp…tKuH",
+                "name": "3hkpj3dQevt4ad1JSx3ke1sWmMR3wYToMKfFLCnxtKuH",
                 "role": "account 3 · writable",
                 "tone": "plain"
               },
               {
-                "name": "3mg7…dfDz",
+                "name": "3mg7sM6RFEBHiiFotFNfvteH1WdFcc9cujKuPaqZdfDz",
                 "role": "account 4 · writable",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "−1.50204428 SOL from 4vJ9…kLKi (you)",
+                "text": "−1.50204428 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "tone": "plain"
               },
               {
@@ -1212,12 +1212,12 @@
             "source": "unknown",
             "accounts": [
               {
-                "name": "Your stake account 3uWi…8KsQ",
+                "name": "Your stake account 3uWi9x2SRpmjztkpkr2WWeBoVq3exjXG2YfDWLvm8KsQ",
                 "role": "account 1 · writable",
                 "tone": "danger"
               },
               {
-                "name": "HAgk…Kpqk",
+                "name": "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "role": "account 2 · writable",
                 "tone": "plain"
               },
@@ -1232,22 +1232,22 @@
                 "tone": "plain"
               },
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "account 5 · signer · writable",
                 "tone": "danger"
               }
             ],
             "effects": [
               {
-                "text": "−50 SOL from your stake account 3uWi…8KsQ",
+                "text": "−50 SOL from your stake account 3uWi9x2SRpmjztkpkr2WWeBoVq3exjXG2YfDWLvm8KsQ",
                 "tone": "danger"
               },
               {
-                "text": "Your stake account 3uWi…8KsQ is closed",
+                "text": "Your stake account 3uWi9x2SRpmjztkpkr2WWeBoVq3exjXG2YfDWLvm8KsQ is closed",
                 "tone": "danger"
               },
               {
-                "text": "−0.000005 SOL from 4vJ9…kLKi (you)",
+                "text": "−0.000005 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "tone": "danger"
               }
             ]
@@ -1259,7 +1259,7 @@
       {
         "tone": "danger",
         "title": "An asset of yours goes to someone else",
-        "note": "−50 SOL → HAgk…Kpqk"
+        "note": "−50 SOL → HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk"
       },
       {
         "tone": "warn",
@@ -1268,7 +1268,7 @@
       },
       {
         "tone": "warn",
-        "title": "3yS1…sfC7 is not a program Otus knows",
+        "title": "3yS1JFVT284y8z1LC9MRoWxZjzFrdoD5axKsZiyMsfC7 is not a program Otus knows",
         "note": "It uses 2 of your accounts · Otus can't read what it does"
       },
       {
@@ -1382,28 +1382,28 @@
           {
             "number": 1,
             "name": "Withdraw",
-            "args": "50 SOL → HAgk…Kpqk",
+            "args": "50 SOL → HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "source": "core",
             "accounts": [
               {
-                "name": "Your stake account 3uWi…8KsQ",
+                "name": "Your stake account 3uWi9x2SRpmjztkpkr2WWeBoVq3exjXG2YfDWLvm8KsQ",
                 "role": "stake · writable",
                 "tone": "plain"
               },
               {
-                "name": "HAgk…Kpqk",
+                "name": "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "role": "recipient · writable",
                 "tone": "plain"
               },
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "withdrawAuthority · signer · writable",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "50 SOL from your stake account 3uWi…8KsQ to HAgk…Kpqk",
+                "text": "50 SOL from your stake account 3uWi9x2SRpmjztkpkr2WWeBoVq3exjXG2YfDWLvm8KsQ to HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "tone": "warn"
               }
             ]
@@ -1486,7 +1486,7 @@
         "tone": "plain",
         "lines": [
           {
-            "note": "To HAgk…Kpqk",
+            "note": "To HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "amount": "−1",
             "tone": "plain"
           },
@@ -1523,23 +1523,23 @@
           {
             "number": 1,
             "name": "TransferSol",
-            "args": "1 SOL → HAgk…Kpqk",
+            "args": "1 SOL → HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "source": "core",
             "accounts": [
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "source · signer · writable",
                 "tone": "plain"
               },
               {
-                "name": "HAgk…Kpqk",
+                "name": "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "role": "destination · writable · new",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "1 SOL from 4vJ9…kLKi (you) to HAgk…Kpqk",
+                "text": "1 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) to HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "tone": "plain"
               }
             ]
@@ -1617,7 +1617,7 @@
         "tone": "plain",
         "lines": [
           {
-            "note": "To HAgk…Kpqk",
+            "note": "To HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "amount": "−1",
             "tone": "plain"
           },
@@ -1654,23 +1654,23 @@
           {
             "number": 1,
             "name": "TransferSol",
-            "args": "1 SOL → HAgk…Kpqk",
+            "args": "1 SOL → HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "source": "core",
             "accounts": [
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "source · signer · writable",
                 "tone": "plain"
               },
               {
-                "name": "HAgk…Kpqk",
+                "name": "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "role": "destination · writable · new",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "1 SOL from 4vJ9…kLKi (you) to HAgk…Kpqk",
+                "text": "1 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) to HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "tone": "plain"
               }
             ]
@@ -1748,7 +1748,7 @@
         "tone": "plain",
         "lines": [
           {
-            "note": "To HAgk…Kpqk",
+            "note": "To HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "amount": "−1",
             "tone": "plain"
           },
@@ -1785,23 +1785,23 @@
           {
             "number": 1,
             "name": "TransferSol",
-            "args": "1 SOL → HAgk…Kpqk",
+            "args": "1 SOL → HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "source": "core",
             "accounts": [
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "source · signer · writable",
                 "tone": "plain"
               },
               {
-                "name": "HAgk…Kpqk",
+                "name": "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "role": "destination · writable · new",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "1 SOL from 4vJ9…kLKi (you) to HAgk…Kpqk",
+                "text": "1 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) to HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "tone": "plain"
               }
             ]
@@ -1879,7 +1879,7 @@
         "tone": "plain",
         "lines": [
           {
-            "note": "To HAgk…Kpqk",
+            "note": "To HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "amount": "−1",
             "tone": "plain"
           },
@@ -1916,23 +1916,23 @@
           {
             "number": 1,
             "name": "TransferSol",
-            "args": "1 SOL → HAgk…Kpqk",
+            "args": "1 SOL → HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "source": "core",
             "accounts": [
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "source · signer · writable",
                 "tone": "plain"
               },
               {
-                "name": "HAgk…Kpqk",
+                "name": "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "role": "destination · writable · new",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "1 SOL from 4vJ9…kLKi (you) to HAgk…Kpqk",
+                "text": "1 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) to HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
                 "tone": "plain"
               }
             ]

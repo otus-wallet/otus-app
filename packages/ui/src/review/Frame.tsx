@@ -9,7 +9,7 @@ import { Button } from '../components/ui/button.tsx';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.tsx';
 import { Icon } from '../components/icons.tsx';
 import { plural } from '@otus-wallet/sdk/format';
-import { short } from '../dom.ts';
+import { ShortAddress } from '../components/address.tsx';
 import { cn } from '../lib/cn.ts';
 import type { AccountView, SiteView, Tone } from '@otus-wallet/core/view.ts';
 import { filled, MARK, text } from './tone.ts';
@@ -113,8 +113,8 @@ export function Frame({ site, account, picker, network, steps, page, left, chip,
                 {picker || (
                     <span className="flex shrink-0 flex-col items-end gap-[3px]">
                         <span className="pixel text-xs text-ink">{account.label}</span>
-                        <span className="text-xs text-ink-2" title={account.address}>
-                            {short(account.address)}
+                        <span className="text-xs text-ink-2">
+                            <ShortAddress address={account.address} />
                         </span>
                     </span>
                 )}

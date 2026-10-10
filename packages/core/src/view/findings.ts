@@ -3,7 +3,7 @@
 import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 import type { Address } from '@solana/kit';
 
-import { cap, quantity, short, sol, SOL_DECIMALS, told } from '@otus-wallet/sdk/format';
+import { cap, quantity, sol, SOL_DECIMALS, told } from '@otus-wallet/sdk/format';
 import type { Finding, Flow } from '@otus-wallet/sdk/review/assess';
 import type { Names } from '@otus-wallet/sdk/review/effects';
 import type { Review } from '@otus-wallet/sdk/review/review';
@@ -21,7 +21,7 @@ export function imitations(tokens: Map<string, TokenInfo | null>, mainnet: boole
     return [...tokens].flatMap(([mint, t]): Finding[] => {
         const symbol = t ? latin(t.symbol).toUpperCase() : '';
         if (!t || t.verified || !symbol || !(IMITATED.has(symbol) || known.has(symbol))) return [];
-        return [{ level: 'warn', code: 'imitation', text: `A token calls itself ${t.symbol}, and it is not the real one`, subject: mint as Address, note: `${short(mint)} is not verified: anyone can name a token ${t.symbol}` }];
+        return [{ level: 'warn', code: 'imitation', text: `A token calls itself ${t.symbol}, and it is not the real one`, subject: mint as Address, note: `${mint} is not verified: anyone can name a token ${t.symbol}` }];
     });
 }
 
@@ -36,7 +36,7 @@ export function noteOf(f: Finding, r: Review, p: Prepared | null, n: Names): str
     if (f.code === 'simulation-failed') return failure(r, n) ?? f.note ?? '';
     if (f.code === 'sends-to-wallet') {
         const out = r.assessment.flows.filter((flow) => flow.change < 0n);
-        return `${out.map(flowText).join(' and ')} → ${f.subject ? short(f.subject) : 'someone else'}`;
+        return `${out.map(flowText).join(' and ')} → ${f.subject ?? 'someone else'}`;
     }
     if (f.code === 'pays-others' || f.code === 'pays-known') {
         const p = r.assessment.payouts.find((x) => x.holder === f.subject);
@@ -46,15 +46,14 @@ export function noteOf(f: Finding, r: Review, p: Prepared | null, n: Names): str
             return `${quantity(amount, t.decimals)} ${t.symbol}`;
         });
         const through = p.programs.length ? ` · through ${p.programs.map((q) => n.program(q)).join(', ')}` : '';
-        return `${amounts.join(' and ')}${p.known ? '' : ` → ${short(p.holder)}`}${through}`;
+        return `${amounts.join(' and ')}${p.known ? '' : ` → ${p.holder}`}${through}`;
     }
     if (f.code === 'large-outflow' && f.subject) return n.token(f.subject).symbol; // the token, by its symbol when verified
     if (f.code === 'check-balances') {
         const [out, back] = [r.assessment.flows.filter((flow) => flow.change < 0n), r.assessment.flows.filter((flow) => flow.change > 0n)];
         return `${out.map(flowText).join(' and ')} out · ${back.map(flowText).join(' and ')} in`;
     }
-    if (f.note) return f.note.replace(/[1-9A-HJ-NP-Za-km-z]{32,44}/g, (a) => short(a));
-    return f.subject ? short(f.subject) : '';
+    return f.note || f.subject || '';
 }
 
 // Why the simulation failed, in words: the program's own message when its logs give one (as "Slippage tolerance

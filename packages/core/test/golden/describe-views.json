@@ -22,7 +22,7 @@
     "network": null,
     "balances": [
       {
-        "asset": "2MNu…wfT9",
+        "asset": "2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9",
         "logo": "chain",
         "icon": null,
         "verified": false,
@@ -56,17 +56,17 @@
     "changes": [
       {
         "title": "Your wallet would no longer be yours",
-        "note": "A program takes it over, with all it holds: 2VDW…SL6Z",
+        "note": "A program takes it over, with all it holds: 2VDW9dFE1ZXz4zWAbaBDQFynNVdRpQ73HyfSHMzBSL6Z",
         "tone": "danger"
       },
       {
         "title": "A token account of yours changes owner",
-        "note": "New owner 2RJD…gzmr. You lose control of it.",
+        "note": "New owner 2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr. You lose control of it.",
         "tone": "danger"
       },
       {
         "title": "A token account of yours gets a delegate, or a bigger allowance",
-        "note": "2RJD…gzmr could move its tokens",
+        "note": "2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr could move its tokens",
         "tone": "warn"
       }
     ],
@@ -97,40 +97,40 @@
             "source": "unknown",
             "accounts": [
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "account 1 · signer · writable",
                 "tone": "danger"
               },
               {
-                "name": "Your 2MNu…wfT9 account",
+                "name": "Your 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9 account",
                 "role": "account 2 · writable",
                 "tone": "danger"
               },
               {
-                "name": "8qbH…VfeR",
+                "name": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
                 "role": "account 3 · writable · new",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "−0.000005 SOL from 4vJ9…kLKi (you)",
+                "text": "−0.000005 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "tone": "danger"
               },
               {
-                "text": "4vJ9…kLKi (you) now belongs to 2VDW…SL6Z",
+                "text": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) now belongs to 2VDW9dFE1ZXz4zWAbaBDQFynNVdRpQ73HyfSHMzBSL6Z",
                 "tone": "danger"
               },
               {
-                "text": "-1000 units 2MNu…wfT9 from your 2MNu…wfT9 account",
+                "text": "-1000 units 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9 from your 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9 account",
                 "tone": "danger"
               },
               {
-                "text": "Your 2MNu…wfT9 account now belongs to 2RJD…gzmr",
+                "text": "Your 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9 account now belongs to 2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr",
                 "tone": "danger"
               },
               {
-                "text": "2RJD…gzmr may move the tokens in your 2MNu…wfT9 account",
+                "text": "2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr may move the tokens in your 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9 account",
                 "tone": "danger"
               }
             ]
@@ -142,32 +142,32 @@
       {
         "tone": "danger",
         "title": "Your wallet would no longer be yours",
-        "note": "A program takes it over, with all it holds: 2VDW…SL6Z"
+        "note": "A program takes it over, with all it holds: 2VDW9dFE1ZXz4zWAbaBDQFynNVdRpQ73HyfSHMzBSL6Z"
       },
       {
         "tone": "danger",
         "title": "A token account of yours changes owner",
-        "note": "New owner 2RJD…gzmr. You lose control of it."
+        "note": "New owner 2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr. You lose control of it."
       },
       {
         "tone": "warn",
         "title": "A token account of yours gets a delegate, or a bigger allowance",
-        "note": "2RJD…gzmr could move its tokens"
+        "note": "2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr could move its tokens"
       },
       {
         "tone": "warn",
         "title": "You send almost all of one of your tokens",
-        "note": "2MNu…wfT9"
+        "note": "2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9"
       },
       {
         "tone": "warn",
-        "title": "2VDW…SL6Z is not a program Otus knows",
+        "title": "2VDW9dFE1ZXz4zWAbaBDQFynNVdRpQ73HyfSHMzBSL6Z is not a program Otus knows",
         "note": "It uses 2 of your accounts · Otus can't read what it does"
       },
       {
         "tone": "ok",
         "title": "Changes",
-        "note": "-1000 units 2MNu…wfT9"
+        "note": "-1000 units 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9"
       },
       {
         "tone": "ok",
@@ -223,7 +223,7 @@
         "tone": "plain",
         "lines": [
           {
-            "note": "To 8qbH…VfeR",
+            "note": "To 8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
             "amount": "−0.1",
             "tone": "plain"
           },
@@ -260,23 +260,23 @@
           {
             "number": 1,
             "name": "TransferSol",
-            "args": "0.1 SOL → 8qbH…VfeR",
+            "args": "0.1 SOL → 8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
             "source": "core",
             "accounts": [
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "source · signer · writable",
                 "tone": "plain"
               },
               {
-                "name": "8qbH…VfeR",
+                "name": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
                 "role": "destination · writable · new",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "0.1 SOL from 4vJ9…kLKi (you) to 8qbH…VfeR",
+                "text": "0.1 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) to 8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
                 "tone": "plain"
               }
             ]
@@ -354,7 +354,7 @@
         "tone": "plain",
         "lines": [
           {
-            "note": "To 8qbH…VfeR",
+            "note": "To 8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
             "amount": "−0.1",
             "tone": "plain"
           },
@@ -391,23 +391,23 @@
           {
             "number": 1,
             "name": "TransferSol",
-            "args": "0.1 SOL → 8qbH…VfeR",
+            "args": "0.1 SOL → 8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
             "source": "core",
             "accounts": [
               {
-                "name": "4vJ9…kLKi (you)",
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "source · signer · writable",
                 "tone": "plain"
               },
               {
-                "name": "8qbH…VfeR",
+                "name": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
                 "role": "destination · writable · new",
                 "tone": "plain"
               }
             ],
             "effects": [
               {
-                "text": "0.1 SOL from 4vJ9…kLKi (you) to 8qbH…VfeR",
+                "text": "0.1 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) to 8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
                 "tone": "plain"
               }
             ]

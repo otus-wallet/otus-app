@@ -4,7 +4,7 @@
 import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import type { Address } from '@solana/kit';
 
-import { amount, plural, short, sol } from '@otus-wallet/sdk/format';
+import { amount, plural, sol } from '@otus-wallet/sdk/format';
 import type { ConfigAction, Step } from '@otus-wallet/sdk/programs/squads';
 import type { Tone } from '@otus-wallet/sdk/review/assess';
 import { story, type Names } from '@otus-wallet/sdk/review/effects';
@@ -60,8 +60,7 @@ function after(t: ProposalTold): string {
 // by its name.
 const whole = (n: Names, a: Address) => {
     const named = n.who(a);
-    if (named === 'you') return `${a}${YOU}`;
-    return named === short(a) ? a : named;
+    return named === 'you' ? `${a}${YOU}` : named;
 };
 
 

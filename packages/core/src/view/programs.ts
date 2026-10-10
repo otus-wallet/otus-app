@@ -3,7 +3,7 @@
 import { COMPUTE_BUDGET_PROGRAM_ADDRESS } from '@solana-program/compute-budget';
 import type { Address } from '@solana/kit';
 
-import { cap, short, told } from '@otus-wallet/sdk/format';
+import { cap, told } from '@otus-wallet/sdk/format';
 import { CORE_PROGRAMS } from '@otus-wallet/sdk/programs/core';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
 import type { Finding, Level, ProgramUse, Verdict } from '@otus-wallet/sdk/review/assess';
@@ -116,7 +116,7 @@ function innerCalls(r: Review, program: Address): string {
     r.message.instructions.forEach((ix, i) => {
         if (r.accounts[ix.programAddressIndex].address !== program) return;
         for (const call of r.simulation.inner.find((g) => g.index === i)?.calls ?? []) {
-            const callee = PROGRAM_NAMES.get(call.program) ?? short(call.program);
+            const callee = PROGRAM_NAMES.get(call.program) ?? call.program;
             const kinds = inner.get(callee) ?? new Map<string, number>();
             const type = call.type ? cap(told(call.type, 40)) : '';
             if (type) kinds.set(type, (kinds.get(type) ?? 0) + 1);

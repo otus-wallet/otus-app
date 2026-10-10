@@ -28,8 +28,9 @@ export function ShortAddress({ address, cut = short, still = false }: { address:
         void navigator.clipboard.writeText(address).then(() => setCopied(true));
     };
     const key = (e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && copy(e);
+    // Gone as the pointer leaves it: addresses sit close, and one's tooltip must not cover the next.
     return (
-        <Tooltip>
+        <Tooltip disableHoverableContent>
             <TooltipTrigger asChild>
                 <span ref={trigger} role="button" tabIndex={0} aria-label={`Copy ${address}`} className="cursor-pointer whitespace-nowrap" onPointerDown={hold} onClick={copy} onKeyDown={key}>
                     {cut(address)}
