@@ -123,7 +123,8 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     // A site's transaction tells nothing of its blockhash's age, and may come with little of its minute left (a Jupiter
     // order, about half): the network is asked instead, while the user decides.
     const away = way.cluster !== networkOf(settings); // for another network than the wallet shows: said in the window
-    const shown = { site: way.site, account: accountView(account), signer: signerOf(account), cluster: way.cluster, known, expiry: null, recipient: way.recipient, later: way.later, away };
+    const kept = [...accounts, ...contacts].map(({ address, label }) => ({ address, label })); // your wallets, watched ones too, and contacts, to tag
+    const shown = { site: way.site, account: accountView(account), signer: signerOf(account), cluster: way.cluster, known, expiry: null, recipient: way.recipient, later: way.later, away, kept };
     const blocked = unsignable ? LEDGER_V1 : undefined;
     const prepared = preparing.then(([p, told]): { p: Prepared; approval: TransactionView } => {
         ready?.(p); // refused as prepared: the window says no before it can be approved

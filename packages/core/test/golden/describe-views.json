@@ -190,7 +190,8 @@
       "Compute Budget: 208,000 compute units"
     ],
     "cluster": "solana:mainnet",
-    "expiry": null
+    "expiry": null,
+    "kept": []
   },
   {
     "kind": "transaction",
@@ -321,7 +322,8 @@
       "Compute Budget: 204,000 compute units"
     ],
     "cluster": "solana:devnet",
-    "expiry": null
+    "expiry": null,
+    "kept": []
   },
   {
     "kind": "transaction",
@@ -452,6 +454,7 @@
       "Compute Budget: 204,000 compute units"
     ],
     "cluster": "solana:mainnet",
-    "expiry": null
+    "expiry": null,
+    "kept": []
   }
 ]

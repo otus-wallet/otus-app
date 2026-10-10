@@ -14,12 +14,12 @@ import { golden } from './golden.ts';
 import { account, DRAIN, DRAIN_AFTER, DRAIN_BEFORE, fakeChain, key, PAYER, RECIPIENT, SYSTEM, transaction, transferV1 } from './helpers.ts';
 
 // What the window shows for a transaction, on a cluster, for a signer, from a site you signed for before or never.
-async function view(bytes: Uint8Array, before: MaybeEncodedAccount[], after: MaybeEncodedAccount[], o: { cluster?: Cluster; signer?: Signer; signedBefore?: number | null; simulation?: Partial<Simulation> } = {}) {
+async function view(bytes: Uint8Array, before: MaybeEncodedAccount[], after: MaybeEncodedAccount[], o: { cluster?: Cluster; signer?: Signer; signedBefore?: number | null; simulation?: Partial<Simulation>; kept?: { address: string; label: string }[] } = {}) {
     const chain = fakeChain(before, after, o.simulation);
     const r = await review(bytes, { wallet: PAYER, signedBefore: o.signedBefore === undefined ? 0 : o.signedBefore, host: 'app.example.com' }, chain);
     const p = await prepare(r, PAYER, chain);
     const site = siteView('https://app.example.com', { account: PAYER, signatures: 3 });
-    return describe(r, p, { site, account: { label: 'Me', address: PAYER }, signer: o.signer ?? 'ready', cluster: o.cluster ?? 'solana:mainnet', known: { tokens: new Map(), decimals: new Map() } });
+    return describe(r, p, { site, account: { label: 'Me', address: PAYER }, signer: o.signer ?? 'ready', cluster: o.cluster ?? 'solana:mainnet', known: { tokens: new Map(), decimals: new Map() }, kept: o.kept });
 }
 
 const SOL = 1_000_000_000n;
@@ -65,4 +65,12 @@ test('what Otus adds, said as the transaction keeps it: in a v1 message, its own
     const after = [account(PAYER, SYSTEM, 4_000_000n - 5_000n), account(RECIPIENT, SYSTEM, 1_000_000n)];
     const v1 = await view(transferV1({ computeUnitLimit: 200_000, loadedAccountsDataSizeLimit: 32_768 }), before, after, { simulation: { loadedBytes: 427_034 } });
     assert.deepEqual(v1.added, ['Lighthouse: one guard on your accounts', '204,000 compute units and 480 KiB of account data']);
+});
+
+test('your other wallets and contacts it names go to the window, by your names; yours in use is "you"', async () => {
+    const send = transaction([getTransferSolInstruction({ source: createNoopSigner(PAYER), destination: key(2), amount: SOL / 10n })]);
+    const before = [account(PAYER, SYSTEM, 2n * SOL)];
+    const after = [account(PAYER, SYSTEM, 2n * SOL - SOL / 10n - 5_000n), account(key(2), SYSTEM, SOL / 10n)];
+    const kept = [{ address: PAYER, label: 'Me' }, { address: key(2), label: 'Bob' }, { address: key(3), label: 'Ana' }];
+    assert.deepEqual((await view(send, before, after, { kept })).kept, [{ address: key(2), label: 'Bob' }]);
 });

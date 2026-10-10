@@ -15,7 +15,7 @@ import type { Account, Site } from './state.ts';
 import type { TokenInfo } from './tokens.ts';
 import { balances } from './view/balances.ts';
 import { imitations, noteOf } from './view/findings.ts';
-import { names } from './view/names.ts';
+import { keptIn, names, type Kept } from './view/names.ts';
 import { programs, selfNamed } from './view/programs.ts';
 import { proposalViews, type ProposalView } from './view/squads.ts';
 
@@ -86,6 +86,7 @@ export type TransactionView = {
     ledger?: { path: string; message: string }; // for a Ledger account: the path of its key, and the message to sign (base64)
     blocked?: string; // why it cannot be signed at all, though shown
     preparing?: true; // shown as reviewed while Otus still adds its guards and fees: no verdict, no hash, no signing yet
+    kept: Kept[]; // your other wallets and contacts it names (tagged), or like an address it names (to cut that one apart)
 };
 
 /** How a site's transaction went once approved, for its window: on its way (Otus sends it, or the site does and Otus
@@ -115,7 +116,8 @@ export type Known = { tokens: Map<string, TokenInfo | null>; decimals: Map<strin
  *  asks for the signature, and sends the transaction when it chooses. */
 /** `away`: the transaction is for another network than the one the wallet shows, which the window then names, mainnet
  *  included. */
-export type Shown = { site: SiteView; account: AccountView; signer: Signer; cluster: Cluster; known: Known; expiry?: Expiry | null; recipient?: string; later?: boolean; away?: boolean };
+/** `kept`: your other wallets and your contacts, by your names for them. */
+export type Shown = { site: SiteView; account: AccountView; signer: Signer; cluster: Cluster; known: Known; expiry?: Expiry | null; recipient?: string; later?: boolean; away?: boolean; kept?: Kept[] };
 
 // Findings shown on the first step, before anything else: what you would lose, and a transaction that would fail.
 const FIRST = new Set(['simulation-failed', 'wallet-change', 'owner-change', 'token-owner-change', 'authority-change', 'delegate', 'close-authority', 'program-change']);
@@ -131,7 +133,7 @@ export const accountView = (a: Account): AccountView => ({ label: a.label, addre
 
 /** Review, the transaction as prepared, and what else is shown → what the window shows. `p` null: shown as reviewed
  *  while it is being prepared, with nothing that preparing decides (guards, fee, hash, the verdict). */
-export function describe(r: Review, p: Prepared | null, { site, account, signer, cluster, known, expiry = null, recipient, later = false, away = false }: Shown): TransactionView {
+export function describe(r: Review, p: Prepared | null, { site, account, signer, cluster, known, expiry = null, recipient, later = false, away = false, kept = [] }: Shown): TransactionView {
     const wallet = account.address as Address;
     const mainnet = cluster === 'solana:mainnet';
     const told = known.told ?? new Map();
@@ -140,7 +142,7 @@ export function describe(r: Review, p: Prepared | null, { site, account, signer,
     const { verdict, findings } = ranked([...described(r.assessment.findings, named, r.assessment.programs, held), ...(p?.findings ?? []), ...imitations(known.tokens, mainnet)]);
     const n = names(r, known, wallet, mainnet);
     const note = (f: Finding) => noteOf(f, r, p, n);
-    return {
+    const view: Omit<TransactionView, 'kept'> = {
         kind: 'transaction',
         site,
         account,
@@ -165,6 +167,7 @@ export function describe(r: Review, p: Prepared | null, { site, account, signer,
         ...(recipient !== undefined && { recipient }),
         ...(p === null && { preparing: true as const }),
     };
+    return { ...view, kept: keptIn(view, kept.filter((k) => k.address !== wallet)) }; // yours in use is "you"
 }
 
 // The verdict in words: its title, what the findings come to, and the chip beside the steps.

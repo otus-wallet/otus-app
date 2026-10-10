@@ -6,7 +6,7 @@ import { Checkbox } from '../components/ui/checkbox.tsx';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../components/ui/collapsible.tsx';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.tsx';
 import { Icon, Logo } from '../components/icons.tsx';
-import { ShortAddress } from '../components/address.tsx';
+import { AddressNames, NameTag, ShortAddress } from '../components/address.tsx';
 import { cn } from '../lib/cn.ts';
 import type { AssetChange, InstructionView, ProgramView, Tone, TransactionView } from '@otus-wallet/core/view.ts';
 import { Block, Heading, Notice, WATCH_ONLY } from './Frame.tsx';
@@ -38,8 +38,9 @@ function TokenMark({ row }: { row: AssetChange }) {
     return <Logo name={row.icon ? 'chain' : row.logo} size={18} className={cn('self-start rounded-[3px] bg-panel', (row.icon || row.logo === 'chain') && 'text-ink-3')} />;
 }
 
-/** Where a transfer made in Otus goes: the address typed, whole, its ends marked. */
+/** Where a transfer made in Otus goes: the address typed, whole, its ends marked; your name for it, if you keep it. */
 export function To({ address }: { address: string }) {
+    const label = useContext(AddressNames).get(address);
     return (
         <Block>
             <Heading>To</Heading>
@@ -47,6 +48,7 @@ export function To({ address }: { address: string }) {
                 <span className="text-ok">{address.slice(0, 4)}</span>
                 {address.slice(4, -4)}
                 <span className="text-ok">{address.slice(-4)}</span>
+                {label && <NameTag label={label} />}
             </p>
         </Block>
     );
@@ -114,6 +116,7 @@ function Asset({ change }: { change: AssetChange }) {
 // people compare), your wallet tagged "you".
 function Yours({ text: line }: { text: string }) {
     const wallet = useContext(YourWallet);
+    const names = useContext(AddressNames);
     const { words, parties } = partiesOf(line);
     return (
         <>
@@ -123,7 +126,7 @@ function Yours({ text: line }: { text: string }) {
                     <span className="text-ok">{address.slice(0, 4)}</span>
                     {address.slice(4, -4)}
                     <span className="text-ok">{address.slice(-4)}</span>
-                    {address === wallet && <YouTag />}
+                    {address === wallet ? <YouTag /> : names.has(address) && <NameTag label={names.get(address)!} />}
                 </span>
             ))}
         </>

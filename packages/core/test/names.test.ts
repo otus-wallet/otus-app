@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { address } from '@solana/kit';
 
-import { addressesIn, apart, atAddresses, cutAmong, endsYours, nameOr } from '../src/view/names.ts';
+import { addressesIn, apart, atAddresses, cutAmong, endsYours, keptIn, nameOr } from '../src/view/names.ts';
 
 const A = address('2apBGMsS6ti9RyF5TwQTDswXBWskiJP2LD4cUEDqYJjk');
 const B = address('AxJkHRY3puoofyj7Pn512M1SGBgWroXMkEdNPQypkzbu');
@@ -76,4 +76,20 @@ test('addresses that look alike, cut as far as where they part; the rest four a 
     assert.deepEqual([cut(A), cut(like)], [apart(A, like), apart(like, A)]);
     assert.equal(cut(B), `${B.slice(0, 4)}…${B.slice(-4)}`);
     assert.equal(cutAmong([B])(like), `${like.slice(0, 4)}…${like.slice(-4)}`); // nothing alike among them
+});
+
+test('your wallets and contacts a view names, or like one it names; none it does not, nor in its bytes', () => {
+    const like = `${A.slice(0, 6)}${B.slice(6, -5)}${A.slice(-5)}`; // a copy of Bob's
+    const view = { notes: [`to ${like}`, `from ${SYSTEM}`], hash: B };
+    const kept = [
+        { address: A, label: 'Bob' },
+        { address: SYSTEM, label: 'Sys\u202etem' },
+        { address: B, label: 'Savings' }, // only in the hash
+        { address: A, label: 'Bob again' },
+    ];
+    assert.deepEqual(keptIn(view, kept), [
+        { address: A, label: 'Bob' }, // not named, but its copy is: the window cuts that one apart from it
+        { address: SYSTEM, label: 'System' }, // named; what would move or hide letters goes
+    ]);
+    assert.deepEqual(keptIn(view, []), []);
 });

@@ -3,7 +3,7 @@
 import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 import { isAddress, type Address } from '@solana/kit';
 
-import { amount, cap, quantity, short, SOL_DECIMALS } from '@otus-wallet/sdk/format';
+import { amount, cap, quantity, short, SOL_DECIMALS, told } from '@otus-wallet/sdk/format';
 import { STAKE_PROGRAM, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
 import { SYSVARS } from '@otus-wallet/sdk/review/assess';
@@ -63,6 +63,25 @@ export function cutAmong(addresses: Iterable<string>): (a: string) => string {
         const twins = seen.filter((x) => x !== a && alike(x, a));
         return twins.length ? apart(a, ...twins) : short(a);
     };
+}
+
+/** What a view to sign holds that is not words: the transaction's bytes, its hash, what a Ledger signs. */
+export const NOT_WORDS: ReadonlySet<string> = new Set(['wire', 'hash', 'ledger']);
+
+/** An address of yours or one you keep, by your name for it. */
+export type Kept = { address: string; label: string };
+
+/** Of your wallets and contacts, the ones a view names, for the window to tag, and the ones like an address it names,
+ *  for the window to cut that one apart from: a copy of a contact's address reads as one. Each named as you wrote it,
+ *  without characters that move or hide others. */
+export function keptIn(view: unknown, kept: Kept[]): Kept[] {
+    const inView = [...new Set(addressesIn(view, NOT_WORDS))];
+    const seen = new Set<string>();
+    return kept.flatMap((k) => {
+        if (seen.has(k.address) || !inView.some((a) => a === k.address || alike(a, k.address))) return [];
+        seen.add(k.address);
+        return [{ address: k.address, label: told(k.label, 32) }];
+    });
 }
 
 /** Every whole address in the words of a view, wherever they sit in it; `skip`: keys whose values are not words (the
