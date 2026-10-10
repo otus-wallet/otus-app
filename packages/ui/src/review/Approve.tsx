@@ -3,16 +3,18 @@
 // lock is the shield's, over the whole page.
 import { useMemo, useState } from 'react';
 
-import { Tile } from '../components/icons.tsx';
+import { Icon, Tile } from '../components/icons.tsx';
 import { AddressCut, AddressNames } from '../components/address.tsx';
 import { YourWallet } from '../components/you.tsx';
 import { addressesIn, cutAmong, NOT_WORDS } from '@otus-wallet/core/view/names.ts';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../components/ui/select.tsx';
 import { short } from '../dom.ts';
-import type { AccountView, Approval, Life, TransactionView } from '@otus-wallet/core/view.ts';
+import type { AccountView, Approval, Life, Line, TransactionView } from '@otus-wallet/core/view.ts';
 import { Answer, Block, Frame, Heading, Left, Notice, Steps, useArmed, useNow, WATCH_ONLY } from './Frame.tsx';
 import { OnLedger } from './Ledger.tsx';
-import { Balances, CopyTransaction, Programs, Verdict } from './Transaction.tsx';
+import { Ack, Balances, CopyTransaction, Programs, Verdict } from './Transaction.tsx';
+import { cn } from '../lib/cn.ts';
+import { filled, MARK } from './tone.ts';
 
 /** No, or yes: for a Ledger account, with the signature its device made (base64); to connect, with another of your
  *  accounts, chosen in the window. */
@@ -70,7 +72,10 @@ function Single({ a, answers: { answer } }: { a: Exclude<Approval, TransactionVi
     const choices = a.kind === 'connect' ? a.choices : [];
     const account = choices.find((c) => c.address === chosen) ?? a.account;
     const watched = a.kind === 'connect' && !choices.some((c) => c.address === account.address); // the one in use only watches
-    const yes = () => answer(true, undefined, account.address !== a.account.address ? account.address : undefined);
+    // A message that is data: signed only once the risk is acknowledged.
+    const risky = a.kind === 'message' && a.findings.some((f) => f.tone === 'danger');
+    const [ack, setAck] = useState(false);
+    const yes = () => (!risky || ack) && answer(true, undefined, account.address !== a.account.address ? account.address : undefined);
     return (
         <Frame
             site={a.site}
@@ -80,7 +85,7 @@ function Single({ a, answers: { answer } }: { a: Exclude<Approval, TransactionVi
             actions={
                 <>
                     <Answer onClick={() => answer(false)}>Reject</Answer>
-                    <Answer variant="default" arms armed={armed} disabled={watched || signer === 'none' || (signs && signer === 'ledger')} onClick={yes}>
+                    <Answer variant={risky ? 'risky' : 'default'} arms armed={armed} disabled={watched || signer === 'none' || (signs && signer === 'ledger') || (risky && !ack)} onClick={yes}>
                         {signs ? 'Sign' : 'Connect'}
                     </Answer>
                 </>
@@ -96,10 +101,16 @@ function Single({ a, answers: { answer } }: { a: Exclude<Approval, TransactionVi
                     {watched && <Notice>{WATCH_ONLY_CONNECT}</Notice>}
                 </>
             ) : a.kind === 'message' ? (
-                <Block>
-                    <Heading>Message to sign</Heading>
-                    <div className="text max-h-[280px] overflow-y-auto rounded-[3px] border border-rule bg-panel px-3 py-2.5 text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">{a.text}</div>
-                </Block>
+                <>
+                    <Block>
+                        <Heading>Message to sign</Heading>
+                        {a.findings.map((f) => (
+                            <Warning key={f.title} line={f} />
+                        ))}
+                        <div className="text max-h-[280px] overflow-y-auto rounded-[3px] border border-rule bg-panel px-3 py-2.5 text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">{a.text}</div>
+                    </Block>
+                    {risky && signer !== 'none' && signer !== 'ledger' && <Ack ack={ack} onAck={setAck} />}
+                </>
             ) : (
                 <Block>
                     <Heading>Sign in</Heading>
@@ -118,6 +129,17 @@ function Single({ a, answers: { answer } }: { a: Exclude<Approval, TransactionVi
         </Frame>
     );
 }
+
+// What a message's review finds, in its tone, above its words.
+const Warning = ({ line }: { line: Line }) => (
+    <div className={cn('verdict flex items-center gap-3 rounded-[3px] border border-current p-3', filled(line.tone))}>
+        <Icon name={MARK[line.tone]} size={22} stroke={2.5} />
+        <div className="flex flex-col gap-[3px]">
+            <p className="font-bold">{line.title}</p>
+            {line.note && <p className="text-xs">{line.note}</p>}
+        </div>
+    </div>
+);
 
 // Your accounts that sign, to connect another than the one in use: the header shows the one chosen (or the watched one in
 // use, until another is), and a list under it.

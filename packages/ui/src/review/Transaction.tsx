@@ -383,6 +383,14 @@ export function CopyTransaction({ wire }: { wire: string }) {
     );
 }
 
+/** Signing past something critical: ticked first. */
+export const Ack = ({ ack, onAck }: { ack: boolean; onAck: (ack: boolean) => void }) => (
+    <label className="ack flex cursor-pointer items-center gap-2.5 rounded-[3px] border border-danger px-3 py-2.5 text-xs font-bold">
+        <Checkbox checked={ack} onCheckedChange={(v) => onAck(v === true)} className="size-[18px] border-danger data-[state=checked]:border-danger data-[state=checked]:bg-danger" />
+        I understand the risk and want to sign anyway
+    </label>
+);
+
 export function Verdict({ t, ack, onAck }: { t: TransactionView; ack: boolean; onAck: (ack: boolean) => void }) {
     return (
         <>
@@ -414,12 +422,7 @@ export function Verdict({ t, ack, onAck }: { t: TransactionView; ack: boolean; o
                     </li>
                 ))}
             </ul>
-            {t.signer !== 'none' && t.verdict === 'danger' && (
-                <label className="ack flex cursor-pointer items-center gap-2.5 rounded-[3px] border border-danger px-3 py-2.5 text-xs font-bold">
-                    <Checkbox checked={ack} onCheckedChange={(v) => onAck(v === true)} className="size-[18px] border-danger data-[state=checked]:border-danger data-[state=checked]:bg-danger" />
-                    I understand the risk and want to sign anyway
-                </label>
-            )}
+            {t.signer !== 'none' && t.verdict === 'danger' && <Ack ack={ack} onAck={onAck} />}
             {t.signer === 'none' && <Notice>{WATCH_ONLY}</Notice>}
         </>
     );

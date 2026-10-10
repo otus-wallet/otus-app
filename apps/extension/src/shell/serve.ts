@@ -14,6 +14,7 @@ import { intake, type Cluster, type Request } from '@otus-wallet/core/intake.ts'
 import { NO_KEY, Refused, type Reply } from '@otus-wallet/core/protocol.ts';
 import { cap } from '@otus-wallet/sdk/format';
 import { decode } from '@otus-wallet/sdk/review/decode';
+import { messageFindings } from '@otus-wallet/sdk/review/message';
 import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Review } from '@otus-wallet/sdk/review/review';
 import { programsCalled } from '@otus-wallet/sdk/review/sites';
@@ -114,7 +115,8 @@ async function handle(request: Request, state: State, shell: Shell): Promise<unk
         case 'message': {
             const { account, site } = connected(state, origin, request.account);
             // Asked like any other, so a site learns nothing from it; the window says a Ledger cannot sign it.
-            await approve({ kind: 'message', site: siteView(origin, site), account: accountView(account), text: readable(request.message), signer: signerOf(account) });
+            const findings = messageFindings(request.message).map((f) => ({ title: f.text, note: f.note ?? '', tone: f.level }));
+            await approve({ kind: 'message', site: siteView(origin, site), account: accountView(account), text: readable(request.message), findings, signer: signerOf(account) });
             if (account.ledger) throw new Refused(LEDGER_MESSAGES);
             const signature = await signFor(account, request.message, shell, { origin });
             return { signedMessage: base64(request.message), signature: base64(signature) };
