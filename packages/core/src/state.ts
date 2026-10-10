@@ -3,6 +3,7 @@ import { isAddress, type Address } from '@solana/kit';
 import { alike } from '@otus-wallet/sdk/format';
 
 import { pathBytes } from './ledger/solana.ts';
+import type { Outside } from './outside.ts';
 import { platform } from './platform.ts';
 import { DEFAULT_SETTINGS, settingsOf, type Settings } from './settings.ts';
 
@@ -14,6 +15,7 @@ export type Account = {
     key?: { secret: string; index?: number };
     ledger?: { path: string };
     signatures?: number; // made with Otus
+    since?: number; // when Otus came to sign for it, in seconds since 1970; none for one it signed for before keeping this
 };
 
 /** Whether the account can sign: with its key in the vault, or on its Ledger. */
@@ -40,10 +42,25 @@ export type Contact = { address: Address; label: string };
 /** What Otus keeps in local storage, one key each, so a write never clobbers another part. `sent`: how
  *  many transfers made in Otus landed at each address; `removed`: accounts on a phrase that you removed, which New
  *  account never brings back; `waiting` and `given`: what sites were signed for that others can still use, the latest
- *  last. */
-export type State = { accounts: Account[]; active: Address | null; sites: Record<string, Site>; contacts: Contact[]; sent: Record<string, number>; removed: Address[]; waiting: Signed[]; given: Given[]; settings: Settings };
+ *  last; `signedHere`: the transactions' signatures Otus made with each account, the latest last; `outside`: what the
+ *  popup checked of each one's activity for those signed elsewhere, by network (outsideKey), the popup's alone. */
+export type State = {
+    accounts: Account[];
+    active: Address | null;
+    sites: Record<string, Site>;
+    contacts: Contact[];
+    sent: Record<string, number>;
+    removed: Address[];
+    waiting: Signed[];
+    given: Given[];
+    signedHere: Record<string, string[]>;
+    outside: Record<string, Outside>;
+    settings: Settings;
+};
 
-const DEFAULTS: State = { accounts: [], active: null, sites: {}, contacts: [], sent: {}, removed: [], waiting: [], given: [], settings: DEFAULT_SETTINGS };
+const DEFAULTS: State = { accounts: [], active: null, sites: {}, contacts: [], sent: {}, removed: [], waiting: [], given: [], signedHere: {}, outside: {}, settings: DEFAULT_SETTINGS };
+/** Signatures kept an account: far more than it makes between two looks at its activity. */
+export const MAX_SIGNED_HERE = 200;
 const MAX_CONTACTS = 200;
 
 export async function load(): Promise<State> {
@@ -95,8 +112,9 @@ export function freeName(state: State): string {
     for (let n = state.accounts.length + 1; ; n++) if (!nameTaken(state, `Account ${n}`)) return `Account ${n}`;
 }
 
-/** An edit, checked, as the change it makes; null for one that changes nothing or makes no sense. */
-export function edited(e: Edit, state: State): Partial<State> | null {
+/** An edit, checked, as the change it makes; null for one that changes nothing or makes no sense. `now`: ms, when an
+ *  account it adds comes to sign. */
+export function edited(e: Edit, state: State, now = Date.now()): Partial<State> | null {
     const has = (address: unknown) => typeof address === 'string' && state.accounts.some((a) => a.address === address);
     const label = named;
     switch (e.edit) {
@@ -109,7 +127,8 @@ export function edited(e: Edit, state: State): Partial<State> | null {
             const left = state.accounts.filter((a) => a.address !== e.address);
             const sites = Object.fromEntries(Object.entries(state.sites).filter(([, site]) => site.account !== e.address));
             const removed = gone.key?.index !== undefined && !state.removed.includes(gone.address) ? [...state.removed, gone.address] : state.removed;
-            return { accounts: left, sites, removed, active: state.active === e.address ? (left[0]?.address ?? null) : state.active };
+            const { [e.address]: _, ...signedHere } = state.signedHere;
+            return { accounts: left, sites, removed, signedHere, active: state.active === e.address ? (left[0]?.address ?? null) : state.active };
         }
         case 'use': {
             if (!has(e.address)) return null;
@@ -146,7 +165,7 @@ export function edited(e: Edit, state: State): Partial<State> | null {
             if (known && signs(known)) return null;
             const name = known?.label ?? (label(e.label) || freeName(state));
             if (!known && nameTaken(state, name)) return null;
-            const account: Account = { address: e.address, label: name, ledger: { path: e.path } };
+            const account: Account = { address: e.address, label: name, ledger: { path: e.path }, since: Math.floor(now / 1000) };
             const accounts = known ? state.accounts.map((a) => (a === known ? account : a)) : [...state.accounts, account];
             return { accounts, active: e.address, contacts: state.contacts.filter((c) => c.address !== e.address) };
         }

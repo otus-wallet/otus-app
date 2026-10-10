@@ -71,7 +71,7 @@ chrome.runtime.onMessage.addListener((message: { call?: unknown; keys?: unknown;
                 if (await shielded()) return respond({ ok: false, error: 'Otus is locked' });
                 let changed = false;
                 await update((state) => {
-                    const part = edited(message as Edit, state);
+                    const part = edited(message as Edit, state, Date.now());
                     changed = part !== null;
                     return part;
                 });

@@ -6,7 +6,7 @@ import { newPhrase, phraseOf, privateKeyFromText, privateKeyOf, privateKeysOf } 
 import { base64, bytes, createVault, openVault, readSecrets, writeSecrets, WrongPassword, type Bytes, type Secret, type Vault } from '../keys/vault.ts';
 import { NO_KEY, Refused } from '@otus-wallet/core/protocol.ts';
 import type { KeysCall, KeysReply, KeyStatus } from '@otus-wallet/core/keystore.ts';
-import { load, named, update, type Account } from '@otus-wallet/core/state.ts';
+import { load, named, signs, update, type Account } from '@otus-wallet/core/state.ts';
 
 export const LOCK_ALARM = 'lock'; // the background sets it from how long Otus has been closed
 const MIN_PASSWORD = 8;
@@ -262,7 +262,9 @@ async function list(account: Account): Promise<Account> {
     let listed = account;
     await update(({ accounts, contacts }) => {
         const known = accounts.find((a) => a.address === account.address);
-        listed = known ? { ...account, label: known.label } : account;
+        // When Otus came to sign for it: kept for one it signed for already (moved onto its phrase), now for any other.
+        const since = known && signs(known) ? known.since : Math.floor(Date.now() / 1000);
+        listed = { ...account, ...(known && { label: known.label }), ...(since !== undefined && { since }) };
         const kept = contacts.filter((c) => c.address !== account.address); // yours now: no longer an address you keep
         return { accounts: known ? accounts.map((a) => (a === known ? listed : a)) : [...accounts, listed], active: account.address, contacts: kept };
     });

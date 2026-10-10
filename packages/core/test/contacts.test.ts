@@ -15,11 +15,13 @@ const state = (part: Partial<State> = {}): State => ({
     removed: [],
     waiting: [],
     given: [],
+    signedHere: {},
+    outside: {},
     settings: DEFAULT_SETTINGS,
     ...part,
 });
 // An edit made on a state, as the background makes it.
-const after = (s: State, e: Parameters<typeof edited>[0]) => ({ ...s, ...(edited(e, s) ?? {}) });
+const after = (s: State, e: Parameters<typeof edited>[0]) => ({ ...s, ...(edited(e, s, 1_800_000_000_000) ?? {}) });
 
 test('an address you know is kept by your name for it, renamed by keeping it again, and dropped', () => {
     let s = after(state(), { edit: 'keep', address: FRIEND, label: '  Ana‮  ' });
@@ -93,14 +95,14 @@ test('nothing kept that passes for what you know: an address like another, a nam
 test('a Ledger account: its address and path as the device gave them; a watched one becomes it, keeping its name', () => {
     const PATH = "44'/501'/0'/0'";
     const added = after(state({ contacts: [{ address: FRIEND, label: 'Ana' }] }), { edit: 'ledger', address: FRIEND, path: PATH, label: 'Ledger 1' });
-    assert.deepEqual(added.accounts.at(-1), { address: FRIEND, label: 'Ledger 1', ledger: { path: PATH } });
+    assert.deepEqual(added.accounts.at(-1), { address: FRIEND, label: 'Ledger 1', ledger: { path: PATH }, since: 1_800_000_000 });
     assert.equal(added.active, FRIEND);
     assert.deepEqual(added.contacts, []); // yours now, no longer an address you keep
     assert.ok(signs(added.accounts.at(-1)!));
     assert.equal(acquaintance(added, FRIEND).as, 'account');
 
     const watched = after(state(), { edit: 'ledger', address: WATCHED, path: "44'/501'", label: 'Ledger 1' });
-    assert.deepEqual(watched.accounts.find((a) => a.address === WATCHED), { address: WATCHED, label: 'Cold', ledger: { path: "44'/501'" } });
+    assert.deepEqual(watched.accounts.find((a) => a.address === WATCHED), { address: WATCHED, label: 'Cold', ledger: { path: "44'/501'" }, since: 1_800_000_000 });
     assert.equal(watched.accounts.length, 2);
     assert.equal(after(state(), { edit: 'ledger', address: STRANGER, path: PATH, label: '' }).accounts.at(-1)?.label, 'Account 3');
 });
@@ -146,4 +148,11 @@ test('the wallet in use takes every connected site with it, unless it is watch-o
     const watching = after(moved, { edit: 'use', address: watched });
     assert.equal(watching.active, watched);
     assert.deepEqual(watching.sites, moved.sites, 'a watch-only wallet signs nothing: the sites stay');
+});
+
+test('a Ledger account comes to sign now; a removed account takes its kept signatures with it', () => {
+    const ledger = edited({ edit: 'ledger', address: FRIEND, path: "44'/501'/0'/0'", label: 'Flex' }, state(), 1_800_000_000_000);
+    assert.equal(ledger?.accounts?.find((a) => a.address === FRIEND)?.since, 1_800_000_000);
+    const removed = edited({ edit: 'remove', address: MINE }, state({ signedHere: { [MINE]: ['a'], [WATCHED]: ['b'] } }));
+    assert.deepEqual(removed?.signedHere, { [WATCHED]: ['b'] });
 });

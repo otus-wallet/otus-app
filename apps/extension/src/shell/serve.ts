@@ -31,7 +31,7 @@ import { signInFields, signInText } from '../siws.ts';
 import type { TokenInfo } from '@otus-wallet/core/tokens.ts';
 import { accountView, siteView, type Approval, type Life, type Outcome, type SiteView } from '@otus-wallet/core/view.ts';
 import type { Answer } from './approvals.ts';
-import { onDevice, sentTo, signs, type Account, type State } from '@otus-wallet/core/state.ts';
+import { MAX_SIGNED_HERE, onDevice, sentTo, signs, type Account, type State } from '@otus-wallet/core/state.ts';
 import { approved, channel, clusterOf, followed, landed, messageOf, Rejected, settled, signerOf, unexpired, withSignature } from './transaction.ts';
 
 /** What serve needs from the extension: its state, the user's answer (behind Otus's lock), the keystore, the network
@@ -118,7 +118,7 @@ async function handle(request: Request, state: State, shell: Shell): Promise<unk
             const findings = messageFindings(request.message).map((f) => ({ title: f.text, note: f.note ?? '', tone: f.level }));
             await approve({ kind: 'message', site: siteView(origin, site), account: accountView(account), text: readable(request.message), findings, signer: signerOf(account) });
             if (account.ledger) throw new Refused(LEDGER_MESSAGES);
-            const signature = await signFor(account, request.message, shell, { origin });
+            const signature = await signFor(account, request.message, shell, { origin }, undefined, false);
             return { signedMessage: base64(request.message), signature: base64(signature) };
         }
         case 'signIn': {
@@ -131,7 +131,7 @@ async function handle(request: Request, state: State, shell: Shell): Promise<unk
             await approve({ kind: 'signIn', site: siteView(origin, site), account: accountView(account), fields: signInFields(input), signer: signerOf(account) });
             if (account.ledger) throw new Refused(LEDGER_MESSAGES);
             const message = new TextEncoder().encode(signInText(input));
-            const signature = await signFor(account, message, shell, { origin, connects: true });
+            const signature = await signFor(account, message, shell, { origin, connects: true }, undefined, false);
             return { account: account.address, signedMessage: base64(message), signature: base64(signature) };
         }
     }
@@ -468,8 +468,8 @@ type Asker = { origin: string; connects?: boolean; programs?: Address[] };
 // Once the user says yes, from state as it is now: the site may have been disconnected, or the account removed,
 // while they decided. The account counts the signature; so does the site that asked, if any (null: your own transfer).
 // A Ledger account's signature came with the yes (`fromDevice`): it counts only over these very bytes, by
-// its own key.
-async function signFor(account: Account, data: Uint8Array, shell: Shell, asker: Asker | null, fromDevice?: SignatureBytes): Promise<SignatureBytes> {
+// its own key. A transaction's signature is kept with the account, to tell those it signs elsewhere from Otus's.
+async function signFor(account: Account, data: Uint8Array, shell: Shell, asker: Asker | null, fromDevice?: SignatureBytes, transaction = true): Promise<SignatureBytes> {
     const { accounts, sites } = await shell.load();
     const now = accounts.find((a) => a.address === account.address);
     if (asker && (!now || (!asker.connects && sites[asker.origin]?.account !== account.address))) throw new Refused(NOT_CONNECTED);
@@ -478,6 +478,7 @@ async function signFor(account: Account, data: Uint8Array, shell: Shell, asker: 
     await shell.update((s) => ({
         accounts: s.accounts.map((a) => (a.address === account.address ? { ...a, signatures: (a.signatures ?? 0) + 1 } : a)),
         ...(asker && signedFor(s.sites, asker, account.address, shell.now())),
+        ...(transaction && { signedHere: { ...s.signedHere, [account.address]: [...(s.signedHere[account.address] ?? []), getBase58Decoder().decode(signature)].slice(-MAX_SIGNED_HERE) } }),
     }));
     return signature;
 }

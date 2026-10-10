@@ -15,6 +15,7 @@ import {
     getAddressFromPublicKey,
     getBase58Encoder,
     getBase64Decoder,
+    getBase58Decoder,
     getBase64Encoder,
     getSolanaErrorFromJsonRpcError,
     getTransactionDecoder,
@@ -77,6 +78,8 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
             removed: [],
             waiting: [],
             given: [],
+            signedHere: {},
+            outside: {},
             settings: DEFAULT_SETTINGS,
         } as State,
     };
@@ -156,6 +159,8 @@ test('signs the transaction as approved, guards and fees included, with your sig
     assert.equal(w.box.state.sites[ORIGIN].signatures, 1);
     assert.equal(w.box.state.sites[ORIGIN].since, NOW / 1000); // the first transaction: known a day later
     assert.equal(w.sent.length, 0);
+    // Its signature kept with the account: Activity tells it from those made elsewhere.
+    assert.deepEqual(w.box.state.signedHere[w.me], [getBase58Decoder().decode(signed.signatures[w.me]!)]);
 });
 
 test('an approved transaction’s window hears how it goes: sent by Otus, or followed while the site sends it', async () => {
@@ -371,6 +376,7 @@ test('signs a message, and a sign-in that the site can check', async () => {
     assert.equal(new TextDecoder().decode(bytes(s.signedMessage)), expected);
     assert.ok(await verifySignature(w.pair.publicKey, bytes(s.signature) as SignatureBytes, bytes(s.signedMessage)));
     assert.equal(w.box.state.sites[ORIGIN]?.account, w.me); // signing in connects the site
+    assert.equal(w.box.state.signedHere[w.me], undefined); // a message never lands: none kept
 });
 
 test('an address you only watch is reviewed but never signed for', async () => {
@@ -673,6 +679,7 @@ test('a Ledger account signs in its window: the approval carries the message, an
     assert.deepEqual(shown.ledger, { path: LEDGER_PATH, message: base64(new Uint8Array(signed.messageBytes)) });
     assert.ok(await verifySignature(real.pair.publicKey, signed.signatures[real.me]!, signed.messageBytes));
     assert.equal(real.box.state.accounts[0].signatures, 1);
+    assert.deepEqual(real.box.state.signedHere[real.me], [getBase58Decoder().decode(signed.signatures[real.me]!)]);
 });
 
 test('a Ledger signature of other bytes, by another key, or none at all, signs nothing', async () => {
