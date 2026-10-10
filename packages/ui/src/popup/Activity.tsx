@@ -9,7 +9,7 @@ import type { Activity } from '@otus-wallet/sdk/activity/summary';
 import { USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
 import { explorerOf, networkOf, walletRpc } from '@otus-wallet/core/settings.ts';
-import { outsideKey } from '@otus-wallet/core/outside.ts';
+import { outsideKey, unchecked } from '@otus-wallet/core/outside.ts';
 import type { State } from '@otus-wallet/core/state.ts';
 import { cachedToken } from '@otus-wallet/core/tokens.ts';
 import { Button } from '../components/ui/button.tsx';
@@ -75,6 +75,7 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
                 {list.length === 0 && <div className="flex justify-end pt-2.5">{mark}</div>}
                 {!read.data && read.error && <Unread error={read.error} retry={() => void read.refetch()} settings={() => go('settings')} />}
                 {read.data && list.length === 0 && <p className="pt-6 text-center text-xs text-ink-3">No transactions yet</p>}
+                {unchecked(checked) && <p className="pt-2.5 text-xs text-warn">Not all checked yet: scroll to finish</p>}
                 {days(list).map(([day, items], d) => (
                     <div key={day} className="day">
                         <div className="flex items-end justify-between">
@@ -176,7 +177,11 @@ function Item({ row, open, flip, explorer, cut, outside }: { row: Row; open: boo
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className={cn('text-sm font-bold [overflow-wrap:anywhere]', TONE[row.tone])}>
                         <Parts parts={row.title} plain={row.tone === 'plain'} cut={cut} />
-                        {outside && <span className="outside ml-1.5 inline-block rounded-[3px] border border-warn-bd bg-warn-bg px-1.5 align-[1px] text-2xs leading-[16px] font-bold text-warn">outside Otus</span>}
+                        {outside && (
+                            <span aria-label="Signed outside Otus" className="outside ml-1.5 inline-grid size-[15px] place-items-center rounded-[3px] border border-warn-bd bg-warn-bg align-[-2px] text-warn">
+                                <Icon name="bang" size={9} stroke={3} />
+                            </span>
+                        )}
                     </span>
                     {row.sub.length > 0 && (
                         <span className={cn('text-xs', row.tone === 'warn' ? 'text-warn [overflow-wrap:anywhere]' : 'truncate text-ink-3')}>
@@ -188,6 +193,7 @@ function Item({ row, open, flip, explorer, cut, outside }: { row: Row; open: boo
             </button>
             {open && (
                 <div className="details flex flex-col gap-1 pb-3 pl-11 text-xs">
+                    {outside && <span className="mb-1 self-start rounded-[3px] border border-warn-bd bg-warn-bg px-1.5 text-2xs leading-[16px] font-bold text-warn">Signed outside Otus</span>}
                     {row.details.map((d, i) => (
                         <span key={i} className={cn('[overflow-wrap:anywhere]', d.tone ? DETAIL[d.tone] : 'font-bold')}>
                             <Tagged text={d.text} cut={cut} />

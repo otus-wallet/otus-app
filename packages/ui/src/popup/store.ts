@@ -3,9 +3,9 @@
 // popup's query cache.
 import { isSolanaError, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, type Address } from '@solana/kit';
 import { useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import { historyPage, NoHistory, PAGE } from '@otus-wallet/sdk/activity/history';
+import { historyPage, NoHistory, type Unreadable } from '@otus-wallet/sdk/activity/history';
 import { summarize, type Activity } from '@otus-wallet/sdk/activity/summary';
 import { access } from '@otus-wallet/sdk/access/access';
 import { tokensTerms, tokenTerms } from '@otus-wallet/sdk/access/mint';
@@ -13,7 +13,7 @@ import { rpcAt, timedOut } from '@otus-wallet/sdk/rpc';
 import { platform } from '@otus-wallet/core/platform.ts';
 import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
 import { load, save, signs, type Edit, type State } from '@otus-wallet/core/state.ts';
-import { lookOutside, outsideKey } from '@otus-wallet/core/outside.ts';
+import { lookOutside, outsideKey, unchecked, type Looked, type Outside } from '@otus-wallet/core/outside.ts';
 import { networkOf, walletRpc } from '@otus-wallet/core/settings.ts';
 import { ask } from '../ask.ts';
 import { holdings, type Holdings } from '@otus-wallet/core/holdings.ts';
@@ -61,23 +61,23 @@ export function useHoldings(rpc: string, address: Address, mainnet = true): Hold
 
 /** A page of a wallet's activity: each transaction in short, or why Otus could not read it; where the next starts; and
  *  when it was read (ms). */
-export type ActivityPage = { rows: (Activity | { unreadable: string })[]; next: string | null; at: number };
+export type ActivityPage = { rows: (Activity | Unreadable)[]; next: string | null; at: number };
 
 const FRESH = 60_000; // ms a page of activity is taken as current
-const FIRST = 25; // transactions the first page holds: what is checked for ones signed outside Otus, at one request's cost
+const PAGE = 25; // transactions a page: what is checked for ones signed outside Otus, at one request's cost all the same
 
 /**
- * A wallet's activity, newest first: the first page, of 25, as the popup opens for a wallet that signs and when shown
- * (the one kept this session, when it is under a minute old), then each next page of 10 as asked for. One request a
+ * A wallet's activity, newest first, 25 transactions a page: the first as the popup opens for a wallet that signs and
+ * when shown (the one kept this session, when it is under a minute old), then each next as asked for. One request a
  * page; never again on its own. Left, what it reads is dropped and it keeps its first page only, as old as it is, so
- * coming back reads one page at most.
+ * coming back reads one page at most. A transaction Otus cannot tell in short shows as unreadable, alone.
  */
 export function useActivity(rpc: string, address: Address) {
     const read = useInfiniteQuery({
         queryKey: activityKey(rpc, address),
         queryFn: async ({ pageParam, signal }): Promise<ActivityPage> => {
-            const page = await historyPage(rpc, address, pageParam ?? undefined, signal, pageParam ? PAGE : FIRST);
-            return { rows: page.items.map((i) => ('unreadable' in i ? i : summarize(i, address))), next: page.next, at: Date.now() };
+            const page = await historyPage(rpc, address, pageParam ?? undefined, signal, PAGE);
+            return { rows: page.items.map((i) => ('unreadable' in i ? i : told(i, address))), next: page.next, at: Date.now() };
         },
         initialPageParam: null as string | null,
         getNextPageParam: (last, _, from) => (last.next !== from ? last.next : null), // a page that points at itself ends it
@@ -96,38 +96,61 @@ export function useActivity(rpc: string, address: Address) {
     return read;
 }
 
+// A landed transaction in short, or unreadable when its summary fails: one never takes the page with it.
+function told(t: Parameters<typeof summarize>[0], address: Address): Activity | Unreadable {
+    try {
+        return summarize(t, address);
+    } catch {
+        return { unreadable: 'Otus could not tell it', slot: t.slot, signature: t.signature, signatures: t.signatures };
+    }
+}
+
+const AHEAD_PAGES = 4; // pages read on their own while part is unchecked, each time the popup opens: 100 transactions
+
 /**
  * The wallet in use, when it signs: its activity read as the popup opens, and as more of it is read, checked for
- * transactions it signed that Otus did not. No request of its own.
+ * transactions it signed that Otus did not. More landed than the first page holds (a flood of transfers can push one
+ * down): the next pages are read on their own, up to four, until all is checked.
  */
 export function useLookOutside(state: State) {
     const wallet = current(state).address;
     const key = outsideKey(networkOf(state.settings), wallet);
     const read = useActivity(walletRpc(state.settings), wallet);
+    const ahead = useRef({ read, pages: 0 });
+    ahead.current.read = read;
     const more = read.hasNextPage;
     useEffect(() => {
-        const rows = read.data?.pages.flatMap((p) => p.rows).filter((r): r is Activity => !('unreadable' in r));
-        // Every row with its slot and signatures, or none checked: a page kept by an older build has neither.
-        if (rows?.every((r) => typeof r.slot === 'bigint' && r.signatures)) lookedOutside(key, wallet, rows, more);
+        const rows = read.data?.pages.flatMap((p) => p.rows);
+        // Every row with its slot and signatures, or none checked: a page kept by an older build has neither. One Otus
+        // could not read is checked by its envelope, when that reads.
+        if (!rows || !rows.every((r) => 'unreadable' in r || (typeof r.slot === 'bigint' && r.signatures))) return;
+        const looked = rows.flatMap((r): Looked[] => (typeof r.slot === 'bigint' && r.signatures && typeof r.signature === 'string' ? [{ signature: r.signature, slot: r.slot, time: r.time ?? null, signatures: r.signatures }] : []));
+        void lookedOutside(key, wallet, looked, more).then((now) => {
+            const { read: latest, pages } = ahead.current;
+            if (!unchecked(now) || !latest.hasNextPage || latest.isFetching || pages >= AHEAD_PAGES) return;
+            ahead.current.pages++;
+            void latest.fetchNextPage();
+        });
     }, [read.data, more, key, wallet]);
 }
 
 let looking: Promise<unknown> = Promise.resolve();
 
-// A wallet's activity as read → what is checked of it, kept: one check at a time, each from what is stored then. Only
-// the popup writes these, and only for accounts Otus still has.
-function lookedOutside(key: string, wallet: Address, rows: Activity[], more: boolean) {
-    looking = looking
-        .then(async () => {
-            const { outside, signedHere, accounts } = await load();
-            const account = accounts.find((a) => a.address === wallet);
-            if (!account || !signs(account)) return;
-            const { now } = lookOutside(rows, wallet, outside[key], new Set(signedHere[wallet] ?? []), account.since, more);
-            if (JSON.stringify(now) === JSON.stringify(outside[key])) return;
-            const kept = Object.fromEntries(Object.entries(outside).filter(([k]) => accounts.some((a) => k.endsWith(` ${a.address}`))));
-            await save({ outside: { ...kept, [key]: now } });
-        })
-        .catch(() => {}); // not kept: checked again as the activity is read again
+// A wallet's activity as read → what is checked of it, kept, and given back: one check at a time, each from what is
+// stored then. Only the popup writes these, and only for accounts Otus still has.
+function lookedOutside(key: string, wallet: Address, read: Looked[], more: boolean): Promise<Outside | undefined> {
+    const done = looking.then(async () => {
+        const { outside, signedHere, accounts } = await load();
+        const account = accounts.find((a) => a.address === wallet);
+        if (!account || !signs(account)) return undefined;
+        const { now } = lookOutside({ read, wallet, before: outside[key], here: new Set(signedHere[wallet] ?? []), since: account.since, more, now: Math.floor(Date.now() / 1000) });
+        if (JSON.stringify(now) === JSON.stringify(outside[key])) return now;
+        const kept = Object.fromEntries(Object.entries(outside).filter(([k]) => accounts.some((a) => k.endsWith(` ${a.address}`))));
+        await save({ outside: { ...kept, [key]: now } });
+        return now;
+    });
+    looking = done.catch(() => {});
+    return done.catch(() => undefined); // not kept: checked again as the activity is read again
 }
 
 /** Activity seen: what was found signed outside Otus no longer marks its tab. */

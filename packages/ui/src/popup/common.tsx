@@ -7,7 +7,7 @@ import { Icon, Logo } from '../components/icons.tsx';
 import { USDC, USDT, WSOL, type Holding } from '@otus-wallet/core/holdings.ts';
 import { cn } from '../lib/cn.ts';
 import type { Screen } from './App.tsx';
-import { outsideKey } from '@otus-wallet/core/outside.ts';
+import { outsideKey, unchecked } from '@otus-wallet/core/outside.ts';
 import { networkOf } from '@otus-wallet/core/settings.ts';
 import type { State } from '@otus-wallet/core/state.ts';
 import { current } from './store.ts';
@@ -37,9 +37,10 @@ export function Bar({ title, back }: { title: string; back?: () => void }) {
 
 /** The bar at the bottom of the lobby, Activity and Settings: one tap from each to the others. */
 /** Home, Activity, Settings. Activity bears an amber dot while it holds transactions the wallet signed outside Otus
- *  that it has not shown yet. */
+ *  that it has not shown yet, or part of it is still to be checked for them. */
 export function TabBar({ at, go, state }: { at: 'lobby' | 'activity' | 'settings'; go: (to: Screen) => void; state: State }) {
-    const outside = state.outside[outsideKey(networkOf(state.settings), current(state).address)]?.unseen === true;
+    const checked = state.outside[outsideKey(networkOf(state.settings), current(state).address)];
+    const outside = checked?.unseen === true || unchecked(checked);
     const tabs = [
         ['lobby', 'home', 'Home'],
         ['activity', 'history', 'Activity'],

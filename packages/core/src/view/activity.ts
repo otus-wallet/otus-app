@@ -51,10 +51,10 @@ const VERBS: Record<Step, string> = { setup: 'new multisig', create: 'create', p
 
 /** Each transaction read → its row; one Otus could not read says so. The copy of an address, of two alike on the page or
  *  known, is told as one. */
-export function rows(read: (Activity | { unreadable: string })[], n: Naming): Row[] {
+export function rows(read: (Activity | { unreadable: string; signature?: string })[], n: Naming): Row[] {
     const done = read.filter((a): a is Activity => 'kind' in a);
     const copies = copiesOn(done, n.known);
-    return read.map((a) => ('unreadable' in a ? unreadable(a.unreadable) : row(a, n, a.other ? (copies.get(a.other) ?? null) : null)));
+    return read.map((a) => ('unreadable' in a ? unreadable(a.unreadable, a.signature ?? null) : row(a, n, a.other ? (copies.get(a.other) ?? null) : null)));
 }
 
 /** How the page cuts an address short: four characters a side, or, for one like others on the page or known, as far as
@@ -86,7 +86,7 @@ function copiesOn(done: Activity[], known: Address[]): Map<Address, Address> {
     return out;
 }
 
-const unreadable = (why: string): Row => ({ signature: null, time: null, icon: 'bang', tone: 'warn', title: [{ text: "Otus couldn't read this one" }], sub: [{ text: why }], details: [], address: null });
+const unreadable = (why: string, signature: string | null): Row => ({ signature, time: null, icon: 'bang', tone: 'warn', title: [{ text: "Otus couldn't read this one" }], sub: [{ text: why }], details: [], address: null });
 
 function row(a: Activity, n: Naming, copies: Address | null): Row {
     const [outs, ins] = [a.moves.filter((m) => m.units < 0n), a.moves.filter((m) => m.units > 0n)];
