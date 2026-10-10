@@ -61,8 +61,14 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
         return <TakeBack account={account} what={taking.what} title={taking.title} settings={state.settings} done={done} />;
     }
     const take = signs(account) ? (row: AccessRow) => setTaking({ what: fixOf(row), title: row.title }) : null; // a watched account signs nothing
+    const checked = read.data && (
+        <p className="px-4 pb-3.5 text-[10.5px] text-ink-3">
+            Checked: your token accounts, what your tokens' authorities can do, and the transactions you signed on a nonce.
+            {read.data.unchecked > 0 && ` ${read.data.unchecked} tokens' authorities were left out.`}
+        </p>
+    );
     return (
-        <Sheet bar={<Bar title="Access" back={() => go('activity')} />}>
+        <Sheet bar={<Bar title="Access" back={() => go('activity')} />} foot={checked}>
             {!read.data && !read.error && <p className="pt-6 text-center text-[11px] text-ink-3">Checking who has access</p>}
             {!read.data && read.error && (
                 <div className="flex flex-col items-center gap-2.5 pt-8 text-center">
@@ -98,16 +104,10 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
                 </Part>
             )}
             {frozen.length > 0 && (
-                <Part title="Freeze authority">
+                <Part title="Can be frozen">
                     <p className="text-[11px] font-bold">{frozen.join(', ')}</p>
                     <p className="text-[10.5px] text-ink-3">{frozen.length === 1 ? `The authority of ${frozen[0]} can freeze your account holding it.` : 'The authorities of these tokens can freeze your accounts holding them.'}</p>
                 </Part>
-            )}
-            {read.data && (
-                <p className="text-[10.5px] text-ink-3">
-                    Checked: your token accounts, what your tokens' authorities can do, and the transactions you signed on a nonce.
-                    {read.data.unchecked > 0 && ` ${read.data.unchecked} tokens' authorities were left out.`}
-                </p>
             )}
         </Sheet>
     );
