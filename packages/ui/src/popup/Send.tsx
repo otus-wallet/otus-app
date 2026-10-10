@@ -223,8 +223,15 @@ export function Send({ state, go }: { state: State; go: (to: Screen) => void }) 
     const others = state.accounts.filter((a) => a.address !== account.address);
     const contacts = state.contacts.filter((c) => !state.accounts.some((a) => a.address === c.address));
 
+    const foot = (
+        <div className="border-t border-dashed border-rule px-4 pt-2.5 pb-3.5">
+            <Button variant="default" className="w-full" disabled={!ready} onClick={send}>
+                {odd || like ? 'Send anyway' : 'Send'}
+            </Button>
+        </div>
+    );
     return (
-        <Sheet bar={<Bar title="Send" back={() => go('lobby')} />} className="send">
+        <Sheet bar={<Bar title="Send" back={() => go('lobby')} />} foot={foot} className="send">
             <div className="flex flex-col gap-1.5">
                 <Heading>Asset</Heading>
                 <Select value={keyOf(chosen)} onValueChange={(asset) => update({ asset, amount: '' })}>
@@ -265,9 +272,6 @@ export function Send({ state, go }: { state: State; go: (to: Screen) => void }) 
                 {odd && <p className="text-xs text-warn">This address belongs to a program, not to someone with a key: what you send may not come back.</p>}
             </div>
             <ErrorLine>{problem || failure}</ErrorLine>
-            <Button variant="default" disabled={!ready} onClick={send}>
-                {odd || like ? 'Send anyway' : 'Send'}
-            </Button>
         </Sheet>
     );
 }
