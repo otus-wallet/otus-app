@@ -171,6 +171,7 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
             {route && (
                 <dl className="flex flex-col gap-1.5 rounded-md border border-rule px-3.5 py-2.5 text-[10.5px]">
                     <Fact name="Rate">{`1 ${pay.symbol} ≈ ${rate(route, payDecimals, getDecimals)} ${get.symbol}`}</Fact>
+                    <Fact name="Slippage">{`${route.ask.slippageBps / 100}%`}</Fact>
                     <Fact name="At least">{`${decimal(route.least, getDecimals)} ${get.symbol}`}</Fact>
                     <Fact name="Route">{[...new Set(route.venues.map((v) => v.label))].join(', ')}</Fact>
                 </dl>
