@@ -134,7 +134,7 @@ export function Doing({ account, job, title, settings, done }: { account: Accoun
 const Taken = ({ job, title }: { job: Job; title: string }) => (
     <Block>
         <Heading>{job.doing}</Heading>
-        <p className="text-xs font-bold">{title}</p>
+        <p className="text-sm font-bold">{title}</p>
     </Block>
 );
 
@@ -187,10 +187,10 @@ function Outcome({ account, job, title, outcome, done, again, settings }: { acco
             <div role="status" className={`outcome flex items-center gap-3 rounded-[3px] border p-3.5 ${tone === 'plain' ? 'border-rule text-ink' : `border-current ${filled(tone)}`}`}>
                 <Icon name={outcome === 'sending' ? 'refresh' : MARK[tone]} size={28} stroke={2.5} />
                 <div className="flex min-w-0 flex-col gap-1">
-                    <p className="title pixel text-[22px] leading-[1.1]">{heading}</p>
+                    <p className="title pixel text-3xl leading-[1.1]">{heading}</p>
                     <p className="font-bold">{words}</p>
                     {signature && (
-                        <a href={explorerOf(settings).tx(signature)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-[3px] text-[11px] font-bold text-inherit">
+                        <a href={explorerOf(settings).tx(signature)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-[3px] text-xs font-bold text-inherit">
                             {short(signature)}
                             <Icon name="external" size={11} stroke={2.5} />
                         </a>

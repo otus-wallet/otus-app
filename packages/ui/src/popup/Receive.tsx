@@ -22,7 +22,7 @@ export function Receive({ state, go }: { state: State; go: (to: Screen) => void 
     return (
         <Sheet bar={<Bar title="Receive" back={() => go('lobby')} />} className="items-center text-center">
             <div ref={code} className="qr mt-2.5 overflow-hidden rounded-[3px] leading-[0]" />
-            <p className="whole max-w-[320px] text-xs leading-relaxed font-bold break-all text-ink-2">
+            <p className="whole max-w-[320px] text-sm leading-relaxed font-bold break-all text-ink-2">
                 <span className="text-ok">{address.slice(0, 4)}</span>
                 {address.slice(4, -4)}
                 <span className="text-ok">{address.slice(-4)}</span>
@@ -56,9 +56,9 @@ function OnLedger({ account }: { account: Account & { ledger: { path: string } }
             ),
         (shown) => setChecked(shown === account.address),
     );
-    if (checked) return <p className="text-[10.5px] text-ok">You confirmed it on your Ledger.</p>;
-    const warning = other && <p className="text-[10.5px] font-bold text-danger">The Ledger plugged in gives another address for this account. Don't share this one until you check it there.</p>;
-    if (state.phase === 'confirming') return <p className="text-[10.5px] text-ink-2">Your Ledger shows its address: check it is this one, then confirm there.</p>;
+    if (checked) return <p className="text-xs text-ok">You confirmed it on your Ledger.</p>;
+    const warning = other && <p className="text-xs font-bold text-danger">The Ledger plugged in gives another address for this account. Don't share this one until you check it there.</p>;
+    if (state.phase === 'confirming') return <p className="text-xs text-ink-2">Your Ledger shows its address: check it is this one, then confirm there.</p>;
     return (
         <div className="flex flex-col items-center gap-1.5">
             {warning}
@@ -67,7 +67,7 @@ function OnLedger({ account }: { account: Account & { ledger: { path: string } }
             </Button>
             {state.phase === 'failed' && <ErrorLine>{state.error.message}</ErrorLine>}
             {state.phase === 'failed' && state.error.trouble === 'unplugged' && (
-                <button type="button" className="cursor-pointer text-[10.5px] text-ink-2 underline" onClick={pairInTab}>
+                <button type="button" className="cursor-pointer text-xs text-ink-2 underline" onClick={pairInTab}>
                     Not found? Connect it again in a tab
                 </button>
             )}

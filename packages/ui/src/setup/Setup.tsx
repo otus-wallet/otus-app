@@ -51,8 +51,8 @@ export function Setup() {
     return (
         <main className="mx-auto flex max-w-[480px] flex-col gap-4 px-5 pt-10 pb-14">
             <header className="flex items-center gap-2.5">
-                <span className="pixel grid size-8 place-items-center rounded-[3px] border border-ok text-sm text-ok">O</span>
-                <span className="pixel text-base">Otus</span>
+                <span className="pixel grid size-8 place-items-center rounded-[3px] border border-ok text-lg text-ok">O</span>
+                <span className="pixel text-lg">Otus</span>
             </header>
             {page === 'start' && <Start adding={keys.vault || state.accounts.length > 0} go={go} />}
             {page === 'create' && <Create length={length} setLength={setLength} shown={shown} setShown={setShown} go={go} />}
@@ -123,7 +123,7 @@ function Create({ length, setLength, shown, setShown, go }: { length: 12 | 24; s
         setDone(true);
     };
     const size = (n: 12 | 24) => (
-        <button key={n} type="button" aria-pressed={length === n} onClick={() => setLength(n)} className={cn('h-7 cursor-pointer rounded-[3px] border px-[9px] text-[11px] font-bold', length === n ? 'border-ok-bd bg-ok-bg text-ok' : 'border-rule text-ink-2 hover:border-ink-3')}>
+        <button key={n} type="button" aria-pressed={length === n} onClick={() => setLength(n)} className={cn('h-7 cursor-pointer rounded-[3px] border px-[9px] text-xs font-bold', length === n ? 'border-ok-bd bg-ok-bg text-ok' : 'border-rule text-ink-2 hover:border-ink-3')}>
             {`${n} words`}
         </button>
     );
@@ -139,7 +139,7 @@ function Create({ length, setLength, shown, setShown, go }: { length: 12 | 24; s
             </div>
             <ol className={cn('phrase grid gap-x-1.5 gap-y-2 rounded-[3px] border border-rule bg-panel p-3', words.length === 24 ? 'grid-cols-4' : 'grid-cols-3')}>
                 {words.map((w, i) => (
-                    <li key={i} className="flex gap-1.5 text-xs font-bold whitespace-nowrap">
+                    <li key={i} className="flex gap-1.5 text-sm font-bold whitespace-nowrap">
                         <span className="w-4 text-right font-normal text-ink-3">{i + 1}</span>
                         {w}
                     </li>
@@ -317,7 +317,7 @@ function Done({ made, go }: { made: Account | null; go: (to: Page) => void }) {
                     <Tile address={made.address} size={36} />
                     <span className="flex min-w-0 flex-col gap-0.5">
                         <span className="font-bold">{made.label}</span>
-                        <span className="text-[10.5px] text-ink-2">{short(made.address)}</span>
+                        <span className="text-xs text-ink-2">{short(made.address)}</span>
                     </span>
                 </div>
             )}

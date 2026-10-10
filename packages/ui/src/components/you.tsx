@@ -15,4 +15,4 @@ export function Tagged({ text: words }: { text: string }) {
     );
 }
 
-export const YouTag = () => <span className="ml-1.5 inline-block rounded-[3px] border border-ok-bd bg-ok-bg px-1.5 align-[1px] text-[10px] leading-[16px] font-bold text-ok">you</span>;
+export const YouTag = () => <span className="ml-1.5 inline-block rounded-[3px] border border-ok-bd bg-ok-bg px-1.5 align-[1px] text-2xs leading-[16px] font-bold text-ok">you</span>;

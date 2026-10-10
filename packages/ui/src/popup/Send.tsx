@@ -180,7 +180,7 @@ export function Send({ state, go }: { state: State; go: (to: Screen) => void }) 
     if (r instanceof Error) {
         return (
             <Sheet bar={<Bar title="Send" back={() => go('lobby')} />}>
-                <p className="text-[10.5px] text-warn">{`Your RPC did not answer: ${said(r)}`}</p>
+                <p className="text-xs text-warn">{`Your RPC did not answer: ${said(r)}`}</p>
                 <Button size="sm" className="self-start" onClick={() => go('settings')}>
                     Settings
                 </Button>
@@ -228,12 +228,12 @@ export function Send({ state, go }: { state: State; go: (to: Screen) => void }) 
             <div className="flex flex-col gap-1.5">
                 <Heading>Asset</Heading>
                 <Select value={keyOf(chosen)} onValueChange={(asset) => update({ asset, amount: '' })}>
-                    <SelectTrigger aria-label="Asset" className="h-[34px] w-full bg-panel text-xs">
+                    <SelectTrigger aria-label="Asset" className="h-[34px] w-full bg-panel text-sm">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                         {assets.map((a) => (
-                            <SelectItem key={keyOf(a)} value={keyOf(a)} className="text-xs">
+                            <SelectItem key={keyOf(a)} value={keyOf(a)} className="text-sm">
                                 <TokenLogo asset={a} size={18} />
                                 {`${nameOf(a)} · ${amount(a)}${a.verified ? '' : ' · unverified'}`}
                             </SelectItem>
@@ -252,8 +252,8 @@ export function Send({ state, go }: { state: State; go: (to: Screen) => void }) 
                     Amount
                 </Heading>
                 <Input inputMode="decimal" placeholder="0" autoComplete="off" spellCheck={false} aria-label="Amount" autoFocus value={typed.amount} onChange={(e) => update({ amount: e.target.value })} />
-                {units !== null && <p className="text-[10.5px] text-ink-3">{`You send ${decimal(units, chosen.decimals)} ${nameOf(chosen)}${chosen.price === null ? '' : ` · ≈ ${dollars((Number(units) / 10 ** chosen.decimals) * chosen.price)}`}`}</p>}
-                {fee > 0n && <p className="text-[10.5px] text-warn">{`The token's transfer fee keeps up to ${decimal(fee, chosen.decimals)}: they get the rest`}</p>}
+                {units !== null && <p className="text-xs text-ink-3">{`You send ${decimal(units, chosen.decimals)} ${nameOf(chosen)}${chosen.price === null ? '' : ` · ≈ ${dollars((Number(units) / 10 ** chosen.decimals) * chosen.price)}`}`}</p>}
+                {fee > 0n && <p className="text-xs text-warn">{`The token's transfer fee keeps up to ${decimal(fee, chosen.decimals)}: they get the rest`}</p>}
             </div>
             <div className="flex flex-col gap-1.5">
                 <Heading>To</Heading>
@@ -262,7 +262,7 @@ export function Send({ state, go }: { state: State; go: (to: Screen) => void }) 
                     {others.length + contacts.length > 0 && <Recipients accounts={others} contacts={contacts} pick={(to) => update({ to })} />}
                 </div>
                 {isAddress(address) && address !== account.address && <Acquainted key={address} address={address} state={state} like={like} />}
-                {odd && <p className="text-[10.5px] text-warn">This address belongs to a program, not to someone with a key: what you send may not come back.</p>}
+                {odd && <p className="text-xs text-warn">This address belongs to a program, not to someone with a key: what you send may not come back.</p>}
             </div>
             <ErrorLine>{problem || failure}</ErrorLine>
             <Button variant="default" disabled={!ready} onClick={send}>
@@ -310,7 +310,7 @@ function problemOf(f: { known: boolean; picked: boolean; chosen: Holding; amount
 // Your other wallets and the addresses you know, any of them a recipient: picked from beside the address field.
 function Recipients({ accounts, contacts, pick }: { accounts: Account[]; contacts: Contact[]; pick: (address: string) => void }) {
     const item = (a: Account | Contact) => (
-        <SelectItem key={a.address} value={a.address} className="text-xs">
+        <SelectItem key={a.address} value={a.address} className="text-sm">
             <span className="flex items-center gap-2">
                 <Tile address={a.address} size={14} />
                 <span className="font-bold">{a.label}</span>
@@ -321,7 +321,7 @@ function Recipients({ accounts, contacts, pick }: { accounts: Account[]; contact
     const group = (title: string, list: (Account | Contact)[]) =>
         list.length > 0 && (
             <SelectGroup>
-                <SelectLabel className="px-2 pt-2 pb-1 text-[10px] font-bold text-ink-3">{title}</SelectLabel>
+                <SelectLabel className="px-2 pt-2 pb-1 text-xs font-bold text-ink-3">{title}</SelectLabel>
                 {list.map(item)}
             </SelectGroup>
         );
@@ -366,7 +366,7 @@ function Acquainted({ address, state, like }: { address: Address; state: State; 
 }
 
 const HINT = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', plain: 'text-ink-3' };
-const Hint = ({ tone = 'plain', children }: { tone?: keyof typeof HINT; children: string }) => <p className={cn('text-[10.5px]', HINT[tone])}>{children}</p>;
+const Hint = ({ tone = 'plain', children }: { tone?: keyof typeof HINT; children: string }) => <p className={cn('text-xs', HINT[tone])}>{children}</p>;
 
 // A name for an address you sent to, to keep it among the ones you know.
 function Naming({ address, state, done }: { address: Address; state: State; done: () => void }) {
@@ -383,7 +383,7 @@ function Naming({ address, state, done }: { address: Address; state: State; done
     return (
         <>
             <div className="flex gap-1.5">
-                <Input placeholder="Its name" aria-label="Name" autoFocus maxLength={32} spellCheck={false} autoComplete="off" className="h-[30px] min-w-0 flex-1 text-xs" value={label} onChange={(e) => (setLabel(e.target.value), setError(''))} onKeyDown={(e) => (e.key === 'Enter' ? void keep() : e.key === 'Escape' && done())} />
+                <Input placeholder="Its name" aria-label="Name" autoFocus maxLength={32} spellCheck={false} autoComplete="off" className="h-[30px] min-w-0 flex-1 text-sm" value={label} onChange={(e) => (setLabel(e.target.value), setError(''))} onKeyDown={(e) => (e.key === 'Enter' ? void keep() : e.key === 'Escape' && done())} />
                 <Button size="sm" variant="default" disabled={!named(label)} onClick={() => void keep()}>
                     Keep
                 </Button>
@@ -443,10 +443,10 @@ function Outcome({ account, to, outcome, leave, again, settings }: { account: Ac
             <div role="status" className={`outcome flex items-center gap-3 rounded-[3px] border p-3.5 ${tone === 'plain' ? 'border-rule text-ink' : `border-current ${filled(tone)}`}`}>
                 <Icon name={outcome === 'sending' ? 'refresh' : MARK[tone]} size={28} stroke={2.5} />
                 <div className="flex min-w-0 flex-col gap-1">
-                    <p className="title pixel text-[22px] leading-[1.1]">{title}</p>
+                    <p className="title pixel text-3xl leading-[1.1]">{title}</p>
                     <p className="font-bold">{words}</p>
                     {signature && (
-                        <a href={explorerOf(settings).tx(signature)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-[3px] text-[11px] font-bold text-inherit">
+                        <a href={explorerOf(settings).tx(signature)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-[3px] text-xs font-bold text-inherit">
                             {short(signature)}
                             <Icon name="external" size={11} stroke={2.5} />
                         </a>

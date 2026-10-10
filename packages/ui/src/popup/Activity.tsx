@@ -66,11 +66,11 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
             <section className="scroll flex min-h-0 flex-1 flex-col px-4 pt-1.5 pb-3.5">
                 {list.length === 0 && <div className="flex justify-end pt-2.5">{mark}</div>}
                 {!read.data && read.error && <Unread error={read.error} retry={() => void read.refetch()} settings={() => go('settings')} />}
-                {read.data && list.length === 0 && <p className="pt-6 text-center text-[11px] text-ink-3">No transactions yet</p>}
+                {read.data && list.length === 0 && <p className="pt-6 text-center text-xs text-ink-3">No transactions yet</p>}
                 {days(list).map(([day, items], d) => (
                     <div key={day} className="day">
                         <div className="flex items-end justify-between">
-                            <h2 className="pixel pt-4 pb-1.5 text-[10px] text-ink-2">{day}</h2>
+                            <h2 className="pixel pt-4 pb-1.5 text-xs text-ink-2">{day}</h2>
                             {d === 0 && mark}
                         </div>
                         <ul>
@@ -82,7 +82,7 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
                     </div>
                 ))}
                 {isFetchNextPageError && (
-                    <p className="flex items-center justify-between gap-2 pt-3 text-[10.5px] text-warn">
+                    <p className="flex items-center justify-between gap-2 pt-3 text-xs text-warn">
                         {`Couldn't read more: ${said(read.error)}`}
                         <Button size="sm" onClick={() => void fetchNextPage()}>
                             Try again
@@ -121,7 +121,7 @@ function Unread({ error, retry, settings }: { error: Error; retry: () => void; s
     const helius = error instanceof NoHistory;
     return (
         <div className="flex flex-col items-center gap-2.5 pt-8 text-center">
-            <p className="text-[11px] text-warn">{helius ? 'Activity needs a Helius RPC' : `The RPC did not answer: ${said(error)}`}</p>
+            <p className="text-xs text-warn">{helius ? 'Activity needs a Helius RPC' : `The RPC did not answer: ${said(error)}`}</p>
             <Button size="sm" onClick={helius ? settings : retry}>
                 {helius ? 'Settings' : 'Try again'}
             </Button>
@@ -165,19 +165,19 @@ function Item({ row, open, flip, explorer }: { row: Row; open: boolean; flip: ()
                     <Icon name={row.icon} size={14} stroke={2.2} />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className={cn('text-[12px] font-bold [overflow-wrap:anywhere]', TONE[row.tone])}>
+                    <span className={cn('text-sm font-bold [overflow-wrap:anywhere]', TONE[row.tone])}>
                         <Parts parts={row.title} plain={row.tone === 'plain'} />
                     </span>
                     {row.sub.length > 0 && (
-                        <span className={cn('truncate text-[10.5px]', row.tone === 'warn' ? 'text-warn' : 'text-ink-3')}>
+                        <span className={cn('text-xs', row.tone === 'warn' ? 'text-warn [overflow-wrap:anywhere]' : 'truncate text-ink-3')}>
                             <Parts parts={row.sub} plain={row.tone === 'plain'} />
                         </span>
                     )}
                 </span>
-                {when && <span className="shrink-0 self-start pt-0.5 text-[10.5px] text-ink-3">{when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
+                {when && <span className="shrink-0 self-start pt-0.5 text-xs text-ink-3">{when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
             </button>
             {open && (
-                <div className="details flex flex-col gap-1 pb-3 pl-11 text-[11px]">
+                <div className="details flex flex-col gap-1 pb-3 pl-11 text-xs">
                     {row.details.map((d, i) => (
                         <span key={i} className={cn('[overflow-wrap:anywhere]', d.tone ? DETAIL[d.tone] : 'font-bold')}>
                             <Tagged text={d.text} />
@@ -185,8 +185,8 @@ function Item({ row, open, flip, explorer }: { row: Row; open: boolean; flip: ()
                     ))}
                     {row.address && (
                         <span className="mt-1 flex flex-col gap-0.5">
-                            <span className="pixel text-[9px] text-ink-3">{row.address.name ? `${row.address.label} · ${row.address.name}` : row.address.label}</span>
-                            <span className="font-bold [overflow-wrap:anywhere]">
+                            <span className="pixel text-xs text-ink-3">{row.address.name ? `${row.address.label} · ${row.address.name}` : row.address.label}</span>
+                            <span className="text-2xs font-bold [overflow-wrap:anywhere]">
                                 <span className={row.address.copy ? 'text-warn' : 'text-ok'}>{row.address.address.slice(0, 4)}</span>
                                 {row.address.address.slice(4, -4)}
                                 <span className={row.address.copy ? 'text-warn' : 'text-ok'}>{row.address.address.slice(-4)}</span>
@@ -195,7 +195,7 @@ function Item({ row, open, flip, explorer }: { row: Row; open: boolean; flip: ()
                     )}
                     {when && <span className="mt-1 text-ink-3">{when.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
                     {row.signature && (
-                        <a href={explorer.tx(row.signature)} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex h-7 items-center gap-1.5 self-start rounded-[3px] border border-rule px-[9px] text-[11px] font-bold text-ink hover:border-ink-3">
+                        <a href={explorer.tx(row.signature)} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex h-7 items-center gap-1.5 self-start rounded-[3px] border border-rule px-[9px] text-xs font-bold text-ink hover:border-ink-3">
                             {`View on ${explorer.name}`}
                             <Icon name="external" size={11} stroke={2.5} />
                         </a>

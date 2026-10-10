@@ -89,20 +89,20 @@ export function Frame({ site, account, picker, network, steps, page, left, chip,
         <main className="flex h-full flex-col">
             <header className="site flex items-center gap-2.5 border-b border-dashed border-rule px-4 pt-3.5 pb-3">
                 <span className="flex min-w-0 items-center gap-2.5">
-                    <span aria-hidden="true" className="pixel grid size-8 shrink-0 place-items-center rounded-[3px] border border-ink text-sm">
+                    <span aria-hidden="true" className="pixel grid size-8 shrink-0 place-items-center rounded-[3px] border border-ink text-lg">
                         {site.host[0]?.toUpperCase() ?? '?'}
                     </span>
                     <span className="flex min-w-0 flex-col items-start gap-[3px]">
-                        <span className="max-w-full text-[13px] font-bold [overflow-wrap:anywhere]" title={site.origin}>
+                        <span className="max-w-full text-base font-bold [overflow-wrap:anywhere]" title={site.origin}>
                             {site.host}
                         </span>
                         {chip ? (
-                            <span className="flex items-center gap-1.5 text-[10.5px]">
+                            <span className="flex items-center gap-1.5 text-xs">
                                 <Chip tone={chip.tone}>{chip.text}</Chip>
                                 {where}
                             </span>
                         ) : (
-                            <span className={cn('text-[10.5px]', site.tone === 'plain' ? 'text-ink-2' : text(site.tone))}>
+                            <span className={cn('text-xs', site.tone === 'plain' ? 'text-ink-2' : text(site.tone))}>
                                 {site.note}
                                 {where && <> · {where}</>}
                             </span>
@@ -112,8 +112,8 @@ export function Frame({ site, account, picker, network, steps, page, left, chip,
                 <span className="flex flex-1 justify-center">{left}</span>
                 {picker || (
                     <span className="flex shrink-0 flex-col items-end gap-[3px]">
-                        <span className="pixel text-[10px] text-ink">{account.label}</span>
-                        <span className="text-[10.5px] text-ink-2" title={account.address}>
+                        <span className="pixel text-xs text-ink">{account.label}</span>
+                        <span className="text-xs text-ink-2" title={account.address}>
                             {short(account.address)}
                         </span>
                     </span>
@@ -142,7 +142,7 @@ export function Steps({ at, reached = at, go }: { at: number; reached?: number; 
                         </>
                     );
                     return (
-                        <li key={s} className={cn('pixel flex flex-1 text-[12px] whitespace-nowrap', i === at ? 'text-ink' : 'text-ink-3')}>
+                        <li key={s} className={cn('pixel flex flex-1 text-xs whitespace-nowrap', i === at ? 'text-ink' : 'text-ink-3')}>
                             {go && i !== at && i <= reached ? (
                                 <button type="button" onClick={() => go(i)} className="flex flex-1 cursor-pointer flex-col gap-1.5 text-left hover:text-ink">
                                     {step}
@@ -167,7 +167,7 @@ export function Left({ from, until, now }: { from: number; until: number; now: n
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <span role="timer" aria-label={`${seconds} seconds left to sign`} className={cn('flex shrink-0 cursor-default items-center gap-1 text-[10.5px] font-bold tabular-nums', left <= 5_000 ? 'text-danger' : left <= 15_000 ? 'text-warn' : 'text-ink-2')}>
+                <span role="timer" aria-label={`${seconds} seconds left to sign`} className={cn('flex shrink-0 cursor-default items-center gap-1 text-xs font-bold tabular-nums', left <= 5_000 ? 'text-danger' : left <= 15_000 ? 'text-warn' : 'text-ink-2')}>
                     <span aria-hidden="true" className="size-[13px] rounded-full border-[1.5px] border-current" style={{ background: `conic-gradient(currentColor ${spent}turn, transparent 0)` }} />
                     {`${seconds}s`}
                 </span>
@@ -181,7 +181,7 @@ export function Left({ from, until, now }: { from: number; until: number; now: n
 
 export function Chip({ tone, children }: { tone: Tone; children: ReactNode }) {
     return (
-        <span className={cn('chip inline-flex shrink-0 items-center gap-1 rounded-[3px] border border-current px-[7px] py-0.5 text-[10.5px] font-bold uppercase', filled(tone))}>
+        <span className={cn('chip inline-flex shrink-0 items-center gap-1 rounded-[3px] border border-current px-[7px] py-0.5 text-xs font-bold uppercase', filled(tone))}>
             <Icon name={MARK[tone]} size={11} stroke={3} />
             {children}
         </span>
@@ -191,7 +191,7 @@ export function Chip({ tone, children }: { tone: Tone; children: ReactNode }) {
 export function Heading({ children, extra }: { children: ReactNode; extra?: ReactNode }) {
     return (
         <div className="flex items-baseline justify-between gap-2">
-            <h2 className="label pixel text-[12px] text-ink-2">{children}</h2>
+            <h2 className="label pixel text-xs text-ink-2">{children}</h2>
             {extra}
         </div>
     );
@@ -203,7 +203,7 @@ export const Block = ({ children, className }: { children: ReactNode; className?
     </div>
 );
 
-export const Notice = ({ children }: { children: ReactNode }) => <p className="notice rounded-[3px] border border-dashed border-rule px-3 py-2.5 text-[11px] text-ink-2">{children}</p>;
+export const Notice = ({ children }: { children: ReactNode }) => <p className="notice rounded-[3px] border border-dashed border-rule px-3 py-2.5 text-xs text-ink-2">{children}</p>;
 
 export const WATCH_ONLY = 'Watch-only: Otus holds no key for this account, so it can only show you this review.';
 

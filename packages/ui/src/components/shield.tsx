@@ -16,7 +16,7 @@ const SHUT: KeyStatus = { vault: true, unlocked: false }; // a keystore that doe
 const RETRY = 1_000; // ms before a read that failed is tried once more: the background may be starting
 
 /** Otus's initial, as the lock and the popup's other gates show it. */
-export const Initial = () => <span className="pixel grid size-[52px] place-items-center rounded-[3px] border border-ok text-2xl text-ok">O</span>;
+export const Initial = () => <span className="pixel grid size-[52px] place-items-center rounded-[3px] border border-ok text-3xl text-ok">O</span>;
 
 /** What `children` draw, only while Otus is unlocked, or has no vault to lock. */
 export function Shield({ asking, children }: { asking?: Asking; children: ReactNode }) {
@@ -92,12 +92,12 @@ function Locked({ asking, unlocked }: { asking?: Asking; unlocked: () => void })
         <main className="mx-auto flex h-full min-h-dvh w-full max-w-[400px] flex-col p-6 text-center">
             <div className="flex flex-1 flex-col items-center justify-center gap-3">
                 <Initial />
-                <h1 className="pixel text-base">Locked</h1>
-                {asking && <p className="text-[10.5px] text-ink-2">{`Request from ${asking.host}`}</p>}
+                <h1 className="pixel text-lg">Locked</h1>
+                {asking && <p className="text-xs text-ink-2">{`Request from ${asking.host}`}</p>}
                 <div className="flex w-full flex-col gap-1.5">
                     <PasswordInput placeholder="Password" autoComplete="current-password" aria-label="Password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void unlock()} />
                     {error && (
-                        <p role="alert" className="text-[10.5px] text-danger">
+                        <p role="alert" className="text-xs text-danger">
                             {error}
                         </p>
                     )}

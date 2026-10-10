@@ -55,7 +55,7 @@ export function Settings({ state, keys, go }: { state: State; keys: KeyStatus; g
                 </Button>
             )}
             <footer className="mt-auto flex items-center justify-end gap-2.5">
-                <span className="version text-[10.5px] font-bold text-ok">v{platform.version()}</span>
+                <span className="version text-xs font-bold text-ok">v{platform.version()}</span>
                 <a href={REPO} target="_blank" rel="noreferrer" aria-label="Otus Wallet on GitHub" className="text-ink-3 hover:text-ink">
                     <Icon name="github" size={15} />
                 </a>
@@ -69,8 +69,8 @@ function Section({ id, icon, title, value, children }: { id: string; icon: 'lock
         <AccordionItem value={id} className="section rounded-[3px] border border-rule-2 bg-panel last:border-b data-[state=open]:border-rule">
             <AccordionTrigger className="section-toggle min-h-[46px] cursor-pointer items-center gap-2.5 rounded-none px-3 py-0 hover:bg-hover">
                 <Icon name={icon} size={15} className="text-ink-2" />
-                <span className="flex-1 text-xs font-bold">{title}</span>
-                <span className="max-w-[150px] truncate text-[10.5px] font-normal text-ink-3">{value}</span>
+                <span className="flex-1 text-sm font-bold">{title}</span>
+                <span className="max-w-[150px] truncate text-xs font-normal text-ink-3">{value}</span>
             </AccordionTrigger>
             <AccordionContent className="flex flex-col gap-2 border-t border-dashed border-rule-2 px-3 pt-3 pb-3.5">{children}</AccordionContent>
         </AccordionItem>
@@ -93,7 +93,7 @@ function AutoLock({ minutes }: { minutes: number }) {
     const choice = (text: string, on: boolean, onClick: () => void) => <Choice key={text} text={text} on={on} onClick={onClick} />;
     return (
         <>
-            <p className="text-[10.5px] text-ink-2">Once you close Otus, it locks:</p>
+            <p className="text-xs text-ink-2">Once you close Otus, it locks:</p>
             <div role="group" aria-label="Lock after" className="flex flex-wrap gap-1.5">
                 {LOCK_CHOICES.map((m) => choice(m === 0 ? 'At once' : m === 60 ? 'After 1 h' : `After ${m} min`, m === minutes && !custom, () => set(m)))}
                 {choice(preset ? 'Custom' : `After ${minutes} min`, !preset || custom, () => setCustom(true))}
@@ -129,7 +129,7 @@ function ExplorerChoice({ chosen }: { chosen: Explorer }) {
 function Preflight({ on }: { on: boolean }) {
     return (
         <>
-            <p className="text-[10.5px] text-ink-2">{on ? "A transaction that would fail isn't sent, so it costs nothing." : 'Sent even if it would fail: its fee is paid.'}</p>
+            <p className="text-xs text-ink-2">{on ? "A transaction that would fail isn't sent, so it costs nothing." : 'Sent even if it would fail: its fee is paid.'}</p>
             <div role="group" aria-label="Preflight" className="flex flex-wrap gap-1.5">
                 <Choice text="On" on={on} onClick={() => void setSettings(() => ({ preflight: true }))} />
                 <Choice text="Skip" on={!on} onClick={() => void setSettings(() => ({ preflight: false }))} />
@@ -181,10 +181,10 @@ function NetworkChoice({ settings }: { settings: Settings }) {
                 <Choice text="Devnet" on={!picking && settings.network === 'devnet'} onClick={() => use('devnet')} />
                 <Choice text="Custom" on={picking} onClick={pick} />
             </div>
-            {!picking && <p className="text-[10.5px] text-ink-2">{settings.network === 'devnet' ? "Solana's public devnet RPC" : "Otus's RPC"}</p>}
+            {!picking && <p className="text-xs text-ink-2">{settings.network === 'devnet' ? "Solana's public devnet RPC" : "Otus's RPC"}</p>}
             {picking && (
                 <>
-                    {saved && <p className="text-[10.5px] break-all text-ink-2">{`${networkName(settings.custom!)}: ${masked(settings.rpc!)}`}</p>}
+                    {saved && <p className="text-xs break-all text-ink-2">{`${networkName(settings.custom!)}: ${masked(settings.rpc!)}`}</p>}
                     <Input placeholder={saved ? 'Another endpoint' : 'Your endpoint'} spellCheck={false} autoComplete="off" aria-label="Your RPC" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void keep()} />
                     <ErrorLine>{error}</ErrorLine>
                     <Button size="sm" variant="default" disabled={asking} onClick={() => void keep()}>
@@ -201,14 +201,14 @@ function TrustedApps({ sites }: { sites: State['sites'] }) {
     const entries = Object.entries(sites);
     return (
         <>
-            <p className="text-[10.5px] text-ink-2">Sites connected to your wallets. They see an address and can ask you to sign; they never sign.</p>
+            <p className="text-xs text-ink-2">Sites connected to your wallets. They see an address and can ask you to sign; they never sign.</p>
             {entries.length === 0 ? (
-                <p className="text-[10.5px] text-ink-3">No site is connected</p>
+                <p className="text-xs text-ink-3">No site is connected</p>
             ) : (
                 <ul>
                     {entries.map(([origin, site]) => (
                         <li key={origin} className="flex items-center gap-2.5 border-t border-dashed border-rule-2 py-2">
-                            <span className="min-w-0 flex-1 truncate text-[10.5px] text-ink-3">
+                            <span className="min-w-0 flex-1 truncate text-xs text-ink-3">
                                 <span className="font-bold text-ink">{new URL(origin).host}</span> {short(site.account)}
                             </span>
                             <Button size="sm" onClick={() => void edit({ edit: 'disconnect', origin })}>
@@ -250,9 +250,9 @@ function KnownAddresses({ state }: { state: State }) {
                     {state.contacts.map((c) => (
                         <li key={c.address} className="flex items-center gap-2.5 border-b border-dashed border-rule-2 py-2">
                             <Tile address={c.address} size={14} />
-                            <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10.5px]">
+                            <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-xs">
                                 <span className="truncate font-bold text-ink">{c.label}</span>
-                                <span className="text-[10px] break-all text-ink-3">{c.address}</span>
+                                <span className="text-xs break-all text-ink-3">{c.address}</span>
                             </span>
                             <Button size="sm" onClick={() => void edit({ edit: 'drop', address: c.address })}>
                                 Remove

@@ -16,17 +16,17 @@ export function Settled({ site, account, outcome }: { site: SiteView; account: A
             <div role="status" className={`outcome mt-3 flex items-center gap-3 rounded-[3px] border p-3.5 ${tone === 'plain' ? 'border-rule text-ink' : `border-current ${filled(tone)}`}`}>
                 <Icon name={going ? 'refresh' : MARK[tone]} size={28} stroke={2.5} />
                 <div className="flex min-w-0 flex-col gap-1">
-                    <p className="title pixel text-[22px] leading-[1.1]">{title}</p>
+                    <p className="title pixel text-3xl leading-[1.1]">{title}</p>
                     <p className="font-bold">{words}</p>
                     {link && link.length > 0 && (
-                        <a href={link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-[3px] text-[11px] font-bold text-inherit">
+                        <a href={link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-[3px] text-xs font-bold text-inherit">
                             View in the explorer
                             <Icon name="external" size={11} stroke={2.5} />
                         </a>
                     )}
                 </div>
             </div>
-            {going && heard && <p className="text-[10.5px] text-ink-3">You can close this window: it changes nothing.</p>}
+            {going && heard && <p className="text-xs text-ink-3">You can close this window: it changes nothing.</p>}
         </Frame>
     );
 }

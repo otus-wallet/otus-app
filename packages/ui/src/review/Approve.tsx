@@ -33,7 +33,7 @@ const CONNECT_RIGHTS = ['Can see your address', 'Can ask you to sign'];
 
 // A site's rights, as a list.
 const Rights = ({ rights }: { rights: string[] }) => (
-    <ul className="rights flex flex-col gap-1.5 rounded-[3px] border border-dashed border-rule px-3 py-2.5 text-[11px] text-ink-2">
+    <ul className="rights flex flex-col gap-1.5 rounded-[3px] border border-dashed border-rule px-3 py-2.5 text-xs text-ink-2">
         {rights.map((r) => (
             <li key={r} className="flex gap-2">
                 <span aria-hidden="true" className="text-ink-3">
@@ -82,12 +82,12 @@ function Single({ a, answers: { answer } }: { a: Exclude<Approval, TransactionVi
             ) : a.kind === 'message' ? (
                 <Block>
                     <Heading>Message to sign</Heading>
-                    <div className="text max-h-[280px] overflow-y-auto rounded-[3px] border border-rule bg-panel px-3 py-2.5 text-[11.5px] [overflow-wrap:anywhere] whitespace-pre-wrap">{a.text}</div>
+                    <div className="text max-h-[280px] overflow-y-auto rounded-[3px] border border-rule bg-panel px-3 py-2.5 text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">{a.text}</div>
                 </Block>
             ) : (
                 <Block>
                     <Heading>Sign in</Heading>
-                    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[11px]">
+                    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
                         {a.fields.map(([k, v]) => (
                             <div key={k} className="contents">
                                 <dt className="text-ink-3">{k}</dt>
@@ -110,13 +110,13 @@ function AccountPicker({ choices, shown, choose }: { choices: AccountView[]; sho
         <Select value={choices.some((c) => c.address === shown.address) ? shown.address : ''} onValueChange={choose}>
             <SelectTrigger aria-label="Account to connect" className="h-auto cursor-pointer gap-1.5 border-0 bg-transparent p-0 shadow-none hover:bg-transparent focus-visible:ring-0 dark:bg-transparent dark:hover:bg-transparent">
                 <span className="flex flex-col items-end gap-[3px]">
-                    <span className="pixel text-[10px] text-ink">{shown.label}</span>
-                    <span className="text-[10.5px] text-ink-2">{short(shown.address)}</span>
+                    <span className="pixel text-xs text-ink">{shown.label}</span>
+                    <span className="text-xs text-ink-2">{short(shown.address)}</span>
                 </span>
             </SelectTrigger>
             <SelectContent position="popper" align="end" sideOffset={8}>
                 {choices.map((c) => (
-                    <SelectItem key={c.address} value={c.address} className="text-xs">
+                    <SelectItem key={c.address} value={c.address} className="text-sm">
                         <span className="flex items-center gap-2">
                             <Tile address={c.address} size={14} />
                             <span className="font-bold">{c.label}</span>

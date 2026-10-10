@@ -142,15 +142,15 @@ export function LedgerAccounts({ state, go, finished }: { state: State; go: (to:
                                     <Tile address={r.address} size={28} />
                                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                                         <span className="font-bold">{short(r.address)}</span>
-                                        <span className="text-[10.5px] text-ink-3">{r.path}</span>
+                                        <span className="text-xs text-ink-3">{r.path}</span>
                                     </span>
-                                    <span className="text-[11px] text-ink-2">{had(r.address) ? 'In Otus' : r.lamports === null ? '' : `${sol(r.lamports)} SOL`}</span>
+                                    <span className="text-xs text-ink-2">{had(r.address) ? 'In Otus' : r.lamports === null ? '' : `${sol(r.lamports)} SOL`}</span>
                                 </label>
                             </li>
                         ))}
                     </ul>
                     {(hidden > 0 || all) && (
-                        <button type="button" className="cursor-pointer self-start text-[10.5px] text-ink-2 underline" onClick={() => setAll(!all)}>
+                        <button type="button" className="cursor-pointer self-start text-xs text-ink-2 underline" onClick={() => setAll(!all)}>
                             {all ? 'Hide the empty ones' : `Show the ${hidden} empty ones`}
                         </button>
                     )}

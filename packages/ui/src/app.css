@@ -90,6 +90,21 @@
     --font-pixel: 'Silkscreen', monospace;
 }
 
+/* The only sizes text comes in, Tailwind's own dropped: tags, and whole addresses (to fit one line), at 2xs; notes,
+   amounts and times at xs; text at sm (the body's). Silkscreen is drawn on a grid of 8 to the em, so it keeps to sizes it is sharp at on a 2× screen: labels at
+   xs, titles at lg, the mark at 3xl. Line heights are the body's. */
+@theme {
+    --text-*: initial;
+    --text-2xs: 11px;
+    --text-xs: 12px;
+    --text-sm: 13px;
+    --text-base: 14px;
+    --text-lg: 16px;
+    --text-xl: 20px;
+    --text-2xl: 22px;
+    --text-3xl: 24px;
+}
+
 @layer base {
     * {
         @apply border-border outline-ring/50;
@@ -146,7 +161,7 @@ body {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
 }
 body {
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 400;
     line-height: 1.45;
     -webkit-font-smoothing: antialiased;

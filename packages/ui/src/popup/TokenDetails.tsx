@@ -53,16 +53,16 @@ function SolDetails({ state }: { state: State }) {
 function Details({ label, address, state, children }: { label: string; address: Address; state: State; children: ReactNode }) {
     const explorer = explorerOf(state.settings);
     return (
-        <div className="details flex flex-col gap-2.5 pb-3 pl-11 text-[11px]">
+        <div className="details flex flex-col gap-2.5 pb-3 pl-11 text-xs">
             <span className="flex flex-col gap-0.5">
-                <span className="pixel text-[9px] text-ink-3">{label}</span>
                 <span className="flex items-center justify-between gap-1">
-                    <span className="min-w-0 text-[10.5px] font-bold [overflow-wrap:anywhere]">{address}</span>
-                    <CopyAddress address={address} label={`Copy ${label.toLowerCase()} address`} className="size-6 shrink-0" />
+                    <span className="pixel text-xs text-ink-3">{label}</span>
+                    <CopyAddress address={address} label={`Copy ${label.toLowerCase()} address`} className="-my-1.5 size-6 shrink-0" />
                 </span>
+                <span className="text-2xs font-bold [overflow-wrap:anywhere]">{address}</span>
             </span>
             {children}
-            <a href={explorer.token(address)} target="_blank" rel="noreferrer" className="inline-flex h-7 items-center gap-1.5 self-start rounded-[3px] border border-rule px-[9px] text-[11px] font-bold text-ink hover:border-ink-3">
+            <a href={explorer.token(address)} target="_blank" rel="noreferrer" className="inline-flex h-7 items-center gap-1.5 self-start rounded-[3px] border border-rule px-[9px] text-xs font-bold text-ink hover:border-ink-3">
                 {`View on ${explorer.name}`}
                 <Icon name="external" size={11} stroke={2.5} />
             </a>

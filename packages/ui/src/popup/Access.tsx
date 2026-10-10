@@ -58,17 +58,17 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
     }
     const take = signs(account) ? (row: AccessRow) => setTaking({ what: fixOf(row), title: row.title }) : null; // a watched account signs nothing
     const checked = read.data && (
-        <p className="px-4 pb-3.5 text-[10.5px] text-ink-3">
+        <p className="px-4 pb-3.5 text-xs text-ink-3">
             Checked: your token accounts, the authorities of your tokens, and the transactions you signed on a nonce.
             {read.data.unchecked > 0 && ` The authorities of ${read.data.unchecked} tokens were left out.`}
         </p>
     );
     return (
         <Sheet bar={<Bar title="Access" back={() => go('activity')} />} foot={checked}>
-            {!read.data && !read.error && <p className="pt-6 text-center text-[11px] text-ink-3">Checking who has access</p>}
+            {!read.data && !read.error && <p className="pt-6 text-center text-xs text-ink-3">Checking who has access</p>}
             {!read.data && read.error && (
                 <div className="flex flex-col items-center gap-2.5 pt-8 text-center">
-                    <p className="text-[11px] text-warn">{`The RPC did not answer: ${said(read.error)}`}</p>
+                    <p className="text-xs text-warn">{`The RPC did not answer: ${said(read.error)}`}</p>
                     <Button size="sm" onClick={() => void read.refetch()}>
                         Try again
                     </Button>
@@ -77,7 +77,7 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
             {read.data && (
                 <div className={cn('flex items-center gap-3 rounded-[3px] border border-current p-3.5', filled(n === 0 && !read.data.unchecked ? 'ok' : 'warn'))}>
                     <Icon name={n === 0 ? 'only' : 'others'} size={24} stroke={2.2} />
-                    <p className="text-[12.5px] font-bold">{accessWords(n, read.data.unchecked)}</p>
+                    <p className="text-sm font-bold">{accessWords(n, read.data.unchecked)}</p>
                 </div>
             )}
             {rows.length > 0 && (
@@ -86,8 +86,8 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
                         {rows.map((row, i) => (
                             <li key={i} className="flex items-center gap-3 border-t border-dashed border-rule-2 py-2.5 first:border-t-0 first:pt-0">
                                 <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                                    <span className={cn('text-[12px] font-bold [overflow-wrap:anywhere]', row.grant.kind === 'closer' ? 'text-ink' : 'text-warn')}>{row.title}</span>
-                                    <span className="text-[10.5px] text-ink-3 [overflow-wrap:anywhere]">{row.sub}</span>
+                                    <span className={cn('text-sm font-bold [overflow-wrap:anywhere]', row.grant.kind === 'closer' ? 'text-ink' : 'text-warn')}>{row.title}</span>
+                                    <span className="text-xs text-ink-3 [overflow-wrap:anywhere]">{row.sub}</span>
                                 </span>
                                 {row.fix && take && (
                                     <Button size="sm" className="shrink-0" onClick={() => take(row)}>
@@ -101,8 +101,8 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
             )}
             {frozen.length > 0 && (
                 <Part title="Can be frozen">
-                    <p className="text-[11px] font-bold">{frozen.join(', ')}</p>
-                    <p className="text-[10.5px] text-ink-3">{frozen.length === 1 ? `The authority of ${frozen[0]} can freeze your account holding it.` : 'The authorities of these tokens can freeze your accounts holding them.'}</p>
+                    <p className="text-xs font-bold">{frozen.join(', ')}</p>
+                    <p className="text-xs text-ink-3">{frozen.length === 1 ? `The authority of ${frozen[0]} can freeze your account holding it.` : 'The authorities of these tokens can freeze your accounts holding them.'}</p>
                 </Part>
             )}
         </Sheet>
@@ -119,7 +119,7 @@ function fixOf({ grant }: AccessRow): Fix {
 // A part of the screen under its title, as large as the review window's section titles.
 const Part = ({ title, children }: { title: string; children: ReactNode }) => (
     <div className="flex flex-col gap-1.5">
-        <h2 className="pixel text-[12px] text-ink-2">{title}</h2>
+        <h2 className="pixel text-xs text-ink-2">{title}</h2>
         {children}
     </div>
 );

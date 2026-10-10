@@ -6,7 +6,7 @@ import { cn } from "../../lib/cn.ts"
 import { Slot } from "radix-ui"
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md text-[13px] font-bold uppercase whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md text-base font-bold uppercase whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -19,8 +19,8 @@ const buttonVariants = cva(
       },
       size: {
         default: "h-11 px-4",
-        sm: "h-[30px] gap-1.5 px-2.5 text-[11px]",
-        xs: "h-[22px] gap-1 px-2 text-[10px]",
+        sm: "h-[30px] gap-1.5 px-2.5 text-xs",
+        xs: "h-[22px] gap-1 px-2 text-2xs",
         icon: "size-8 rounded-md",
       },
     },

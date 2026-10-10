@@ -9,8 +9,8 @@ export function Empty({ setUp }: { setUp: () => void }) {
         <main className="flex h-full flex-col p-6 text-center">
             <div className="flex flex-1 flex-col items-center justify-center gap-3">
                 <Initial />
-                <h1 className="pixel text-base">Otus</h1>
-                <p className="text-[10.5px] text-ink-2">Every transaction reviewed before you sign.</p>
+                <h1 className="pixel text-lg">Otus</h1>
+                <p className="text-xs text-ink-2">Every transaction reviewed before you sign.</p>
             </div>
             <Button variant="default" className="w-full" onClick={setUp}>
                 Set up Otus
@@ -26,8 +26,8 @@ export function Stale() {
         <main className="flex h-full flex-col p-6 text-center">
             <div className="flex flex-1 flex-col items-center justify-center gap-3">
                 <Initial />
-                <h1 className="pixel text-base">Otus was updated</h1>
-                <p className="text-[10.5px] text-ink-2">Reload it to use the new version, then unlock it again.</p>
+                <h1 className="pixel text-lg">Otus was updated</h1>
+                <p className="text-xs text-ink-2">Reload it to use the new version, then unlock it again.</p>
             </div>
             <Button variant="default" className="w-full" onClick={() => platform.reload()}>
                 Reload Otus

@@ -58,22 +58,22 @@ export function OnLedger({ t, answer, expiry, died = false }: { t: TransactionVi
             <Block>
                 <Heading>Sign on your Ledger</Heading>
                 {expired ? null : failed ? (
-                    <p role="alert" className="text-[11px] text-danger">
+                    <p role="alert" className="text-xs text-danger">
                         {failed.message}
                     </p>
                 ) : (
-                    <p className="text-[11px] text-ink-2">{state.phase === 'confirming' ? 'Check it on your Ledger, then confirm it there.' : 'Connect your Ledger, unlock it and open its Solana app.'}</p>
+                    <p className="text-xs text-ink-2">{state.phase === 'confirming' ? 'Check it on your Ledger, then confirm it there.' : 'Connect your Ledger, unlock it and open its Solana app.'}</p>
                 )}
                 {failed?.trouble === 'unplugged' && (
-                    <button type="button" className="cursor-pointer self-start text-[10.5px] text-ink-2 underline" onClick={pairInTab}>
+                    <button type="button" className="cursor-pointer self-start text-xs text-ink-2 underline" onClick={pairInTab}>
                         Not found? Connect it again in a tab
                     </button>
                 )}
             </Block>
             <Block>
                 <Heading>Message hash</Heading>
-                <p className="hash text-[15px] leading-[1.7] font-bold [word-spacing:0.3em]">{t.hash}</p>
-                <p className="text-[10.5px] text-ink-3">When your Ledger cannot show what it signs, it shows this hash: it must be the same.</p>
+                <p className="hash text-lg leading-[1.7] font-bold [word-spacing:0.3em]">{t.hash}</p>
+                <p className="text-xs text-ink-3">When your Ledger cannot show what it signs, it shows this hash: it must be the same.</p>
             </Block>
             {t.recipient && <Notice>{`When it can, your Ledger shows the amount and where it goes: ${t.recipient}`}</Notice>}
         </Frame>

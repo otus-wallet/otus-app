@@ -32,7 +32,7 @@ export function WalletScreen({ state, go }: { state: State; go: (to: Screen) => 
         <Sheet bar={<Bar title={account.label} back={() => go('lobby')} />}>
             <div className="flex flex-col items-center gap-2 pt-3.5 pb-1 text-center">
                 <Tile address={account.address} size={44} />
-                <p className="max-w-[260px] text-[11px] break-all text-ink-2">{account.address}</p>
+                <p className="max-w-[260px] text-xs break-all text-ink-2">{account.address}</p>
                 <CopyButton text={() => account.address} label="Copy address" />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -47,7 +47,7 @@ export function WalletScreen({ state, go }: { state: State; go: (to: Screen) => 
             </div>
             <div className="flex flex-col gap-1.5">
                 <Heading>Signatures</Heading>
-                <p className="inline-flex items-center gap-1.5 text-[10.5px] text-ink-2">
+                <p className="inline-flex items-center gap-1.5 text-xs text-ink-2">
                     <Icon name="fingerprint" size={14} />
                     {`${n} ${n === 1 ? 'signature' : 'signatures'} with Otus`}
                 </p>
@@ -55,7 +55,7 @@ export function WalletScreen({ state, go }: { state: State; go: (to: Screen) => 
             {account.key ? <Secrets account={account} /> : <Holder account={account} />}
             <div className="flex flex-col gap-1.5">
                 <Heading>Remove</Heading>
-                <p className="text-[10.5px] text-ink-3">{GONE[holder(account)]}</p>
+                <p className="text-xs text-ink-3">{GONE[holder(account)]}</p>
                 <Button size="sm" variant={removing ? 'risky' : 'outline'} className="self-start" onClick={remove}>
                     <Icon name="trash" size={13} />
                     {removing ? 'Sure? Remove it' : 'Remove this wallet'}
@@ -79,7 +79,7 @@ function Holder({ account }: { account: Account }) {
     const where = { ledger: `Its key is on your Ledger, at ${account.ledger?.path}.` } as Record<string, string>;
     const at = holder(account);
     return (
-        <p className="inline-flex items-center gap-2 rounded-[3px] border border-dashed border-rule px-3 py-2.5 text-[11px] text-ink-2">
+        <p className="inline-flex items-center gap-2 rounded-[3px] border border-dashed border-rule px-3 py-2.5 text-xs text-ink-2">
             <Icon name={at === 'watched' ? 'eye' : 'key'} size={13} />
             {where[at] ?? 'Watch only: Otus holds no key for this address.'}
         </p>
@@ -139,7 +139,7 @@ function Secrets({ account }: { account: Account }) {
         return (
             <div className="flex flex-col gap-1.5">
                 <Heading>{`Show ${name}`}</Heading>
-                <p className="text-[10.5px] text-warn">{`Anyone who sees your ${name} takes everything in this wallet. Make sure no one is watching.`}</p>
+                <p className="text-xs text-warn">{`Anyone who sees your ${name} takes everything in this wallet. Make sure no one is watching.`}</p>
                 <PasswordInput placeholder="Password" autoComplete="current-password" aria-label="Password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void reveal()} />
                 <ErrorLine>{error}</ErrorLine>
                 <div className="flex justify-end gap-2">
@@ -159,16 +159,16 @@ function Secrets({ account }: { account: Account }) {
             {what === 'phrase' ? (
                 <ol className="phrase grid grid-cols-3 gap-x-1.5 gap-y-2 rounded-[3px] border border-rule bg-panel p-3">
                     {shown.split(' ').map((word, i) => (
-                        <li key={i} className="flex gap-1.5 text-xs font-bold whitespace-nowrap">
+                        <li key={i} className="flex gap-1.5 text-sm font-bold whitespace-nowrap">
                             <span className="w-4 text-right font-normal text-ink-3">{i + 1}</span>
                             {word}
                         </li>
                     ))}
                 </ol>
             ) : (
-                <p className="rounded-[3px] border border-rule bg-panel px-3 py-2.5 text-[11px] break-all select-all">{shown}</p>
+                <p className="rounded-[3px] border border-rule bg-panel px-3 py-2.5 text-xs break-all select-all">{shown}</p>
             )}
-            <p className="text-[10.5px] text-ink-3">Copied, it leaves your clipboard when you hide it.</p>
+            <p className="text-xs text-ink-3">Copied, it leaves your clipboard when you hide it.</p>
             <div className="flex justify-end gap-2">
                 <CopyButton text={() => shown} onCopy={() => ((copied.current = true), setTimeout(forget, 60_000))} />
                 <Button size="sm" onClick={close}>

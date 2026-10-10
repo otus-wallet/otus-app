@@ -83,18 +83,18 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
                 <Choice text="Native" on={tab === 'native'} onClick={() => setTab('native')} />
                 <Choice text="Liquid" on={tab === 'liquid'} onClick={() => setTab('liquid')} />
             </div>
-            {tab === 'liquid' && <p className="pt-4 text-center text-[11px] text-ink-3">Liquid stake comes with swaps: soon.</p>}
+            {tab === 'liquid' && <p className="pt-4 text-center text-xs text-ink-3">Liquid stake comes with swaps: soon.</p>}
             {tab === 'native' && (
                 <>
-                    {!stakes.data && !stakes.error && <p className="pt-6 text-center text-[11px] text-ink-3">Reading your stake</p>}
+                    {!stakes.data && !stakes.error && <p className="pt-6 text-center text-xs text-ink-3">Reading your stake</p>}
                     {!stakes.data && stakes.error && <Failed error={stakes.error} again={() => void stakes.refetch()} />}
                     {stakes.data && (
-                        <Part title="Your stake" extra={epoch.data && <span className="text-[10.5px] text-ink-3">{`Epoch ${epoch.data.epoch}`}</span>}>
+                        <Part title="Your stake" extra={epoch.data && <span className="text-xs text-ink-3">{`Epoch ${epoch.data.epoch}`}</span>}>
                             {read.length === 0 ? (
-                                <p className="text-[11px] text-ink-3">No stake yet</p>
+                                <p className="text-xs text-ink-3">No stake yet</p>
                             ) : (
                                 <>
-                                    <p className="text-[11px] font-bold">{`${sol(total)} SOL`}</p>
+                                    <p className="text-xs font-bold">{`${sol(total)} SOL`}</p>
                                     <ul>
                                         {read.map((s) => {
                                             if ('unreadable' in s) {
@@ -177,10 +177,10 @@ function NewStake({ state, terms, validators, error, back, start }: { state: Sta
             <div className="flex flex-col gap-1.5">
                 <Heading>Validator</Heading>
                 <Input placeholder="Name or address" autoComplete="off" spellCheck={false} aria-label="Find a validator" autoFocus value={query} onChange={(e) => setQuery(e.target.value)} />
-                {!validators && !error && <p className="text-[11px] text-ink-3">Reading the validators</p>}
-                {!validators && error && <p className="text-[11px] text-warn">{`The RPC did not answer: ${said(error)}`}</p>}
-                {validators && listed.length === 0 && <p className="text-[11px] text-ink-3">No validator by that name or address</p>}
-                {validators && !query.trim() && <p className="mt-1.5 text-[10.5px] text-ink-3">Ranked by the highest rewards in the last 3 epochs.</p>}
+                {!validators && !error && <p className="text-xs text-ink-3">Reading the validators</p>}
+                {!validators && error && <p className="text-xs text-warn">{`The RPC did not answer: ${said(error)}`}</p>}
+                {validators && listed.length === 0 && <p className="text-xs text-ink-3">No validator by that name or address</p>}
+                {validators && !query.trim() && <p className="mt-1.5 text-xs text-ink-3">Ranked by the highest rewards in the last 3 epochs.</p>}
                 <ul className="flex flex-col gap-1.5">
                     {listed.map((v) => (
                         <li key={v.vote}>
@@ -199,7 +199,7 @@ function NewStake({ state, terms, validators, error, back, start }: { state: Sta
                                         Amount
                                     </Heading>
                                     <Input inputMode="decimal" placeholder="0" autoComplete="off" spellCheck={false} aria-label="Amount" autoFocus value={text} onChange={(e) => setText(e.target.value)} />
-                                    <p className="text-[10.5px] text-ink-3">{`At least ${sol(terms.min)} SOL. Its account keeps ${sol(terms.rent)} SOL of rent, back when you withdraw.`}</p>
+                                    <p className="text-xs text-ink-3">{`At least ${sol(terms.min)} SOL. Its account keeps ${sol(terms.rent)} SOL of rent, back when you withdraw.`}</p>
                                     <ErrorLine>{problem}</ErrorLine>
                                     <Button variant="default" className="mt-1 w-full" disabled={!ready} onClick={go}>
                                         Stake
@@ -239,16 +239,16 @@ function ValidatorRow({ v, open, flip, logos, children }: { v: Validator; open: 
                 <ValidatorLogo node={v.node} shown={logos} />
                 <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
                     <span className="flex items-center gap-1.5">
-                        <span className={cn('min-w-0 flex-1 truncate text-[12px] font-bold', open && 'text-ok')}>{title}</span>
+                        <span className={cn('min-w-0 flex-1 truncate text-sm font-bold', open && 'text-ok')}>{title}</span>
                         {v.top && (
                             <Tip text="One of the few validators that together hold a third of all stake">
-                                <span className="pixel shrink-0 rounded-sm border border-rule px-[3px] py-px text-[8px] text-ink-3">Top third</span>
+                                <span className="pixel shrink-0 rounded-sm border border-rule px-[3px] py-px text-xs text-ink-3">Top third</span>
                             </Tip>
                         )}
                     </span>
-                    <span className="text-[10.5px] text-ink-3">{sub}</span>
+                    <span className="text-xs text-ink-3">{sub}</span>
                     {notes.map((n) => (
-                        <span key={n.text} className={cn('text-[10.5px]', n.tone === 'danger' ? 'text-danger' : 'text-warn')}>
+                        <span key={n.text} className={cn('text-xs', n.tone === 'danger' ? 'text-danger' : 'text-warn')}>
                             {n.text}
                         </span>
                     ))}
@@ -264,8 +264,8 @@ const Row = ({ title, sub, logo, children }: { title: string; sub: string; logo:
     <li className="flex items-center gap-3 border-t border-dashed border-rule-2 py-2.5 first:border-t-0 first:pt-0">
         {logo}
         <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-            <span className="text-[12px] font-bold [overflow-wrap:anywhere]">{title}</span>
-            <span className="text-[10.5px] text-ink-3 [overflow-wrap:anywhere]">{sub}</span>
+            <span className="text-sm font-bold [overflow-wrap:anywhere]">{title}</span>
+            <span className="text-xs text-ink-3 [overflow-wrap:anywhere]">{sub}</span>
         </span>
         {children}
     </li>
@@ -275,7 +275,7 @@ const Row = ({ title, sub, logo, children }: { title: string; sub: string; logo:
 const Part = ({ title, extra, children }: { title: string; extra?: ReactNode; children: ReactNode }) => (
     <div className="flex flex-col gap-1.5">
         <div className="flex items-baseline justify-between">
-            <h2 className="pixel text-[12px] text-ink-2">{title}</h2>
+            <h2 className="pixel text-xs text-ink-2">{title}</h2>
             {extra}
         </div>
         {children}
@@ -284,7 +284,7 @@ const Part = ({ title, extra, children }: { title: string; extra?: ReactNode; ch
 
 const Failed = ({ error, again }: { error: unknown; again: () => void }) => (
     <div className="flex flex-col items-center gap-2.5 pt-8 text-center">
-        <p className="text-[11px] text-warn">{`The RPC did not answer: ${said(error)}`}</p>
+        <p className="text-xs text-warn">{`The RPC did not answer: ${said(error)}`}</p>
         <Button size="sm" onClick={again}>
             Try again
         </Button>

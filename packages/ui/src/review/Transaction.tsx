@@ -43,7 +43,7 @@ export function To({ address }: { address: string }) {
     return (
         <Block>
             <Heading>To</Heading>
-            <p className="text-xs leading-relaxed font-bold break-all">
+            <p className="text-sm leading-relaxed font-bold break-all">
                 <span className="text-ok">{address.slice(0, 4)}</span>
                 {address.slice(4, -4)}
                 <span className="text-ok">{address.slice(-4)}</span>
@@ -61,8 +61,8 @@ function Line({ change, note, amount, tone, className }: { change: AssetChange; 
                 {change.asset}
                 {change.verified && <Seal symbol={change.asset} />}
             </span>
-            <span className="min-w-0 flex-1 text-[10.5px] text-ink-3">{note}</span>
-            <span className={cn('amount shrink-0 text-[13px] font-bold', text(tone))}>{amount}</span>
+            <span className="min-w-0 flex-1 text-xs text-ink-3">{note}</span>
+            <span className={cn('amount shrink-0 text-base font-bold', text(tone))}>{amount}</span>
         </span>
     );
 }
@@ -129,19 +129,19 @@ export function Balances({ t }: { t: TransactionView }) {
             {t.proposals.map((p, i) => (
                 <Block key={i}>
                     <Heading>{p.title}</Heading>
-                    {p.you && <p className="text-[11px] font-bold">{p.you}</p>}
+                    {p.you && <p className="text-xs font-bold">{p.you}</p>}
                     <ul className="flex flex-col gap-1">
                         {p.lines.map((l, j) => (
-                            <li key={j} className={cn('proposal-line text-[11px] [overflow-wrap:anywhere]', text(l.tone))}>
+                            <li key={j} className={cn('proposal-line text-xs [overflow-wrap:anywhere]', text(l.tone))}>
                                 <Yours text={l.text} />
                             </li>
                         ))}
                     </ul>
-                    {p.after && <p className="text-[11px] text-ink-2">{p.after}</p>}
+                    {p.after && <p className="text-xs text-ink-2">{p.after}</p>}
                 </Block>
             ))}
             <Block>
-                <Heading extra={<span className="text-[10.5px] text-ink-3">{`simulated · ${t.network ?? 'mainnet'}`}</span>}>Balance changes</Heading>
+                <Heading extra={<span className="text-xs text-ink-3">{`simulated · ${t.network ?? 'mainnet'}`}</span>}>Balance changes</Heading>
                 {t.balances.length ? (
                     <ul>
                         {t.balances.map((change, i) => (
@@ -149,13 +149,13 @@ export function Balances({ t }: { t: TransactionView }) {
                         ))}
                     </ul>
                 ) : (
-                    <p className="text-[10.5px] text-ink-3">No balance of yours changes</p>
+                    <p className="text-xs text-ink-3">No balance of yours changes</p>
                 )}
                 {t.changes.map((c, i) => (
                     <div key={i} className={cn('change mt-1.5 flex items-start gap-2.5 rounded-[3px] border border-current px-3 py-2.5', filled(c.tone))}>
                         <Icon name={MARK[c.tone]} size={16} stroke={2.5} />
-                        <span className="flex flex-col gap-[3px] text-[10.5px]">
-                            <span className="text-xs font-bold">{c.title}</span>
+                        <span className="flex flex-col gap-[3px] text-xs">
+                            <span className="text-sm font-bold">{c.title}</span>
                             {c.note && <span>{c.note}</span>}
                         </span>
                     </div>
@@ -164,7 +164,7 @@ export function Balances({ t }: { t: TransactionView }) {
             {t.guards.text && (
                 <Block>
                     <Heading>Guards</Heading>
-                    <p className="inline-flex items-center gap-2 text-[10.5px] text-ink-2">
+                    <p className="inline-flex items-center gap-2 text-xs text-ink-2">
                         <Icon name={t.guards.held ? 'check' : 'bang'} size={13} stroke={2.5} />
                         {t.guards.text}
                     </p>
@@ -184,8 +184,8 @@ export function Balances({ t }: { t: TransactionView }) {
                     >
                         Message hash
                     </Heading>
-                    <p className="hash text-xs leading-[1.7] [word-spacing:0.3em]">{t.hash}</p>
-                    <p className="text-[10.5px] text-ink-3">Ledger and Otus show this same hash on their screen.</p>
+                    <p className="hash text-sm leading-[1.7] [word-spacing:0.3em]">{t.hash}</p>
+                    <p className="text-xs text-ink-3">Ledger and Otus show this same hash on their screen.</p>
                 </Block>
             )}
         </>
@@ -198,7 +198,7 @@ export function Programs({ t }: { t: TransactionView }) {
         <>
             <Block>
                 <Heading>Programs and instructions</Heading>
-                <p className="text-[10.5px] text-ink-3">
+                <p className="text-xs text-ink-3">
                     <Count n={p} one="program" many="programs" /> · <Count n={i} one="instruction" many="instructions" />
                     {inner ? ` · +${inner} called inside` : ''}
                 </p>
@@ -213,7 +213,7 @@ export function Programs({ t }: { t: TransactionView }) {
                     <Heading>Added by Otus</Heading>
                     <ul>
                         {t.added.map((x) => (
-                            <li key={x} className="flex items-start gap-2 text-[10.5px] text-ink-2">
+                            <li key={x} className="flex items-start gap-2 text-xs text-ink-2">
                                 <Icon name="plus" size={12} stroke={2.5} className="mt-0.5" />
                                 {x}
                             </li>
@@ -236,12 +236,12 @@ function Program({ program, open: first }: { program: ProgramView; open: boolean
                     <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
                         <span className="flex min-w-0 items-baseline gap-1.5">
                             <span className="font-bold">{program.name}</span>
-                            <span className="truncate text-[10.5px] text-ink-3" title={program.address}>
+                            <span className="truncate text-xs text-ink-3" title={program.address}>
                                 {short(program.address)}
                             </span>
                         </span>
-                        <span className={cn('text-[10.5px]', program.subTone === 'plain' ? 'text-ink-2' : text(program.subTone))}>{program.sub}</span>
-                        {program.standing === 'described' && <span className="text-[10.5px] text-ink-3">Named by its own IDL</span>}
+                        <span className={cn('text-xs', program.subTone === 'plain' ? 'text-ink-2' : text(program.subTone))}>{program.sub}</span>
+                        {program.standing === 'described' && <span className="text-xs text-ink-3">Named by its own IDL</span>}
                     </span>
                     <Standing program={program} />
                 </CollapsibleTrigger>
@@ -251,10 +251,10 @@ function Program({ program, open: first }: { program: ProgramView; open: boolean
                             <Step key={ix.number} ix={ix} open={instruction === ix.number} flip={() => setInstruction(instruction === ix.number ? null : ix.number)} />
                         ))}
                     </ul>
-                    {program.meta && <p className={cn('meta px-2.5 pt-2 text-[10.5px] font-bold', program.metaTone === 'plain' ? 'text-ink-2' : program.metaTone === 'info' ? 'text-info' : text(program.metaTone))}>{program.meta}</p>}
+                    {program.meta && <p className={cn('meta px-2.5 pt-2 text-xs font-bold', program.metaTone === 'plain' ? 'text-ink-2' : program.metaTone === 'info' ? 'text-info' : text(program.metaTone))}>{program.meta}</p>}
                     {program.inner && (
-                        <p className="mt-2 border-t border-dashed border-rule-2 px-2.5 pt-2 pb-2.5 text-[10.5px] text-ink-2">
-                            <span className="label pixel text-[9px] text-ink-3">Calls inside </span>
+                        <p className="mt-2 border-t border-dashed border-rule-2 px-2.5 pt-2 pb-2.5 text-xs text-ink-2">
+                            <span className="label pixel text-xs text-ink-3">Calls inside </span>
                             {program.inner}
                         </p>
                     )}
@@ -280,7 +280,7 @@ function Standing({ program }: { program: ProgramView }) {
         <Tooltip>
             <TooltipTrigger asChild>
                 <span role="img" aria-label={words} className={cn('standing grid size-5 shrink-0 place-items-center rounded-[3px] border border-current', tone ? filled(tone) : 'text-ink-3')}>
-                    {tone ? <Icon name={MARK[tone]} size={11} stroke={3} /> : <span className="text-[11px] leading-none font-bold">?</span>}
+                    {tone ? <Icon name={MARK[tone]} size={11} stroke={3} /> : <span className="text-xs leading-none font-bold">?</span>}
                 </span>
             </TooltipTrigger>
             <TooltipContent sideOffset={6} className="max-w-[220px]">
@@ -299,18 +299,18 @@ function markOf(program: ProgramView): 'ok' | 'warn' | 'danger' | null {
 }
 
 const Badge = ({ tone, children }: { tone: TransactionView['programs'][number]['tone']; children: string }) => (
-    <span className={cn('badge shrink-0 rounded-[3px] border border-current px-1.5 py-px text-[9.5px] font-bold whitespace-nowrap uppercase', tone === 'plain' ? 'text-ink-2' : text(tone))}>{children}</span>
+    <span className={cn('badge shrink-0 rounded-[3px] border border-current px-1.5 py-px text-2xs font-bold whitespace-nowrap uppercase', tone === 'plain' ? 'text-ink-2' : text(tone))}>{children}</span>
 );
 
 function Step({ ix, open, flip }: { ix: InstructionView; open: boolean; flip: () => void }) {
     return (
         <li className="instruction border-t border-dashed border-rule-2">
             <button type="button" aria-expanded={open} onClick={flip} className="toggle flex min-h-11 w-full cursor-pointer items-center gap-2 py-1.5 text-left">
-                <span className="w-[22px] shrink-0 text-[10.5px] text-ink-3">{`#${ix.number}`}</span>
+                <span className="w-[22px] shrink-0 text-xs text-ink-3">{`#${ix.number}`}</span>
                 <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
                     <span className="font-bold">{ix.name}</span>
                     {ix.args && (
-                        <span className="text-[10.5px] text-ink-2 [overflow-wrap:anywhere]">
+                        <span className="text-xs text-ink-2 [overflow-wrap:anywhere]">
                             <Tagged text={ix.args} />
                         </span>
                     )}
@@ -318,19 +318,19 @@ function Step({ ix, open, flip }: { ix: InstructionView; open: boolean; flip: ()
                 <Badge tone={ix.source === 'unknown' ? 'danger' : 'plain'}>{ix.source}</Badge>
             </button>
             {open && (
-                <div className="details flex flex-col gap-[3px] pb-2.5 pl-[30px] text-[11px]">
-                    {ix.accounts.length > 0 && <span className="label pixel mt-1.5 text-[9px] text-ink-3">Accounts</span>}
+                <div className="details flex flex-col gap-[3px] pb-2.5 pl-[30px] text-xs">
+                    {ix.accounts.length > 0 && <span className="label pixel mt-1.5 text-xs text-ink-3">Accounts</span>}
                     {ix.accounts.map((a, i) => (
                         <span key={i} className="flex justify-between gap-2">
                             <span className={text(a.tone)}>
                                 <Tagged text={a.name} />
                             </span>
-                            <span className={cn('text-right text-[10px] text-ink-2', text(a.tone))}>{a.role}</span>
+                            <span className={cn('text-right text-xs text-ink-2', text(a.tone))}>{a.role}</span>
                         </span>
                     ))}
-                    {ix.effects.length > 0 && <span className="label pixel mt-1.5 text-[9px] text-ink-3">Effect</span>}
+                    {ix.effects.length > 0 && <span className="label pixel mt-1.5 text-xs text-ink-3">Effect</span>}
                     {ix.effects.map((e, i) => (
-                        <span key={i} className={cn('effect text-[11px] font-bold', e.tone === 'plain' ? 'text-ink' : text(e.tone))}>
+                        <span key={i} className={cn('effect text-xs font-bold', e.tone === 'plain' ? 'text-ink' : text(e.tone))}>
                             <Tagged text={e.text} />
                         </span>
                     ))}
@@ -366,7 +366,7 @@ export function Verdict({ t, ack, onAck }: { t: TransactionView; ack: boolean; o
             <div className={cn('verdict flex items-center gap-3 rounded-[3px] border border-current p-3.5', filled(t.verdict))}>
                 <Icon name={MARK[t.verdict]} size={28} stroke={2.5} />
                 <div>
-                    <p className="title pixel text-[22px] leading-[1.1]">{t.title}</p>
+                    <p className="title pixel text-3xl leading-[1.1]">{t.title}</p>
                     <p className="font-bold">{t.sub}</p>
                 </div>
             </div>
@@ -378,13 +378,13 @@ export function Verdict({ t, ack, onAck }: { t: TransactionView; ack: boolean; o
                         </span>
                         <span className="words flex min-w-0 flex-col gap-[3px]">
                             <span className="font-bold">{f.title}</span>
-                            {f.note && <span className="text-[10.5px] text-ink-2">{f.note}</span>}
+                            {f.note && <span className="text-xs text-ink-2">{f.note}</span>}
                         </span>
                     </li>
                 ))}
             </ul>
             {t.signer !== 'none' && t.verdict === 'danger' && (
-                <label className="ack flex cursor-pointer items-center gap-2.5 rounded-[3px] border border-danger px-3 py-2.5 text-[11.5px] font-bold">
+                <label className="ack flex cursor-pointer items-center gap-2.5 rounded-[3px] border border-danger px-3 py-2.5 text-xs font-bold">
                     <Checkbox checked={ack} onCheckedChange={(v) => onAck(v === true)} className="size-[18px] border-danger data-[state=checked]:border-danger data-[state=checked]:bg-danger" />
                     I understand the risk and want to sign anyway
                 </label>

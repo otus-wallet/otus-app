@@ -106,7 +106,7 @@ function Row({ account: a, active, total, onPick }: { account: Account; active: 
                 <Tile address={a.address} size={28} />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="truncate font-bold">{a.label}</span>
-                    <span className="truncate text-[10.5px] text-ink-3">{`${short(a.address)}${a.key ? '' : a.ledger ? ' · Ledger' : ' · watch only'}`}</span>
+                    <span className="truncate text-xs text-ink-3">{`${short(a.address)}${a.key ? '' : a.ledger ? ' · Ledger' : ' · watch only'}`}</span>
                 </span>
                 <span className="font-bold">{total}</span>
             </button>

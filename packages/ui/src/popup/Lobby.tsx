@@ -46,17 +46,17 @@ export function Lobby({ state, go }: { state: State; go: (to: Screen) => void })
                     </p>
                     {day && (
                         <Tip text="Last 24 hours">
-                            <p className={cn('day inline-flex cursor-default items-center gap-2 text-[14px] font-bold', { up: 'text-ok', down: 'text-danger', flat: 'text-ink-3' }[trendOf(day.percent).way])}>
+                            <p className={cn('day inline-flex cursor-default items-center gap-2 text-base font-bold', { up: 'text-ok', down: 'text-danger', flat: 'text-ink-3' }[trendOf(day.percent).way])}>
                                 {`${day.delta < 0 ? '−' : '+'}${dollars(Math.abs(day.delta))}`}
-                                <Trend change={day.percent} className="px-[7px] text-[11.5px]" />
+                                <Trend change={day.percent} className="px-[7px] text-xs" />
                             </p>
                         </Tip>
                     )}
-                    {r instanceof Error && <p className="text-[10.5px] text-warn">{`${{ custom: 'Your RPC', devnet: "Solana's devnet RPC", mainnet: "Otus's RPC" }[state.settings.network]} did not answer: ${said(r)}`}</p>}
+                    {r instanceof Error && <p className="text-xs text-warn">{`${{ custom: 'Your RPC', devnet: "Solana's devnet RPC", mainnet: "Otus's RPC" }[state.settings.network]} did not answer: ${said(r)}`}</p>}
                     {(!signs(account) || r instanceof Error) && (
                         <div className="mt-1.5 flex items-center justify-center gap-2">
                             {!signs(account) && (
-                                <span className="inline-flex items-center gap-1 rounded-[3px] border border-current px-[7px] py-0.5 text-[10.5px] font-bold uppercase">
+                                <span className="inline-flex items-center gap-1 rounded-[3px] border border-current px-[7px] py-0.5 text-xs font-bold uppercase">
                                     <Icon name="eye" size={11} stroke={2.5} />
                                     Watch only
                                 </span>
@@ -80,7 +80,7 @@ export function Lobby({ state, go }: { state: State; go: (to: Screen) => void })
                 </ul>
                 {assets.some((a) => !a.verified) && (
                     <>
-                        <h2 className="pixel text-[10px] text-ink-2">Unverified</h2>
+                        <h2 className="pixel text-xs text-ink-2">Unverified</h2>
                         <ul className="assets unverified">
                             {assets.filter((a) => !a.verified).map((a) => line(a))}
                         </ul>
@@ -104,14 +104,14 @@ export function WalletBar({ state, go }: { state: State; go: (to: Screen) => voi
                 <Tile address={account.address} size={22} />
             </button>
             <button type="button" onClick={() => go('wallets')} className="wallet flex h-9 min-w-0 flex-1 cursor-pointer items-center justify-center gap-[7px] rounded-md border border-transparent hover:border-rule">
-                {network !== 'solana:mainnet' && <span className="network shrink-0 rounded-[3px] border border-current px-1 py-px text-[9.5px] font-bold text-warn uppercase">{networkName(network)}</span>}
+                {network !== 'solana:mainnet' && <span className="network shrink-0 rounded-[3px] border border-current px-1 py-px text-2xs font-bold text-warn uppercase">{networkName(network)}</span>}
                 <span className="max-w-[120px] truncate font-bold">{account.label}</span>
-                <span className="text-[10.5px] whitespace-nowrap text-ink-2">{short(account.address)}</span>
+                <span className="text-xs whitespace-nowrap text-ink-2">{short(account.address)}</span>
                 <Icon name="down" size={12} stroke={2.5} />
             </button>
             <CopyAddress address={account.address} />
             <Tip text={`${n} ${n === 1 ? 'signature' : 'signatures'} with Otus`}>
-                <span tabIndex={0} className="prints inline-flex shrink-0 cursor-default items-center gap-1 px-1 text-[11px] font-bold text-ink-2">
+                <span tabIndex={0} className="prints inline-flex shrink-0 cursor-default items-center gap-1 px-1 text-xs font-bold text-ink-2">
                     <Icon name="fingerprint" size={15} />
                     {n}
                 </span>
@@ -131,7 +131,7 @@ function Act({ name, label, onClick, tip }: { name: 'receive' | 'send' | 'swap' 
             className={cn('act flex h-[58px] flex-1 flex-col items-center justify-center gap-1.5 rounded-[3px] border border-rule bg-panel text-ink', off ? 'cursor-default text-ink-3' : 'cursor-pointer hover:border-ink-3')}
         >
             <Icon name={name} size={18} />
-            <span className="pixel text-[10px] tracking-[0.04em]">{label}</span>
+            <span className="pixel text-xs tracking-[0.04em]">{label}</span>
         </button>
     );
     return tip ? <Tip text={tip}>{act}</Tip> : act;
@@ -167,7 +167,7 @@ function AssetLine({ asset: a, dim }: { asset: Holding; dim: boolean }) {
                     <span className="truncate font-bold">{a.native ? 'Solana' : symbol}</span>
                     {a.verified && <Seal symbol={a.native ? 'SOL' : symbol} />}
                 </span>
-                <span className="truncate text-[10.5px] text-ink-3">{`${amount(a)} ${symbol}${a.price === null ? '' : ` · ${price(a.price)}`}`}</span>
+                <span className="truncate text-xs text-ink-3">{`${amount(a)} ${symbol}${a.price === null ? '' : ` · ${price(a.price)}`}`}</span>
             </span>
             <span className="values flex shrink-0 flex-col items-end gap-0.5 text-right">
                 <span className={cn('font-bold', dim && 'text-ink-3')}>{a.usd === null ? '—' : dollars(a.usd)}</span>
@@ -203,7 +203,7 @@ function Banner({ settings }: { settings: Settings }) {
     const [tone, mark, words] = bannerOf(last);
     const style = { ok: 'border-ok-bd bg-ok-bg text-ok', danger: 'border-danger-bd bg-danger-bg text-danger', plain: 'border-rule' }[tone];
     return (
-        <div role="status" className={cn('banner mx-3 mt-2 flex items-center gap-2 rounded-[3px] border py-1 pr-1 pl-2.5 text-[11px]', style)}>
+        <div role="status" className={cn('banner mx-3 mt-2 flex items-center gap-2 rounded-[3px] border py-1 pr-1 pl-2.5 text-xs', style)}>
             <Icon name={mark} size={13} stroke={2.5} />
             <span className="min-w-0 flex-1 truncate">
                 {words}

@@ -44,7 +44,7 @@ setInterval(() => {
 
 function Window() {
     const now = useSyncExternalStore((l) => (listeners.add(l), () => listeners.delete(l)), () => heard);
-    if (now.gone) return <p className="p-4 text-[10.5px] text-ink-2">This request is no longer waiting.</p>;
+    if (now.gone) return <p className="p-4 text-xs text-ink-2">This request is no longer waiting.</p>;
     if (!now.approval) return null;
     if (now.approved) return <Settled site={now.approval.site} account={now.approval.account} outcome={now.outcome ?? null} />;
     return (

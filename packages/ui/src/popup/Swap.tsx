@@ -100,7 +100,7 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
     if (!mainnet || !signs(account)) {
         return (
             <Sheet bar={bar}>
-                <p className="pt-4 text-center text-[11px] text-ink-3">{!mainnet ? 'Swaps are on mainnet only.' : 'Watch only: Otus holds no key for it.'}</p>
+                <p className="pt-4 text-center text-xs text-ink-3">{!mainnet ? 'Swaps are on mainnet only.' : 'Watch only: Otus holds no key for it.'}</p>
             </Sheet>
         );
     }
@@ -141,7 +141,7 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
             <Pane
                 label="You pay"
                 extra={
-                    <span className="flex items-center gap-2 text-[10.5px] text-ink-3">
+                    <span className="flex items-center gap-2 text-xs text-ink-3">
                         {heldWords(held, payHeld)}
                         {available > 0n && (
                             <Button size="xs" onClick={() => setText(decimal(available, payDecimals))}>
@@ -164,15 +164,15 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
                 worth={got !== null ? `≈ ${dollars(got)}` : ''}
             />
             {route && (
-                <dl className="flex flex-col gap-1.5 rounded-md border border-rule px-3.5 py-2.5 text-[10.5px]">
+                <dl className="flex flex-col gap-1.5 rounded-md border border-rule px-3.5 py-2.5 text-xs">
                     <Fact name="Rate">{`1 ${pay.symbol} ≈ ${rate(route, payDecimals, getDecimals)} ${get.symbol}`}</Fact>
                     <Fact name="Slippage">{`${route.ask.slippageBps / 100}%`}</Fact>
                     <Fact name="At least">{`${decimal(route.least, getDecimals)} ${get.symbol}`}</Fact>
                     <Fact name="Route">{[...new Set(route.venues.map((v) => v.label))].join(', ')}</Fact>
                 </dl>
             )}
-            {impact !== null && impact >= NOTABLE && <p className={cn('text-[10.5px]', heavy ? 'text-danger' : 'text-warn')}>{`Price impact ${impact.toFixed(impact < 10 ? 1 : 0)}%: you get that much less than the market price`}</p>}
-            {!get.verified && <p className="text-[10.5px] text-warn">{`${get.symbol} is not verified: check its address, ${short(get.mint)}`}</p>}
+            {impact !== null && impact >= NOTABLE && <p className={cn('text-xs', heavy ? 'text-danger' : 'text-warn')}>{`Price impact ${impact.toFixed(impact < 10 ? 1 : 0)}%: you get that much less than the market price`}</p>}
+            {!get.verified && <p className="text-xs text-warn">{`${get.symbol} is not verified: check its address, ${short(get.mint)}`}</p>}
             <ErrorLine>{problem || (quote.isError ? said(quote.error) : '')}</ErrorLine>
         </Sheet>
     );
@@ -182,20 +182,20 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
 const Pane = ({ label, extra, amount, token, worth }: { label: string; extra?: ReactNode; amount: ReactNode; token: ReactNode; worth: string }) => (
     <div className="flex flex-col gap-1.5 rounded-md border border-rule bg-panel px-3.5 pt-2.5 pb-2 transition-[box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
         <div className="flex h-5 items-center justify-between">
-            <span className="pixel text-[10px] text-ink-2">{label}</span>
+            <span className="pixel text-xs text-ink-2">{label}</span>
             {extra}
         </div>
         <div className="flex items-center gap-2">
             {amount}
             {token}
         </div>
-        <p className="h-4 text-[10.5px] text-ink-3">{worth}</p>
+        <p className="h-4 text-xs text-ink-3">{worth}</p>
     </div>
 );
 
 // An amount as a pane shows it: large, left, borderless; read only on the side the quote fills.
 const Amount = (props: InputHTMLAttributes<HTMLInputElement>) => (
-    <input inputMode="decimal" placeholder="0" autoComplete="off" spellCheck={false} {...props} className="min-w-0 flex-1 bg-transparent text-[22px] leading-8 font-bold outline-none placeholder:text-ink-3 read-only:cursor-default" />
+    <input inputMode="decimal" placeholder="0" autoComplete="off" spellCheck={false} {...props} className="min-w-0 flex-1 bg-transparent text-2xl leading-8 font-bold outline-none placeholder:text-ink-3 read-only:cursor-default" />
 );
 
 // How much one of what you pay brings of what you get, at the quote: shown with up to six significant digits.
@@ -221,7 +221,7 @@ function heldWords(held: ReturnType<typeof useHoldings>, h: Holding | undefined)
 
 // A side's token, to pick another.
 const TokenButton = ({ side, onClick }: { side: Side; onClick: () => void }) => (
-    <button type="button" aria-label={`Token: ${side.symbol}`} onClick={onClick} className="flex h-[34px] min-w-[108px] shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-rule bg-black px-2.5 text-xs font-bold hover:border-ink-3">
+    <button type="button" aria-label={`Token: ${side.symbol}`} onClick={onClick} className="flex h-[34px] min-w-[108px] shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-rule bg-black px-2.5 text-sm font-bold hover:border-ink-3">
         <TokenLogo asset={side} size={18} />
         {side.symbol}
         <Icon name="down" size={12} className="text-ink-3" />
@@ -248,18 +248,18 @@ function TokenPick({ title, held, findMore, throughOtus, pick, back }: { title: 
                         <button type="button" onClick={() => pick(s)} className="flex w-full cursor-pointer items-center gap-2.5 border-t border-dashed border-rule-2 py-2 text-left first:border-t-0">
                             <TokenLogo asset={s} size={24} />
                             <span className="flex min-w-0 flex-1 flex-col">
-                                <span className="flex items-center gap-1.5 text-xs font-bold">
+                                <span className="flex items-center gap-1.5 text-sm font-bold">
                                     {s.symbol}
                                     {s.verified && <Seal symbol={s.symbol} />}
                                 </span>
-                                <span className="truncate text-[10.5px] text-ink-3">{`${s.name || s.symbol} · ${short(s.mint)}`}</span>
+                                <span className="truncate text-xs text-ink-3">{`${s.name || s.symbol} · ${short(s.mint)}`}</span>
                             </span>
                         </button>
                     </li>
                 ))}
             </ul>
             {findMore && q && found.isError && <ErrorLine>{said(found.error)}</ErrorLine>}
-            {q && sides.length === 0 && !found.isFetching && <p className="text-[11px] text-ink-3">No token by that name or address</p>}
+            {q && sides.length === 0 && !found.isFetching && <p className="text-xs text-ink-3">No token by that name or address</p>}
         </Sheet>
     );
 }

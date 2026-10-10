@@ -25,7 +25,7 @@ export function Bar({ title, back }: { title: string; back?: () => void }) {
     return (
         <header className="flex items-center gap-1 border-b border-dashed border-rule px-2.5 pt-2.5 pb-2">
             {back ? <IconButton name="left" label="Back" onClick={back} /> : <span className="size-8" />}
-            <h1 className="pixel flex-1 text-center text-[13px]">{title}</h1>
+            <h1 className="pixel flex-1 text-center text-lg">{title}</h1>
             <span className="size-8" />
         </header>
     );
@@ -49,7 +49,7 @@ export function TabBar({ at, go }: { at: 'lobby' | 'activity' | 'settings'; go: 
                     className={cn('flex h-[52px] flex-1 cursor-pointer flex-col items-center justify-center gap-[5px]', at === to ? 'text-ink' : 'text-ink-3 hover:text-ink-2')}
                 >
                     <Icon name={icon} size={16} stroke={2.2} />
-                    <span className="pixel text-[9px] tracking-[0.04em]">{label}</span>
+                    <span className="pixel text-xs tracking-[0.04em]">{label}</span>
                 </button>
             ))}
         </nav>
@@ -87,7 +87,7 @@ export const Fact = ({ name, children, wrap = false }: { name: string; children:
 export function Heading({ children, extra }: { children: ReactNode; extra?: ReactNode }) {
     return (
         <div className="flex items-baseline justify-between gap-2">
-            <h2 className="pixel text-[10px] text-ink-2">{children}</h2>
+            <h2 className="pixel text-xs text-ink-2">{children}</h2>
             {extra}
         </div>
     );
@@ -100,7 +100,7 @@ export function Tip({ text, children }: { text: string; children: ReactNode }) {
         <Tooltip>
             <TooltipTrigger asChild>{children}</TooltipTrigger>
             <TooltipContent sideOffset={6} collisionPadding={8}>
-                {rest.length ? <strong className="block text-[11px] text-ink">{title}</strong> : title}
+                {rest.length ? <strong className="block text-xs text-ink">{title}</strong> : title}
                 {rest.map((line) => (
                     <span key={line} className="block">
                         {line}
@@ -136,7 +136,7 @@ export function CopyButton({ text, label = 'Copy', size = 'sm', onCopy }: { text
 export function Trend({ change, className }: { change: number; className?: string }) {
     const { shown, way } = trendOf(change);
     const tone = { up: 'border-ok-bd bg-ok-bg text-ok', down: 'border-danger-bd bg-danger-bg text-danger', flat: 'border-rule text-ink-3' }[way];
-    return <span className={cn('rounded-[3px] border px-1.5 py-px text-[10px] font-bold whitespace-nowrap', tone, className)}>{`${way === 'up' ? '▲ ' : way === 'down' ? '▼ ' : ''}${shown}%`}</span>;
+    return <span className={cn('rounded-[3px] border px-1.5 py-px text-2xs font-bold whitespace-nowrap', tone, className)}>{`${way === 'up' ? '▲ ' : way === 'down' ? '▼ ' : ''}${shown}%`}</span>;
 }
 
 /** The seal of a verified token, saying so on hover. */
@@ -163,14 +163,14 @@ export function TokenLogo({ asset, size = 28 }: { asset: Pick<Holding, 'mint' | 
 
 /** One of a few choices side by side, the one on marked. */
 export const Choice = ({ text, on, onClick }: { text: string; on: boolean; onClick: () => void }) => (
-    <button type="button" aria-pressed={on} onClick={onClick} className={cn('h-7 cursor-pointer rounded-[3px] border px-[9px] text-[11px] font-bold', on ? 'border-ok-bd bg-ok-bg text-ok' : 'border-rule text-ink-2 hover:border-ink-3')}>
+    <button type="button" aria-pressed={on} onClick={onClick} className={cn('h-7 cursor-pointer rounded-[3px] border px-[9px] text-xs font-bold', on ? 'border-ok-bd bg-ok-bg text-ok' : 'border-rule text-ink-2 hover:border-ink-3')}>
         {text}
     </button>
 );
 
 export const ErrorLine = ({ children }: { children: ReactNode }) =>
     children ? (
-        <p role="alert" className="text-[10.5px] text-danger">
+        <p role="alert" className="text-xs text-danger">
             {children}
         </p>
     ) : null;
