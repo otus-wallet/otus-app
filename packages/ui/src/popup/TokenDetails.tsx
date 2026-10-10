@@ -12,6 +12,7 @@ import { cachedToken } from '@otus-wallet/core/tokens.ts';
 import type { State } from '@otus-wallet/core/state.ts';
 import { solFacts, tokenFacts, type TokenFact } from '@otus-wallet/core/view/token.ts';
 import { Icon } from '../components/icons.tsx';
+import { ShortAddress } from '../components/address.tsx';
 import { Addressed, YouTag } from '../components/you.tsx';
 import { cn } from '../lib/cn.ts';
 import { CopyAddress, Fact, Tip } from './common.tsx';
@@ -69,9 +70,9 @@ function Details({ label, address, state, children }: { label: string; address: 
     );
 }
 
-// Each line; one naming an address has it to copy (yours tagged), and a number in short says it whole on hover. Words
-// are shown as they are, but for addresses, cut short: a token's symbol is its maker's, so nothing in them is read as a
-// tag.
+// Each line; one naming an address shows it whole on hover and copies it on a click, by its name too (yours tagged), and
+// a number in short says it whole on hover. Words are shown as they are, but for addresses, cut short: a token's symbol
+// is its maker's, so nothing in them is read as a tag.
 function Facts({ facts }: { facts: TokenFact[] }) {
     return (
         <dl className="flex flex-col gap-1">
@@ -83,15 +84,23 @@ function Facts({ facts }: { facts: TokenFact[] }) {
                                 <span className="cursor-default">{f.value}</span>
                             </Tip>
                         ) : (
-                            <span>
-                                <Addressed text={f.value} />
-                            </span>
+                            <Value fact={f} />
                         )}
                         {f.you && <YouTag />}
-                        {f.address && <CopyAddress address={f.address} label={`Copy ${f.name.toLowerCase()}`} className="-my-1.5 size-6 shrink-0" />}
                     </span>
                 </Fact>
             ))}
         </dl>
+    );
+}
+
+// A line's value: an address it names, cut short or by its name, to hover and copy; other words with any address in them
+// cut short.
+function Value({ fact: f }: { fact: TokenFact }) {
+    if (f.address && !f.value.includes(f.address)) return <ShortAddress address={f.address} name={f.value} />;
+    return (
+        <span>
+            <Addressed text={f.value} />
+        </span>
     );
 }
