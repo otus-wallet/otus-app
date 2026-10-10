@@ -95,6 +95,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
         : quick;
     const looked: string[][] = []; // the mints Jupiter was asked about
     const outcomes: Outcome[] = []; // what approved windows heard
+    const settled = { count: 0 }; // how many times Otus's pages were told a transaction landed
     const shell: Shell = {
         load: async () => box.state,
         update: async (change) => void (box.state = { ...box.state, ...(change(box.state) ?? {}) }),
@@ -117,6 +118,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
         send: (tx, on) => send(tx, on, async () => {}),
         tokens: async (mints) => (looked.push(mints), new Map()),
         now: () => NOW,
+        settled: () => void settled.count++,
     };
     // A transfer of 0.001 SOL to key(2) from `from`, its fee paid by `payer`.
     const transfer = (from: Address = me, payer: Address = from, version: 0 | 1 = 0) =>
@@ -135,7 +137,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
             ),
         );
     const call = (method: string, params: object, origin = ORIGIN) => serve({ method, params }, origin, shell);
-    return { me, pair, box, approvals, firsts, shownAt, sent, looked, outcomes, transfer, call, shell };
+    return { me, pair, box, approvals, firsts, shownAt, sent, looked, outcomes, settled, transfer, call, shell };
 }
 
 const result = <T>(reply: Reply): T => {
@@ -175,6 +177,28 @@ test('an approved transaction’s window hears how it goes: sent by Otus, or fol
     const late = await wallet({ chain: { valid: async () => ++checks <= 1 } });
     await late.call('signTransaction', { account: late.me, transactions: [late.transfer()] });
     assert.deepEqual(late.outcomes, [{ phase: 'refused', error: 'It expired before you signed it, so nothing was sent' }]);
+});
+
+test('Otus’s pages hear when a transaction it signed lands, sent by Otus or by the site; not when nothing landed', async () => {
+    const sends = await wallet();
+    result(await sends.call('signAndSendTransaction', { account: sends.me, transactions: [sends.transfer()] }));
+    assert.equal(sends.settled.count, 1);
+    await own(bytes(sends.transfer()), sends.me, key(2), sends.shell);
+    assert.equal(sends.settled.count, 2);
+    const signs = await wallet();
+    result(await signs.call('signTransaction', { account: signs.me, transactions: [signs.transfer()] }));
+    for (let i = 0; i < 20 && signs.settled.count < 1; i++) await new Promise((r) => setTimeout(r, 10));
+    assert.equal(signs.settled.count, 1);
+    // Refused by the network, expired, or never seen: nothing to read again.
+    const refused = await wallet({ chain: { send: async () => { throw blockhashNotFound(); } } });
+    await refused.call('signAndSendTransaction', { account: refused.me, transactions: [refused.transfer()] });
+    let checks = 0;
+    const late = await wallet({ chain: { status: async () => null, valid: async () => ++checks <= 2 } });
+    await late.call('signAndSendTransaction', { account: late.me, transactions: [late.transfer()] });
+    const unseen = await wallet({ chain: { status: async () => null } });
+    unseen.shell.send = async () => ({ signature: key(10) as never, outcome: 'unknown', error: null });
+    result(await unseen.call('signAndSendTransaction', { account: unseen.me, transactions: [unseen.transfer()] }));
+    assert.deepEqual([refused.settled.count, late.settled.count, unseen.settled.count], [0, 0, 0]);
 });
 
 test('only what Otus builds to take access back is signed that way; a payer signature a site wrote is not followed', async () => {

@@ -17,7 +17,7 @@ import { holdings, type Holdings } from '@otus-wallet/core/holdings.ts';
 import { epochOf, stakeRent, stakesOf } from '@otus-wallet/core/stake/stakes.ts';
 import { validatorNames, validatorsOf } from '@otus-wallet/core/stake/validators.ts';
 import { named } from '@otus-wallet/core/state.ts';
-import { accessKey, activityKey, forgetActivity, holdingsKey, queries, type ActivityPages } from './query.ts';
+import { accessKey, activityKey, holdingsKey, landed, queries, type ActivityPages } from './query.ts';
 
 export type Otus = { state: State; keys: KeyStatus };
 
@@ -43,20 +43,13 @@ export function useOtus(): Otus | null {
 
 const REFRESH = 30_000; // ms between reads of what a wallet holds, while it is shown
 
-// A transfer made here that landed (or failed) changed what the wallet holds: the balances are read again then, and the
-// activity from its first page.
-platform.storage.onChanged.addListener((changes, area) => {
-    const last = changes.lastTransfer?.newValue as { pending?: boolean } | undefined;
-    if (area !== 'session' || !last || last.pending) return;
-    void queries.invalidateQueries({ queryKey: ['holdings'] });
-    void queries.resetQueries({ queryKey: ['activity'] });
-    forgetActivity();
-});
+// A transaction Otus signed, yours or a site's, landed (or failed, paying its fee): what it changed is read again.
+platform.storage.onChanged.addListener((changes, area) => void (area === 'session' && changes.settled?.newValue && landed()));
 
 /**
  * What a wallet holds: the last read at once, this session's included, then read again; again every half minute while
- * shown, and once a transfer made here lands. A read that fails keeps what was read before; an error shows only when
- * nothing was ever read.
+ * shown, and once a transaction Otus signed lands. A read that fails keeps what was read before; an error shows only
+ * when nothing was ever read.
  */
 export function useHoldings(rpc: string, address: Address, mainnet = true): Holdings | Error | undefined {
     const read = useQuery({ queryKey: holdingsKey(rpc, address), queryFn: () => holdings(rpc, address, mainnet), refetchInterval: REFRESH });
@@ -102,8 +95,9 @@ export function useActivity(rpc: string, address: Address) {
 const ACCESS_FRESH = 5 * 60_000; // ms who else has access is taken as current: it changes only when you sign
 
 /** Who besides the wallet can move, burn, freeze or close what it holds, and the site behind each when Otus knows it:
- *  read when shown, at most every five minutes, and again once a site is signed for something it can still use. Three
- *  requests: its token accounts of each token program, then their mints with the nonce accounts it waits on. */
+ *  read when shown, at most every five minutes, and again once a site is signed for something it can still use, or a
+ *  transaction Otus signed lands. Three requests: its token accounts of each token program, then their mints with the
+ *  nonce accounts it waits on. */
 export function useAccess(rpc: string, address: Address, state: State) {
     const waiting = state.waiting.filter((w) => w.wallet === address);
     const stamp = Math.max(0, ...waiting.map((w) => w.at), ...state.given.map((g) => g.at));

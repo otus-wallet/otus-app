@@ -30,6 +30,14 @@ const unpack = (s: string): unknown =>
 
 let kept: Kept = {};
 
+/** A transaction Otus signed landed: what each wallet holds, its stake, who else has access and its activity are read
+ *  again, and the activity kept this session is dropped. */
+export function landed() {
+    for (const key of ['holdings', 'stakes', 'access']) void queries.invalidateQueries({ queryKey: [key] });
+    void queries.resetQueries({ queryKey: ['activity'] });
+    forgetActivity();
+}
+
 /** Drops the activity kept this session: a transfer landed, so what was read is behind. */
 export function forgetActivity() {
     kept = Object.fromEntries(Object.entries(kept).filter(([key]) => !key.startsWith('["activity"')));
@@ -39,11 +47,15 @@ export function forgetActivity() {
 /** Puts what each wallet held, as last read this session, into the cache: before the popup draws. */
 export async function restore() {
     try {
-        kept = (((await platform.storage.session.get(KEPT))[KEPT] ?? {}) as Kept) || {};
+        const stored = await platform.storage.session.get({ [KEPT]: {}, settled: 0 });
+        kept = ((stored[KEPT] ?? {}) as Kept) || {};
+        const settled = typeof stored.settled === 'number' ? stored.settled : 0; // when a transaction Otus signed last landed
         for (const [key, { at, packed }] of Object.entries(kept)) {
             const queryKey = JSON.parse(key);
             const data = unpack(packed);
             queries.setQueryData(queryKey, queryKey[0] === 'activity' ? { pages: [data], pageParams: [null] } : data, { updatedAt: at });
+            // Read before it landed, while the popup was closed: shown at once all the same, and read again.
+            if (at < settled) void queries.invalidateQueries({ queryKey, exact: true });
         }
     } catch {
         kept = {}; // nothing kept, or kept by another build: read afresh

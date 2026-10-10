@@ -29,6 +29,7 @@ const shell = {
     tokens: async (mints: string[]) => tokens(mints, rpcFor('solana:mainnet', (await load()).settings) === OTUS_RPC),
     now: Date.now,
     fast: throughSender,
+    settled: () => void chrome.storage.session.set({ settled: Date.now() }),
 };
 const PAGES = new URL(chrome.runtime.getURL('')).origin;
 const ours = (sender?: chrome.runtime.MessageSender) => sender?.id === chrome.runtime.id && sender.origin === PAGES;
@@ -45,7 +46,7 @@ chrome.storage.session.get('lastTransfer').then(async ({ lastTransfer }) => {
     if (!last.signature) return void chrome.storage.session.set({ lastTransfer: { ok: false, error: 'Otus stopped before it was signed', at: Date.now() } });
     const status = await shell.chain(walletRpc((await load()).settings)).status(last.signature).catch(() => null);
     const outcome = status?.confirmed ? (status.error ? 'failed' : 'confirmed') : 'unknown';
-    await chrome.storage.session.set({ lastTransfer: { ok: true, result: { signature: last.signature, outcome }, at: Date.now() } });
+    await chrome.storage.session.set({ lastTransfer: { ok: true, result: { signature: last.signature, outcome }, at: Date.now() }, ...(status?.confirmed && { settled: Date.now() }) });
 });
 
 // Content scripts never need storage: the vault, accounts and settings stay out of their reach. Without that (Chrome
