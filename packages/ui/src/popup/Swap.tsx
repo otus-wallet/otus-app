@@ -22,7 +22,6 @@ import { Input } from '../components/ui/input.tsx';
 import { cn } from '../lib/cn.ts';
 import type { Screen } from './App.tsx';
 import { Bar, ErrorLine, Fact, Seal, Sheet, TokenLogo } from './common.tsx';
-import { forgetActivity, queries } from './query.ts';
 import { current, said, useHoldings } from './store.ts';
 import { Doing, type Job } from './TakeBack.tsx';
 
@@ -84,16 +83,12 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
     const quotedAt = quote.dataUpdatedAt;
 
     if (doing) {
-        // Gone out (on its way, landed, or not confirmed yet): what it moved shows in Activity, and the amount is cleared,
-        // so that it is not swapped twice by mistake.
+        // Gone out (on its way, landed, or not confirmed yet): what it moved shows in Activity, read again once it lands,
+        // and the amount is cleared, so that it is not swapped twice by mistake.
         const done = (landed: boolean, gone = landed) => {
             setDoing(null);
             setText('');
-            void queries.invalidateQueries({ queryKey: ['holdings'] });
-            if (!gone) return;
-            void queries.resetQueries({ queryKey: ['activity'] });
-            forgetActivity();
-            go('activity');
+            if (gone) go('activity');
         };
         return <Doing account={account} job={doing.job} title={doing.title} settings={state.settings} done={done} />;
     }

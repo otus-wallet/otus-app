@@ -31,7 +31,7 @@ import type { TokenInfo } from '@otus-wallet/core/tokens.ts';
 import { accountView, siteView, type Approval, type Life, type Outcome, type SiteView } from '@otus-wallet/core/view.ts';
 import type { Answer } from './approvals.ts';
 import { onDevice, sentTo, signs, type Account, type State } from '@otus-wallet/core/state.ts';
-import { approved, channel, clusterOf, followed, landed, messageOf, Rejected, signerOf, unexpired, withSignature } from './transaction.ts';
+import { approved, channel, clusterOf, followed, landed, messageOf, Rejected, settled, signerOf, unexpired, withSignature } from './transaction.ts';
 
 /** What serve needs from the extension: its state, the user's answer (behind Otus's lock), the keystore, the network
  *  and the time. Tests pass fakes. */
@@ -45,7 +45,7 @@ export type Shell = {
     tokens(mints: string[]): Promise<Map<string, TokenInfo | null>>; // names and prices, from Jupiter
     now(): number; // ms since 1970
     fast?(chain: Chain): Chain; // the chain a swap lands through: Helius Sender's, by Otus's server; without it, the chain itself
-    settled?(): void; // a transaction Otus signed landed, or failed onchain: Otus's pages read again what it changed
+    settled?(): void; // a transaction Otus signed landed, failed onchain, or went out unseen yet: Otus's pages read again what it changed
 };
 
 const NOT_CONNECTED = 'this site is not connected to that account';
@@ -175,8 +175,8 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
         else {
             outcome.tell({ phase: 'waiting', host, link: link(id) });
             void followed(id, r, chain).then((f) => {
-                if ('failed' in f) shell.settled?.();
                 outcome.tell('failed' in f ? { phase: 'landed', failed: f.failed, link: link(id) } : { phase: 'unseen', expired: f.expired, link: link(id) });
+                if ('failed' in f) settled(shell);
             });
         }
         return { transactions: [base64(signed)] };

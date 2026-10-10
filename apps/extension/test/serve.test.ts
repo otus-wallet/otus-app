@@ -179,26 +179,47 @@ test('an approved transaction’s window hears how it goes: sent by Otus, or fol
     assert.deepEqual(late.outcomes, [{ phase: 'refused', error: 'It expired before you signed it, so nothing was sent' }]);
 });
 
-test('Otus’s pages hear when a transaction it signed lands, sent by Otus or by the site; not when nothing landed', async () => {
+test('Otus’s pages hear when a transaction it signed goes out, sent by Otus or by the site; not when nothing did', async () => {
+    const wait = async (done: () => boolean) => {
+        for (let i = 0; i < 50 && !done(); i++) await new Promise((r) => setTimeout(r, 10));
+    };
     const sends = await wallet();
     result(await sends.call('signAndSendTransaction', { account: sends.me, transactions: [sends.transfer()] }));
     assert.equal(sends.settled.count, 1);
     await own(bytes(sends.transfer()), sends.me, key(2), sends.shell);
     assert.equal(sends.settled.count, 2);
-    const signs = await wallet();
-    result(await signs.call('signTransaction', { account: signs.me, transactions: [signs.transfer()] }));
-    for (let i = 0; i < 20 && signs.settled.count < 1; i++) await new Promise((r) => setTimeout(r, 10));
-    assert.equal(signs.settled.count, 1);
-    // Refused by the network, expired, or never seen: nothing to read again.
-    const refused = await wallet({ chain: { send: async () => { throw blockhashNotFound(); } } });
-    await refused.call('signAndSendTransaction', { account: refused.me, transactions: [refused.transfer()] });
-    let checks = 0;
-    const late = await wallet({ chain: { status: async () => null, valid: async () => ++checks <= 2 } });
-    await late.call('signAndSendTransaction', { account: late.me, transactions: [late.transfer()] });
-    const unseen = await wallet({ chain: { status: async () => null } });
+    // Failed onchain, it paid its fee; not seen yet, it may land in a moment: both are read again.
+    const failed = await wallet({ chain: { status: async () => ({ error: { InstructionError: [0, 'InvalidArgument'] } as never, confirmed: true }) } });
+    await failed.call('signAndSendTransaction', { account: failed.me, transactions: [failed.transfer()] });
+    assert.equal(failed.settled.count, 1);
+    const unseen = await wallet();
     unseen.shell.send = async () => ({ signature: key(10) as never, outcome: 'unknown', error: null });
     result(await unseen.call('signAndSendTransaction', { account: unseen.me, transactions: [unseen.transfer()] }));
-    assert.deepEqual([refused.settled.count, late.settled.count, unseen.settled.count], [0, 0, 0]);
+    assert.equal(unseen.settled.count, 1);
+    // The site sends it: once Otus sees it land; not when it expires unseen.
+    const signs = await wallet();
+    result(await signs.call('signTransaction', { account: signs.me, transactions: [signs.transfer()] }));
+    await wait(() => signs.settled.count > 0);
+    assert.equal(signs.settled.count, 1);
+    let siteChecks = 0;
+    const lost = await wallet({ chain: { status: async () => null, valid: async () => ++siteChecks <= 2 } });
+    result(await lost.call('signTransaction', { account: lost.me, transactions: [lost.transfer()] }));
+    await wait(() => lost.outcomes.length > 1);
+    assert.deepEqual([lost.outcomes[1]?.phase, lost.settled.count], ['unseen', 0]);
+    // Refused by the network, or expired once sent: nothing went out.
+    const refused = await wallet({ chain: { send: async () => { throw blockhashNotFound(); } } });
+    assert.deepEqual(await refused.call('signAndSendTransaction', { account: refused.me, transactions: [refused.transfer()] }), { ok: false, error: 'it expired before it was sent, so nothing was sent' });
+    let checks = 0;
+    const late = await wallet({ chain: { status: async () => null, valid: async () => ++checks <= 2 } });
+    assert.deepEqual(await late.call('signAndSendTransaction', { account: late.me, transactions: [late.transfer()] }), { ok: false, error: 'it expired before it landed, so nothing was sent' });
+    assert.ok(late.sent.length > 0); // it went to the network, and expired there
+    assert.deepEqual([refused.settled.count, late.settled.count], [0, 0]);
+    // Telling the pages never changes how it went.
+    const loud = await wallet();
+    loud.shell.settled = () => {
+        throw new Error('no pages');
+    };
+    result(await loud.call('signAndSendTransaction', { account: loud.me, transactions: [loud.transfer()] }));
 });
 
 test('only what Otus builds to take access back is signed that way; a payer signature a site wrote is not followed', async () => {

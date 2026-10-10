@@ -30,12 +30,20 @@ const unpack = (s: string): unknown =>
 
 let kept: Kept = {};
 
+// How long after a transaction lands what it changed is read again: several landing together are read once, and an RPC
+// a little behind the network has caught up. A read this soon after one landed may not show it yet.
+const LANDED_WAIT = 1_500;
+let soon: ReturnType<typeof setTimeout> | undefined;
+
 /** A transaction Otus signed landed: what each wallet holds, its stake, who else has access and its activity are read
- *  again, and the activity kept this session is dropped. */
+ *  again in a moment, and the activity kept this session is dropped. */
 export function landed() {
-    for (const key of ['holdings', 'stakes', 'access']) void queries.invalidateQueries({ queryKey: [key] });
-    void queries.resetQueries({ queryKey: ['activity'] });
-    forgetActivity();
+    clearTimeout(soon);
+    soon = setTimeout(() => {
+        for (const key of ['holdings', 'stakes', 'access']) void queries.invalidateQueries({ queryKey: [key] });
+        void queries.resetQueries({ queryKey: ['activity'] });
+        forgetActivity();
+    }, LANDED_WAIT);
 }
 
 /** Drops the activity kept this session: a transfer landed, so what was read is behind. */
@@ -54,8 +62,8 @@ export async function restore() {
             const queryKey = JSON.parse(key);
             const data = unpack(packed);
             queries.setQueryData(queryKey, queryKey[0] === 'activity' ? { pages: [data], pageParams: [null] } : data, { updatedAt: at });
-            // Read before it landed, while the popup was closed: shown at once all the same, and read again.
-            if (at < settled) void queries.invalidateQueries({ queryKey, exact: true });
+            // Read before it landed (or too soon after) while the popup was closed: shown at once all the same, and read again.
+            if (at < settled + 2 * LANDED_WAIT) void queries.invalidateQueries({ queryKey, exact: true });
         }
     } catch {
         kept = {}; // nothing kept, or kept by another build: read afresh

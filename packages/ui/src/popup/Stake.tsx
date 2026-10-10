@@ -20,7 +20,6 @@ import { search, stakeProblem, standingWords, validatorWords } from '@otus-walle
 import type { Screen } from './App.tsx';
 import { Bar, Choice, ErrorLine, Heading, Sheet, Tip } from './common.tsx';
 import { decimal } from '@otus-wallet/core/money.ts';
-import { queries } from './query.ts';
 import { current, said, useEpoch, useHoldings, useStakes, useStakeTerms, useValidators } from './store.ts';
 import { Doing, type Job } from './TakeBack.tsx';
 
@@ -42,12 +41,10 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
     const logos = logosShown(state);
 
     if (doing) {
-        // Read again whatever happened: what is still on its way may land.
+        // What it changed is read again once it lands.
         const done = () => {
             setDoing(null);
             setAdding(false);
-            void queries.invalidateQueries({ queryKey: ['stakes'] });
-            void queries.invalidateQueries({ queryKey: ['holdings'] });
         };
         return <Doing account={account} job={doing.job} title={doing.title} settings={state.settings} done={done} />;
     }

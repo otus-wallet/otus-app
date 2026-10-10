@@ -113,7 +113,7 @@ export function useAccess(rpc: string, address: Address, state: State) {
 const MINT_FRESH = 10 * 60_000; // ms a token's terms are taken as current: its authorities hardly ever change
 
 /** A token's terms and whether its metadata can change, read onchain once its details are opened: one request. */
-export const useTokenTerms = (rpc: string, mint: Address) => useQuery({ queryKey: ['mint', rpc, mint], queryFn: () => tokenTerms(rpcAt(rpc), mint), staleTime: MINT_FRESH, refetchOnReconnect: false });
+export const useTokenTerms = (rpc: string, mint: Address) => useQuery({ queryKey: ['mintTerms', rpc, mint], queryFn: () => tokenTerms(rpcAt(rpc), mint), staleTime: MINT_FRESH, refetchOnReconnect: false });
 
 const STAKE_FRESH = 30_000; // ms a wallet's stake accounts, and the epoch, are taken as current
 const VALIDATORS_FRESH = 10 * 60_000; // ms the validators are

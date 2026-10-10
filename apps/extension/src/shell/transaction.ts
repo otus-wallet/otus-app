@@ -274,15 +274,25 @@ export function withSignature(bytes: Uint8Array, address: Address, signature: Si
     return new Uint8Array(getTransactionEncoder().encode({ ...tx, signatures: { ...tx.signatures, [address]: signature } }));
 }
 
-/** Sent and watched until it lands, even to fail onchain, which Otus's pages hear; one the network refuses, or that can
- *  no longer land, is refused in words. */
+/** Sent and watched until it lands, even to fail onchain, which Otus's pages hear (as they do when it is not seen yet:
+ *  it may land in a moment); one the network refuses, or that can no longer land, is refused in words. */
 export async function landed(signed: Uint8Array, chain: Chain, shell: Shell): Promise<Sent> {
     const s = await shell.send(signed, chain).catch((e: unknown) => {
         throw new Refused(refusal(e));
     });
     if (s.outcome === 'expired') throw new Refused('it expired before it landed, so nothing was sent');
-    if (s.outcome !== 'unknown') shell.settled?.();
+    settled(shell);
     return s;
+}
+
+/** Tells Otus's pages a transaction it signed went out, to read again what it changed: telling them never changes how
+ *  it went. */
+export function settled(shell: Pick<Shell, 'settled'>) {
+    try {
+        shell.settled?.();
+    } catch (e) {
+        console.error('Otus: telling pages', e);
+    }
 }
 
 // Why the RPC refused to send a transaction, in words: kit's errors carry only a code in this build. A preflight is

@@ -19,7 +19,6 @@ import { accessRows, accessWords, freezable, others, type AccessNaming, type Acc
 import { KNOWN_SYMBOLS } from './Activity.tsx';
 import type { Screen } from './App.tsx';
 import { Bar, Sheet } from './common.tsx';
-import { queries } from './query.ts';
 import { current, said, useAccess, useHeldNow } from './store.ts';
 import { TakeBack } from './TakeBack.tsx';
 
@@ -53,11 +52,8 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
     const frozen = freezable(grants, naming);
     const n = others(grants);
     if (taking) {
-        // Read again whatever happened: a take-back that is still on its way may land, and its row must not stay.
-        const done = () => {
-            setTaking(null);
-            void queries.invalidateQueries({ queryKey: ['access'] });
-        };
+        // Its row goes once it lands, as access is read again then.
+        const done = () => setTaking(null);
         return <TakeBack account={account} what={taking.what} title={taking.title} settings={state.settings} done={done} />;
     }
     const take = signs(account) ? (row: AccessRow) => setTaking({ what: fixOf(row), title: row.title }) : null; // a watched account signs nothing
