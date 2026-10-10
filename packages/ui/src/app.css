@@ -143,6 +143,11 @@
         display: block;
         flex: none;
     }
+    /* A tooltip only shows: the pointer goes through it, to what is under it (the next address in a list, which a
+       tooltip still fading out would otherwise keep from opening its own). */
+    [data-radix-popper-content-wrapper]:has(> [data-slot='tooltip-content']) {
+        pointer-events: none;
+    }
     /* Scrolling bodies: a thin bar in the rules' colour, brighter under the pointer. */
     .scroll {
         overflow-y: auto;
