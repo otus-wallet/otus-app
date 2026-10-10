@@ -4,7 +4,7 @@
 import type { Address } from '@solana/kit';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
-import { short, sol } from '@otus-wallet/sdk/format';
+import { sol } from '@otus-wallet/sdk/format';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
 import { seedOf, stakeAt, staking } from '@otus-wallet/core/send/stake.ts';
 import { units as unitsOf } from '@otus-wallet/core/send/transfer.ts';
@@ -13,6 +13,7 @@ import { signs, type State } from '@otus-wallet/core/state.ts';
 import { lockedOf, nextSeed, standingOf, type StakeAccount, type Standing } from '@otus-wallet/core/stake/stakes.ts';
 import type { Validator } from '@otus-wallet/core/stake/validators.ts';
 import { Logo } from '../components/icons.tsx';
+import { Addressed } from '../components/you.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
 import { cn } from '../lib/cn.ts';
@@ -37,7 +38,7 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
     const terms = useStakeTerms(rpc);
     const validators = useValidators(rpc, networkOf(state.settings), epoch.data?.epoch);
     const byVote = useMemo(() => new Map((validators.data ?? []).map((v) => [v.vote, v])), [validators.data]);
-    const nameOf = (vote: Address | null) => (vote === null ? 'Not delegated' : (byVote.get(vote)?.name ?? short(vote)));
+    const nameOf = (vote: Address | null) => (vote === null ? 'Not delegated' : (byVote.get(vote)?.name ?? vote));
     const logos = logosShown(state);
 
     if (doing) {
@@ -99,7 +100,7 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
                                         {read.map((s) => {
                                             if ('unreadable' in s) {
                                                 return (
-                                                    <Row key={s.address} title={short(s.address)} sub={`${sol(s.lamports)} SOL · Otus can't read this stake account`} logo={<ValidatorLogo node={null} shown={false} />}>
+                                                    <Row key={s.address} title={s.address} sub={`${sol(s.lamports)} SOL · Otus can't read this stake account`} logo={<ValidatorLogo node={null} shown={false} />}>
                                                         {null}
                                                     </Row>
                                                 );
@@ -170,7 +171,7 @@ function NewStake({ state, terms, validators, error, back, start }: { state: Sta
             landed: 'Staked',
             where: 'Stake',
         };
-        start(job, `${decimal(units, 9)} SOL with ${open.name ?? short(vote)}`);
+        start(job, `${decimal(units, 9)} SOL with ${open.name ?? vote}`);
     };
     return (
         <Sheet bar={<Bar title="Stake SOL" back={back} />}>
@@ -264,8 +265,12 @@ const Row = ({ title, sub, logo, children }: { title: string; sub: string; logo:
     <li className="flex items-center gap-3 border-t border-dashed border-rule-2 py-2.5 first:border-t-0 first:pt-0">
         {logo}
         <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-            <span className="text-sm font-bold [overflow-wrap:anywhere]">{title}</span>
-            <span className="text-xs text-ink-3 [overflow-wrap:anywhere]">{sub}</span>
+            <span className="text-sm font-bold [overflow-wrap:anywhere]">
+                <Addressed text={title} />
+            </span>
+            <span className="text-xs text-ink-3 [overflow-wrap:anywhere]">
+                <Addressed text={sub} />
+            </span>
         </span>
         {children}
     </li>

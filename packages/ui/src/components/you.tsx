@@ -19,7 +19,9 @@ export function Tagged({ text: words, cut, still = false }: { text: string; cut?
     );
 }
 
-const Addressed = ({ text, cut, still }: { text: string; cut?: Cut; still: boolean }) =>
+/** Words with each address in them cut short, and nothing else read in them: for words someone else wrote (a token's
+ *  symbol, a validator's name), where " (you)" is only words. */
+export const Addressed = ({ text, cut, still = false }: { text: string; cut?: Cut; still?: boolean }) =>
     atAddresses(text).map((w, i) => (i % 2 ? <ShortAddress key={i} address={w} cut={cut} still={still} /> : <Unsplit key={i} text={w} />));
 
 // A short address (its ends, an ellipsis between) on one line: a line may break after an ellipsis, and its two halves

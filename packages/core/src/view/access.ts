@@ -4,7 +4,7 @@
 import type { Address } from '@solana/kit';
 
 import type { Grant } from '@otus-wallet/sdk/access/access';
-import { amount, short, sol } from '@otus-wallet/sdk/format';
+import { amount, sol } from '@otus-wallet/sdk/format';
 import type { Given, Signed } from '../state.ts';
 
 /** What the words need: a token's symbol and decimals when known, a name for an address, and what Otus kept of the
@@ -39,12 +39,12 @@ export function accessRows(grants: Grant[], n: AccessNaming): AccessRow[] {
                 return [{ grant: g, title: `${n.who(g.to)} can move ${what}`, sub: given ? `Approved on ${given.host} · ${day(given.at)}` : `A delegate on your ${symbol} account`, fix: 'revoke' }];
             }
             case 'permanent':
-                return [{ grant: g, title: `The authority of ${n.symbol(g.mint)} can move or burn yours`, sub: `Its permanent delegate ${short(g.to)}, at any time`, fix: null }];
+                return [{ grant: g, title: `The authority of ${n.symbol(g.mint)} can move or burn yours`, sub: `Its permanent delegate ${g.to}, at any time`, fix: null }];
             case 'nonce': {
                 const signed = n.waiting.find((w) => w.account === g.account && w.nonce === g.nonce);
                 const where = signed ? ` on ${signed.host}` : '';
                 const yours = g.authority === n.wallet;
-                return [{ grant: g, title: `A transaction you signed${where} can still run`, sub: yours ? 'It waits on a nonce of yours, not a blockhash: it never expires' : `It waits on a nonce, not a blockhash: only ${short(g.authority)} can cancel it`, fix: yours ? 'cancel' : null }];
+                return [{ grant: g, title: `A transaction you signed${where} can still run`, sub: yours ? 'It waits on a nonce of yours, not a blockhash: it never expires' : `It waits on a nonce, not a blockhash: only ${g.authority} can cancel it`, fix: yours ? 'cancel' : null }];
             }
             case 'closer':
                 if (g.sol > 0n) return [{ grant: g, title: `${n.who(g.to)} can close your wrapped SOL account`, sub: `And take the ${sol(g.sol)} SOL in it, at any time`, fix: null }];

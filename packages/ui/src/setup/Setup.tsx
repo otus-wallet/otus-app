@@ -7,12 +7,12 @@ import { platform } from '@otus-wallet/core/platform.ts';
 import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
 import { load, type Account, type State } from '@otus-wallet/core/state.ts';
 import { PasswordInput } from '../components/password.tsx';
+import { ShortAddress } from '../components/address.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
 import { Textarea } from '../components/ui/textarea.tsx';
 import { Icon, Tile } from '../components/icons.tsx';
 import { ask } from '../ask.ts';
-import { short } from '../dom.ts';
 import { cn } from '../lib/cn.ts';
 import { LedgerAccounts } from './Ledger.tsx';
 import { ErrorLine, Heading, Lead, Muted, Row, Soft } from './parts.tsx';
@@ -317,7 +317,9 @@ function Done({ made, go }: { made: Account | null; go: (to: Page) => void }) {
                     <Tile address={made.address} size={36} />
                     <span className="flex min-w-0 flex-col gap-0.5">
                         <span className="font-bold">{made.label}</span>
-                        <span className="text-xs text-ink-2">{short(made.address)}</span>
+                        <span className="text-xs text-ink-2">
+                            <ShortAddress address={made.address} />
+                        </span>
                     </span>
                 </div>
             )}

@@ -4,13 +4,13 @@
 import type { Address } from '@solana/kit';
 import { useMemo, useState, type ReactNode } from 'react';
 
-import { short } from '@otus-wallet/sdk/format';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
 import { networkOf, walletRpc } from '@otus-wallet/core/settings.ts';
 import type { Fix } from '@otus-wallet/core/send/fix.ts';
 import { signs, type State } from '@otus-wallet/core/state.ts';
 import { cachedToken } from '@otus-wallet/core/tokens.ts';
 import { Button } from '../components/ui/button.tsx';
+import { Addressed, Tagged } from '../components/you.tsx';
 import { Icon } from '../components/icons.tsx';
 import { cn } from '../lib/cn.ts';
 import { filled } from '../review/tone.ts';
@@ -34,14 +34,14 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
         const mainnet = networkOf(state.settings) === 'solana:mainnet';
         return {
             wallet: account.address,
-            program: (a) => PROGRAM_NAMES.get(a) ?? short(a),
+            program: (a) => PROGRAM_NAMES.get(a) ?? a,
             symbol: (mint) => {
                 const asset = assets.get(mint);
-                if (!mainnet) return short(mint);
-                return KNOWN_SYMBOLS[mint] ?? (asset?.verified && asset.symbol ? asset.symbol : cachedToken(mint)?.verified ? cachedToken(mint)!.symbol : short(mint));
+                if (!mainnet) return mint;
+                return KNOWN_SYMBOLS[mint] ?? (asset?.verified && asset.symbol ? asset.symbol : cachedToken(mint)?.verified ? cachedToken(mint)!.symbol : mint);
             },
             decimals: (mint) => assets.get(mint)?.decimals ?? (mainnet ? cachedToken(mint)?.decimals : null) ?? null,
-            who: (a: Address) => (a === account.address ? `${short(a)}${YOU}` : (names.get(a) ?? PROGRAM_NAMES.get(a) ?? short(a))),
+            who: (a: Address) => (a === account.address ? `${a}${YOU}` : (names.get(a) ?? PROGRAM_NAMES.get(a) ?? a)),
             given: state.given,
             waiting: state.waiting.filter((w) => w.wallet === account.address),
         };
@@ -86,8 +86,12 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
                         {rows.map((row, i) => (
                             <li key={i} className="flex items-center gap-3 border-t border-dashed border-rule-2 py-2.5 first:border-t-0 first:pt-0">
                                 <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                                    <span className={cn('text-sm font-bold [overflow-wrap:anywhere]', row.grant.kind === 'closer' ? 'text-ink' : 'text-warn')}>{row.title}</span>
-                                    <span className="text-xs text-ink-3 [overflow-wrap:anywhere]">{row.sub}</span>
+                                    <span className={cn('text-sm font-bold [overflow-wrap:anywhere]', row.grant.kind === 'closer' ? 'text-ink' : 'text-warn')}>
+                                        <Tagged text={row.title} />
+                                    </span>
+                                    <span className="text-xs text-ink-3 [overflow-wrap:anywhere]">
+                                        <Tagged text={row.sub} />
+                                    </span>
                                 </span>
                                 {row.fix && take && (
                                     <Button size="sm" className="shrink-0" onClick={() => take(row)}>
@@ -101,8 +105,12 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
             )}
             {frozen.length > 0 && (
                 <Part title="Can be frozen">
-                    <p className="text-xs font-bold">{frozen.join(', ')}</p>
-                    <p className="text-xs text-ink-3">{frozen.length === 1 ? `The authority of ${frozen[0]} can freeze your account holding it.` : 'The authorities of these tokens can freeze your accounts holding them.'}</p>
+                    <p className="text-xs font-bold">
+                        <Addressed text={frozen.join(', ')} />
+                    </p>
+                    <p className="text-xs text-ink-3">
+                        <Addressed text={frozen.length === 1 ? `The authority of ${frozen[0]} can freeze your account holding it.` : 'The authorities of these tokens can freeze your accounts holding them.'} />
+                    </p>
                 </Part>
             )}
         </Sheet>

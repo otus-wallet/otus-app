@@ -17,6 +17,7 @@ import type { Route } from '@otus-wallet/core/swap/route.ts';
 import { askedWire } from '@otus-wallet/core/swap/terms.ts';
 import { cachedToken, search, type TokenInfo } from '@otus-wallet/core/tokens.ts';
 import { Icon } from '../components/icons.tsx';
+import { Addressed } from '../components/you.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
 import { cn } from '../lib/cn.ts';
@@ -172,7 +173,11 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
                 </dl>
             )}
             {impact !== null && impact >= NOTABLE && <p className={cn('text-xs', heavy ? 'text-danger' : 'text-warn')}>{`Price impact ${impact.toFixed(impact < 10 ? 1 : 0)}%: you get that much less than the market price`}</p>}
-            {!get.verified && <p className="text-xs text-warn">{`${get.symbol} is not verified: check its address, ${short(get.mint)}`}</p>}
+            {!get.verified && (
+                <p className="text-xs text-warn">
+                    <Addressed text={`${get.symbol} is not verified: check its address, ${get.mint}`} />
+                </p>
+            )}
             <ErrorLine>{problem || (quote.isError ? said(quote.error) : '')}</ErrorLine>
         </Sheet>
     );

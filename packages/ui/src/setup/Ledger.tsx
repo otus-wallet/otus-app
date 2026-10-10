@@ -13,6 +13,7 @@ import { platform } from '@otus-wallet/core/platform.ts';
 import { walletRpc } from '@otus-wallet/core/settings.ts';
 import { load, nameTaken, signs, type Account, type State } from '@otus-wallet/core/state.ts';
 import { Checkbox } from '../components/ui/checkbox.tsx';
+import { Addressed } from '../components/you.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
 import { Tile } from '../components/icons.tsx';
@@ -110,7 +111,7 @@ export function LedgerAccounts({ state, go, finished }: { state: State; go: (to:
                 const now = await load();
                 if (!now.accounts.some((a) => a.address === r.address && signs(a))) {
                     const reply = (await platform.send({ edit: 'ledger', address: r.address, path: r.path, label: freeName(now) })) as { ok: boolean } | undefined;
-                    if (!reply?.ok) return setError(`Otus did not add ${short(r.address)}: it looks like an address you have`);
+                    if (!reply?.ok) return setError(`Otus did not add ${r.address}: it looks like an address you have`);
                 }
                 last = (await load()).accounts.find((a) => a.address === r.address);
                 setOwned((o) => new Set([...o, r.address]));
@@ -166,7 +167,7 @@ export function LedgerAccounts({ state, go, finished }: { state: State; go: (to:
                     </div>
                 </>
             )}
-            <ErrorLine>{error}</ErrorLine>
+            <ErrorLine>{error && <Addressed text={error} />}</ErrorLine>
             <Row>
                 <Button size="sm" onClick={() => go('start')}>
                     Back

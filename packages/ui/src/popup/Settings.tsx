@@ -9,11 +9,11 @@ import { clusterOfGenesis, EXPLORERS, explorerOf, LOCK_CHOICES, MAX_LOCK_AFTER, 
 import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
 import { lookalike, named, nameTaken, type State } from '@otus-wallet/core/state.ts';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion.tsx';
+import { ShortAddress } from '../components/address.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
 import { Icon, Tile } from '../components/icons.tsx';
 import { ask } from '../ask.ts';
-import { short } from '../dom.ts';
 import type { Screen } from './App.tsx';
 import { Bar, Choice, ErrorLine, Sheet, TabBar } from './common.tsx';
 import { edit, said, setSettings } from './store.ts';
@@ -209,7 +209,7 @@ function TrustedApps({ sites }: { sites: State['sites'] }) {
                     {entries.map(([origin, site]) => (
                         <li key={origin} className="flex items-center gap-2.5 border-t border-dashed border-rule-2 py-2">
                             <span className="min-w-0 flex-1 truncate text-xs text-ink-3">
-                                <span className="font-bold text-ink">{new URL(origin).host}</span> {short(site.account)}
+                                <span className="font-bold text-ink">{new URL(origin).host}</span> <ShortAddress address={site.account} />
                             </span>
                             <Button size="sm" onClick={() => void edit({ edit: 'disconnect', origin })}>
                                 Disconnect
