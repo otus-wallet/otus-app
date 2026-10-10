@@ -99,7 +99,7 @@ export function Tip({ text, children }: { text: string; children: ReactNode }) {
     return (
         <Tooltip>
             <TooltipTrigger asChild>{children}</TooltipTrigger>
-            <TooltipContent sideOffset={6}>
+            <TooltipContent sideOffset={6} collisionPadding={8}>
                 {rest.length ? <strong className="block text-[11px] text-ink">{title}</strong> : title}
                 {rest.map((line) => (
                     <span key={line} className="block">

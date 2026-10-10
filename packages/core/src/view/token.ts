@@ -7,10 +7,15 @@ import { amount } from '@otus-wallet/sdk/format';
 import { TOKEN_2022_PROGRAM_ADDRESS } from '@otus-wallet/sdk/programs/addresses';
 import type { Market, Supply } from '../tokens.ts';
 
-/** One line: its name, what it says, the address it names (to copy), and `warn` when someone else can take yours, it
- *  is stopped now, or Otus cannot tell. What can stop it later (a freeze or pause authority, a hook) is said plainly:
- *  most tokens come with some. */
-export type TokenFact = { name: string; value: string; address?: Address; warn?: boolean };
+/** One line: its name, what it says (a large number in short, `full` saying it whole), the address it names (to copy),
+ *  and `warn` when someone else can take yours, it is stopped now, or Otus cannot tell. What can stop it later (a freeze
+ *  or pause authority, a hook) is said plainly: most tokens come with some. */
+export type TokenFact = { name: string; value: string; full?: string; address?: Address; warn?: boolean };
+
+// A large number in short, as 3.8B; and dollars so.
+const short = (n: number) => n.toLocaleString('en-US', { notation: 'compact', maximumFractionDigits: 1 });
+const shortUsd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 });
+const fullUsd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
 
 /** How a token's facts are read: who an address is (its name, or the address in short), the token's symbol, the epoch
  *  (when its transfer fee is changing), and now (Unix seconds). */
@@ -77,7 +82,7 @@ export function tokenFacts(terms: MintTerms, metadata: MetadataState | null, n: 
     }
     if (others.length) facts.push({ name: 'Extensions', value: others.join(', ') });
     if (terms.unknown.length) facts.push({ name: 'Unreadable', value: terms.unknown.length === 1 ? 'An extension' : `${terms.unknown.length} extensions`, warn: true });
-    facts.push({ name: 'Supply', value: `${amount(terms.supply, terms.decimals, false)} ${n.symbol}` });
+    facts.push({ name: 'Supply', value: `${short(Number(terms.supply) / 10 ** terms.decimals)} ${n.symbol}`, full: `${amount(terms.supply, terms.decimals, false)} ${n.symbol}` });
     if (market) facts.push(...marketFacts(market));
     facts.push({ name: 'Program', value: terms.program === TOKEN_2022_PROGRAM_ADDRESS ? 'Token-2022' : 'Token' });
     return facts;
@@ -87,11 +92,10 @@ export function tokenFacts(terms: MintTerms, metadata: MetadataState | null, n: 
  *  first pool opened. */
 export function marketFacts(m: Market): TokenFact[] {
     const facts: TokenFact[] = [];
-    const usd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 });
-    if (m.cap !== null) facts.push({ name: 'Market cap', value: usd(m.cap) });
+    if (m.cap !== null) facts.push({ name: 'Market cap', value: shortUsd(m.cap), full: fullUsd(m.cap) });
     if (m.holders !== null) facts.push({ name: 'Holders', value: m.holders.toLocaleString('en-US') });
     if (m.topHolders !== null) facts.push({ name: 'Top holders', value: `${m.topHolders.toLocaleString('en-US', { maximumFractionDigits: 1 })}% of supply` });
-    if (m.liquidity !== null) facts.push({ name: 'Liquidity', value: usd(m.liquidity) });
+    if (m.liquidity !== null) facts.push({ name: 'Liquidity', value: shortUsd(m.liquidity), full: fullUsd(m.liquidity) });
     if (m.firstPool !== null) facts.push({ name: 'First pool', value: new Date(m.firstPool).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) });
     return facts;
 }
@@ -99,8 +103,8 @@ export function marketFacts(m: Market): TokenFact[] {
 /** SOL's own facts: it has no mint, only a wrapped one for token programs; its supply and what circulates, when known. */
 export function solFacts(supply: Supply | null): TokenFact[] {
     const facts: TokenFact[] = [{ name: 'Type', value: 'Native token' }];
-    const whole = (sol: number) => `${Math.round(sol).toLocaleString('en-US')} SOL`; // decimals of hundreds of millions say nothing
-    if (supply) facts.push({ name: 'Supply', value: whole(supply.total) }, { name: 'Circulating', value: whole(supply.circulating) });
+    const sol = (n: number) => ({ value: `${short(n)} SOL`, full: `${n.toLocaleString('en-US', { maximumFractionDigits: 9 })} SOL` });
+    if (supply) facts.push({ name: 'Supply', ...sol(supply.total) }, { name: 'Circulating', ...sol(supply.circulating) });
     facts.push({ name: 'Program', value: 'System' });
     return facts;
 }

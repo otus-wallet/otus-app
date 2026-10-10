@@ -16,7 +16,7 @@ import { solFacts, tokenFacts, type TokenFact } from '@otus-wallet/core/view/tok
 import { Icon } from '../components/icons.tsx';
 import { Tagged } from '../components/you.tsx';
 import { cn } from '../lib/cn.ts';
-import { CopyAddress, Fact } from './common.tsx';
+import { CopyAddress, Fact, Tip } from './common.tsx';
 import { current, said, useTokenTerms } from './store.ts';
 
 export function TokenDetails({ asset, state }: { asset: Holding; state: State }) {
@@ -70,14 +70,20 @@ function Details({ label, address, state, children }: { label: string; address: 
     );
 }
 
-// Each line; one naming an address has it to copy.
+// Each line; one naming an address has it to copy, and a number in short says it whole on hover.
 function Facts({ facts }: { facts: TokenFact[] }) {
     return (
         <dl className="flex flex-col gap-1">
             {facts.map((f, i) => (
                 <Fact key={i} name={f.name} wrap>
                     <span className={cn('inline-flex items-center gap-0.5', f.warn && 'text-warn')}>
-                        <Tagged text={f.value} />
+                        {f.full ? (
+                            <Tip text={f.full}>
+                                <span className="cursor-default">{f.value}</span>
+                            </Tip>
+                        ) : (
+                            <Tagged text={f.value} />
+                        )}
                         {f.address && <CopyAddress address={f.address} label={`Copy ${f.name.toLowerCase()}`} className="-my-1.5 size-6 shrink-0" />}
                     </span>
                 </Fact>

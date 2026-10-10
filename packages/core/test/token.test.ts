@@ -19,7 +19,7 @@ test('a plain token: no one can mint or freeze, its metadata fixed, its supply a
         { name: 'Mint authority', value: 'None' },
         { name: 'Freeze authority', value: 'None' },
         { name: 'Metadata', value: 'Immutable' },
-        { name: 'Supply', value: '1,234.5 JUP' },
+        { name: 'Supply', value: '1.2K JUP', full: '1,234.5 JUP' },
         { name: 'Program', value: 'Token' },
     ]);
     // Authorities name their address, to copy; without metadata Otus reads, that line is left out; unreadable, it warns.
@@ -70,7 +70,7 @@ test('Token-2022’s extensions: who can take yours or has stopped it warns; eac
         { name: 'Amount multiplier', value: '×1.5' }, // the next one, as its time has come
         { name: 'Extensions', value: 'Confidential transfers, Group pointer' },
         { name: 'Unreadable', value: '2 extensions', warn: true },
-        { name: 'Supply', value: '1,234.5 PYUSD' },
+        { name: 'Supply', value: '1.2K PYUSD', full: '1,234.5 PYUSD' },
         { name: 'Program', value: 'Token-2022' },
     ]);
 });
@@ -84,11 +84,11 @@ test('a transfer fee as it holds now, its cap, and the one to come', () => {
     assert.equal(shown(fee(0, 1n, 0n), fee(0, 1n, 0n), null), '0%'); // a cap of 0 on no fee says nothing
 });
 
-test('SOL: native, no mint; its supply and what circulates in whole SOL, when read', () => {
+test('SOL: native, no mint; its supply and what circulates in short, whole on hover, when known', () => {
     assert.deepEqual(solFacts({ total: 612_345_678.9, circulating: 512_000_000.1 }), [
         { name: 'Type', value: 'Native token' },
-        { name: 'Supply', value: '612,345,679 SOL' },
-        { name: 'Circulating', value: '512,000,000 SOL' },
+        { name: 'Supply', value: '612.3M SOL', full: '612,345,678.9 SOL' },
+        { name: 'Circulating', value: '512M SOL', full: '512,000,000.1 SOL' },
         { name: 'Program', value: 'System' },
     ]);
     assert.deepEqual(solFacts(null).map((f) => f.name), ['Type', 'Program']);
@@ -97,12 +97,12 @@ test('SOL: native, no mint; its supply and what circulates in whole SOL, when re
 test('its market, between its supply and its program: market cap, holders, the top holders’ share, liquidity, the first pool', () => {
     const market = { cap: 1_241_445_666.9, holders: 838_628, topHolders: 15.44, liquidity: 5_602_336.3, firstPool: Date.UTC(2024, 0, 29, 17, 33, 29) };
     assert.deepEqual(marketFacts(market), [
-        { name: 'Market cap', value: '$1.2B' },
+        { name: 'Market cap', value: '$1.2B', full: '$1,241,445,666.90' },
         { name: 'Holders', value: '838,628' },
         { name: 'Top holders', value: '15.4% of supply' },
-        { name: 'Liquidity', value: '$5.6M' },
+        { name: 'Liquidity', value: '$5.6M', full: '$5,602,336.30' },
         { name: 'First pool', value: '29 Jan 2024' },
     ]);
-    assert.deepEqual(marketFacts({ cap: null, holders: null, topHolders: null, liquidity: 980, firstPool: null }), [{ name: 'Liquidity', value: '$980' }]);
+    assert.deepEqual(marketFacts({ cap: null, holders: null, topHolders: null, liquidity: 980, firstPool: null }), [{ name: 'Liquidity', value: '$980', full: '$980.00' }]);
     assert.deepEqual(tokenFacts(terms(), null, naming(), market).map((f) => f.name), ['Mint authority', 'Freeze authority', 'Supply', 'Market cap', 'Holders', 'Top holders', 'Liquidity', 'First pool', 'Program']);
 });
