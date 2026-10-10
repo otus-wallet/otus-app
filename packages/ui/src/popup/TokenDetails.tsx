@@ -56,7 +56,7 @@ function Details({ label, address, state, children }: { label: string; address: 
         <div className="details flex flex-col gap-2.5 pb-3 pl-11 text-[11px]">
             <span className="flex flex-col gap-0.5">
                 <span className="pixel text-[9px] text-ink-3">{label}</span>
-                <span className="flex items-center gap-1">
+                <span className="flex items-center justify-between gap-1">
                     <span className="min-w-0 text-[10.5px] font-bold [overflow-wrap:anywhere]">{address}</span>
                     <CopyAddress address={address} label={`Copy ${label.toLowerCase()} address`} className="size-6 shrink-0" />
                 </span>
