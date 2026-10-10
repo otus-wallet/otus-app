@@ -98,15 +98,15 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
                 </Part>
             )}
             {frozen.length > 0 && (
-                <Part title="Issuers can freeze">
+                <Part title="Freeze authority">
                     <p className="text-[11px] font-bold">{frozen.join(', ')}</p>
-                    <p className="text-[10.5px] text-ink-3">{frozen.length === 1 ? `The issuer of ${frozen[0]} can freeze your account holding it.` : 'The issuers of these tokens can freeze your accounts holding them.'}</p>
+                    <p className="text-[10.5px] text-ink-3">{frozen.length === 1 ? `The authority of ${frozen[0]} can freeze your account holding it.` : 'The authorities of these tokens can freeze your accounts holding them.'}</p>
                 </Part>
             )}
             {read.data && (
                 <p className="text-[10.5px] text-ink-3">
-                    Checked: your token accounts, what your tokens' issuers can do, and the transactions you signed on a nonce.
-                    {read.data.unchecked > 0 && ` ${read.data.unchecked} tokens' issuers were left out.`}
+                    Checked: your token accounts, what your tokens' authorities can do, and the transactions you signed on a nonce.
+                    {read.data.unchecked > 0 && ` ${read.data.unchecked} tokens' authorities were left out.`}
                 </p>
             )}
         </Sheet>

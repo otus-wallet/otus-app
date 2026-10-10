@@ -39,7 +39,7 @@ export function accessRows(grants: Grant[], n: AccessNaming): AccessRow[] {
                 return [{ grant: g, title: `${n.who(g.to)} can move ${what}`, sub: given ? `Approved on ${given.host} · ${day(given.at)}` : `A delegate on your ${symbol} account`, fix: 'revoke' }];
             }
             case 'permanent':
-                return [{ grant: g, title: `The issuer of ${n.symbol(g.mint)} can move or burn yours`, sub: `Its permanent delegate ${short(g.to)}, at any time`, fix: null }];
+                return [{ grant: g, title: `The authority of ${n.symbol(g.mint)} can move or burn yours`, sub: `Its permanent delegate ${short(g.to)}, at any time`, fix: null }];
             case 'nonce': {
                 const signed = n.waiting.find((w) => w.account === g.account && w.nonce === g.nonce);
                 const where = signed ? ` on ${signed.host}` : '';
