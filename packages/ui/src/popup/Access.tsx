@@ -63,8 +63,8 @@ export function Access({ state, go }: { state: State; go: (to: Screen) => void }
     const take = signs(account) ? (row: AccessRow) => setTaking({ what: fixOf(row), title: row.title }) : null; // a watched account signs nothing
     const checked = read.data && (
         <p className="px-4 pb-3.5 text-[10.5px] text-ink-3">
-            Checked: your token accounts, what your tokens' authorities can do, and the transactions you signed on a nonce.
-            {read.data.unchecked > 0 && ` ${read.data.unchecked} tokens' authorities were left out.`}
+            Checked: your token accounts, the authorities of your tokens, and the transactions you signed on a nonce.
+            {read.data.unchecked > 0 && ` The authorities of ${read.data.unchecked} tokens were left out.`}
         </p>
     );
     return (
