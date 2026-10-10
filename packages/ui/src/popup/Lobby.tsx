@@ -1,7 +1,7 @@
 // The lobby: everything on it belongs to the wallet in use. Its icon opens what you can do with it; its name, the list
 // of all wallets. The balance in the middle, Receive, Send and Swap under it, then the wallet's tokens; at the bottom,
 // the way to its activity and to settings.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { platform } from '@otus-wallet/core/platform.ts';
 import { explorerOf, networkName, networkOf, walletRpc, type Settings } from '@otus-wallet/core/settings.ts';
@@ -15,6 +15,7 @@ import type { Screen } from './App.tsx';
 import { CopyAddress, IconButton, Seal, TabBar, Tip, TokenLogo, Trend } from './common.tsx';
 import { amount, balanceSize, dayChange, dollars, NOTHING, price, trendOf } from '@otus-wallet/core/money.ts';
 import { current, said, useHoldings } from './store.ts';
+import { TokenDetails } from './TokenDetails.tsx';
 
 export function Lobby({ state, go }: { state: State; go: (to: Screen) => void }) {
     const account = current(state);
@@ -25,6 +26,9 @@ export function Lobby({ state, go }: { state: State; go: (to: Screen) => void })
     const day = mainnet && read && dayChange(read);
     // Off mainnet nothing has a price: the balance is its SOL.
     const total = mainnet ? dollars(usd) : `${amount({ units: sol, decimals: 9 })} SOL`;
+    const [open, setOpen] = useState<string | null>(null); // the token whose details are shown, by mint
+    // A token's line, opened on a click: SOL, which has no mint, only says what you hold.
+    const line = (a: Holding, dim = false) => (a.native ? <Asset key="native" asset={a} dim={dim} /> : <Asset key={a.mint} asset={a} dim={dim} open={open === a.mint} flip={() => setOpen(open === a.mint ? null : a.mint)} details={<TokenDetails asset={a} state={state} />} />);
     return (
         <main className="flex h-full flex-col">
             <WalletBar state={state} go={go} />
@@ -66,13 +70,13 @@ export function Lobby({ state, go }: { state: State; go: (to: Screen) => void })
                     <Act name="stake" label="Stake" onClick={() => go('stake')} />
                 </div>
                 <ul className={cn('assets', !read && 'unread')}>
-                    {assets.filter((a) => a.verified).map((a) => <Asset key={a.native ? 'native' : a.mint} asset={a} dim={!read} />)}
+                    {assets.filter((a) => a.verified).map((a) => line(a, !read))}
                 </ul>
                 {assets.some((a) => !a.verified) && (
                     <>
                         <h2 className="pixel text-[10px] text-ink-2">Unverified</h2>
                         <ul className="assets unverified">
-                            {assets.filter((a) => !a.verified).map((a) => <Asset key={a.mint} asset={a} />)}
+                            {assets.filter((a) => !a.verified).map((a) => line(a))}
                         </ul>
                     </>
                 )}
@@ -127,11 +131,30 @@ function Act({ name, label, onClick, tip }: { name: 'receive' | 'send' | 'swap' 
     return tip ? <Tip text={tip}>{act}</Tip> : act;
 }
 
-// One token: its name and seal; what you hold of it and its price; its value, and how its price moved in a day.
-function Asset({ asset: a, dim = false }: { asset: Holding; dim?: boolean }) {
+// One token: its name and seal; what you hold of it and its price; its value, and how its price moved in a day. With
+// `flip`, a click opens its details under it.
+function Asset({ asset: a, dim = false, open = false, flip, details }: { asset: Holding; dim?: boolean; open?: boolean; flip?: () => void; details?: ReactNode }) {
+    const row = 'flex w-full items-center gap-3 px-0.5 py-[11px] text-left';
+    return (
+        <li className="asset border-t border-dashed border-rule-2">
+            {flip ? (
+                <button type="button" aria-expanded={open} onClick={flip} className={cn(row, 'cursor-pointer')}>
+                    <AssetLine asset={a} dim={dim} />
+                </button>
+            ) : (
+                <div className={row}>
+                    <AssetLine asset={a} dim={dim} />
+                </div>
+            )}
+            {open && details}
+        </li>
+    );
+}
+
+function AssetLine({ asset: a, dim }: { asset: Holding; dim: boolean }) {
     const symbol = a.symbol || short(a.mint);
     return (
-        <li className="asset flex items-center gap-3 border-t border-dashed border-rule-2 px-0.5 py-[11px]">
+        <>
             <TokenLogo asset={a} />
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="inline-flex items-center gap-1.5">
@@ -144,7 +167,7 @@ function Asset({ asset: a, dim = false }: { asset: Holding; dim?: boolean }) {
                 <span className={cn('font-bold', dim && 'text-ink-3')}>{a.usd === null ? '—' : dollars(a.usd)}</span>
                 {a.change !== null && <Trend change={a.change} />}
             </span>
-        </li>
+        </>
     );
 }
 

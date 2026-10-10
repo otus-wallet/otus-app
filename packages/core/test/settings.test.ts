@@ -45,4 +45,8 @@ test('an endpoint\'s network, by the genesis hash it gives; explorer pages on th
     assert.equal(explorerOf({ ...DEFAULT_SETTINGS, network: 'devnet' }).tx(SIGNATURE), `https://solscan.io/tx/${SIGNATURE}?cluster=devnet`);
     const local: Settings = { ...DEFAULT_SETTINGS, network: 'custom', rpc: 'http://127.0.0.1:8899', custom: 'solana:localnet', explorer: 'solana' };
     assert.equal(explorerOf(local).tx(SIGNATURE), `https://explorer.solana.com/tx/${SIGNATURE}?cluster=custom&customUrl=http%3A%2F%2F127.0.0.1%3A8899`);
+    // A token's page, on the network the wallet shows.
+    const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+    assert.equal(explorerOf(DEFAULT_SETTINGS).token(USDC), `https://solscan.io/token/${USDC}`);
+    assert.equal(explorerOf({ ...DEFAULT_SETTINGS, explorer: 'orb', network: 'devnet' }).token(USDC), `https://orbmarkets.io/address/${USDC}?cluster=devnet`);
 });

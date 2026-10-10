@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { historyPage, NoHistory } from '@otus-wallet/sdk/activity/history';
 import { summarize, type Activity } from '@otus-wallet/sdk/activity/summary';
 import { access } from '@otus-wallet/sdk/access/access';
+import { tokenTerms } from '@otus-wallet/sdk/access/mint';
 import { rpcAt, timedOut } from '@otus-wallet/sdk/rpc';
 import { platform } from '@otus-wallet/core/platform.ts';
 import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
@@ -108,6 +109,11 @@ export function useAccess(rpc: string, address: Address, state: State) {
         refetchOnReconnect: false,
     });
 }
+
+const MINT_FRESH = 10 * 60_000; // ms a token's terms are taken as current: its authorities hardly ever change
+
+/** A token's terms and whether its metadata can change, read onchain once its details are opened: one request. */
+export const useTokenTerms = (rpc: string, mint: Address) => useQuery({ queryKey: ['mint', rpc, mint], queryFn: () => tokenTerms(rpcAt(rpc), mint), staleTime: MINT_FRESH, refetchOnReconnect: false });
 
 const STAKE_FRESH = 30_000; // ms a wallet's stake accounts, and the epoch, are taken as current
 const VALIDATORS_FRESH = 10 * 60_000; // ms the validators are

@@ -75,6 +75,14 @@ export function CopyAddress({ address, label = 'Copy address', className }: { ad
     return <IconButton name={done ? 'check' : 'copy'} label={label} className={cn(className, done && 'text-ok hover:text-ok')} onClick={() => navigator.clipboard.writeText(address).then(() => setDone(true))} />;
 }
 
+/** One line of facts, in a <dl>: its name, and what it says, on one line or, `wrap`, on as many as it takes. */
+export const Fact = ({ name, children, wrap = false }: { name: string; children: ReactNode; wrap?: boolean }) => (
+    <div className="flex items-baseline justify-between gap-3">
+        <dt className="shrink-0 text-ink-3">{name}</dt>
+        <dd className={cn('min-w-0 text-right text-ink-2', wrap ? '[overflow-wrap:anywhere]' : 'truncate')}>{children}</dd>
+    </div>
+);
+
 /** A heading in the pixel font, with something on its right. */
 export function Heading({ children, extra }: { children: ReactNode; extra?: ReactNode }) {
     return (

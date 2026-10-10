@@ -54,11 +54,11 @@ export const clusterOfGenesis = (hash: string): Cluster => (Object.hasOwn(GENESI
 /** A network's name, as the wallet shows it. */
 export const networkName = (cluster: Cluster) => ({ 'solana:mainnet': 'Mainnet', 'solana:devnet': 'Devnet', 'solana:testnet': 'Testnet', 'solana:localnet': 'Localnet' })[cluster];
 
-/** The explorers a transaction can open in, by name, and the page each gives one on mainnet. */
+/** The explorers a transaction or a token can open in, by name, and the page each gives one on mainnet. */
 export const EXPLORERS = {
-    solscan: { name: 'Solscan', tx: (signature: string) => `https://solscan.io/tx/${signature}` },
-    solana: { name: 'Solana Explorer', tx: (signature: string) => `https://explorer.solana.com/tx/${signature}` },
-    orb: { name: 'Orb', tx: (signature: string) => `https://orbmarkets.io/tx/${signature}` },
+    solscan: { name: 'Solscan', tx: (signature: string) => `https://solscan.io/tx/${signature}`, token: (mint: string) => `https://solscan.io/token/${mint}` },
+    solana: { name: 'Solana Explorer', tx: (signature: string) => `https://explorer.solana.com/tx/${signature}`, token: (mint: string) => `https://explorer.solana.com/address/${mint}` },
+    orb: { name: 'Orb', tx: (signature: string) => `https://orbmarkets.io/tx/${signature}`, token: (mint: string) => `https://orbmarkets.io/address/${mint}` },
 } as const;
 export type Explorer = keyof typeof EXPLORERS;
 
@@ -70,7 +70,7 @@ export function explorerOf(settings: Settings, cluster = networkOf(settings)) {
     const local = rpcFor(cluster, settings);
     const reachable = URL.canParse(local) && ['localhost', '127.0.0.1'].includes(new URL(local).hostname);
     const on = cluster === 'solana:mainnet' ? '' : cluster === 'solana:localnet' ? `?cluster=custom${reachable ? `&customUrl=${encodeURIComponent(local)}` : ''}` : `?cluster=${cluster.slice('solana:'.length)}`;
-    return { name: chosen.name, tx: (signature: string) => `${chosen.tx(signature)}${on}` };
+    return { name: chosen.name, tx: (signature: string) => `${chosen.tx(signature)}${on}`, token: (mint: string) => `${chosen.token(mint)}${on}` };
 }
 
 export const LOCK_CHOICES = [0, 1, 2, 5, 15, 30, 60];

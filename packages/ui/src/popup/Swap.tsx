@@ -21,7 +21,7 @@ import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
 import { cn } from '../lib/cn.ts';
 import type { Screen } from './App.tsx';
-import { Bar, ErrorLine, Seal, Sheet, TokenLogo } from './common.tsx';
+import { Bar, ErrorLine, Fact, Seal, Sheet, TokenLogo } from './common.tsx';
 import { forgetActivity, queries } from './query.ts';
 import { current, said, useHoldings } from './store.ts';
 import { Doing, type Job } from './TakeBack.tsx';
@@ -201,14 +201,6 @@ const Pane = ({ label, extra, amount, token, worth }: { label: string; extra?: R
 // An amount as a pane shows it: large, left, borderless; read only on the side the quote fills.
 const Amount = (props: InputHTMLAttributes<HTMLInputElement>) => (
     <input inputMode="decimal" placeholder="0" autoComplete="off" spellCheck={false} {...props} className="min-w-0 flex-1 bg-transparent text-[22px] leading-8 font-bold outline-none placeholder:text-ink-3 read-only:cursor-default" />
-);
-
-// One line of the quote's facts: its name, and what it says.
-const Fact = ({ name, children }: { name: string; children: ReactNode }) => (
-    <div className="flex items-baseline justify-between gap-3">
-        <dt className="shrink-0 text-ink-3">{name}</dt>
-        <dd className="min-w-0 truncate text-right text-ink-2">{children}</dd>
-    </div>
 );
 
 // How much one of what you pay brings of what you get, at the quote: shown with up to six significant digits.
