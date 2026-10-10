@@ -284,6 +284,7 @@ test('a transfer made in the popup is reviewed as Otus’s own, signed and sent,
     assert.equal(w.box.state.accounts[0].signatures, 1);
     assert.equal(w.box.state.sites[ORIGIN].signatures, 0);
     assert.deepEqual(w.box.state.sent, { [key(2)]: 1 }); // landed there: the address is one you sent to
+    assert.deepEqual(w.box.state.signedHere, { [w.me]: [signature] }); // kept, as every transaction Otus signs
     // Only for an account Otus holds a key for, and that alone signs it.
     assert.match((await own(bytes(w.transfer()), key(5), key(2), w.shell) as { error: string }).error, /no key/);
     // The address shown whole is one the transfer names.
@@ -360,6 +361,23 @@ test('signs and sends, and answers with the signature once it lands', async () =
     assert.equal(w.sent.length, 1);
     const landed = getTransactionDecoder().decode(w.sent[0]);
     assert.deepEqual(new Uint8Array(getBase58Encoder().encode(signatures[0])), new Uint8Array(landed.signatures[w.me]!));
+});
+
+test('the latest 200 signatures are kept an account, and only for an account still in Otus', async () => {
+    const w = await wallet();
+    const others = { [key(7)]: ['theirs'] };
+    w.box.state = { ...w.box.state, signedHere: { [w.me]: Array.from({ length: 200 }, (_, i) => `old${i}`), ...others } };
+    const { transactions } = result<{ transactions: string[] }>(await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] }));
+    const kept = w.box.state.signedHere[w.me];
+    assert.deepEqual([kept.length, kept[0], kept.at(-1)], [200, 'old1', getBase58Decoder().decode(getTransactionDecoder().decode(bytes(transactions[0])).signatures[w.me]!)]);
+    assert.deepEqual(w.box.state.signedHere[key(7)], ['theirs']); // another account's untouched
+    // Removed while its key signed: no entry comes back for it.
+    const gone = await wallet();
+    const sign = gone.shell.sign;
+    gone.shell.sign = async (a, data) => ((gone.box.state = { ...gone.box.state, accounts: [], signedHere: {} }), sign(a, data));
+    await gone.call('signTransaction', { account: gone.me, transactions: [gone.transfer()] });
+    assert.equal(gone.box.state.accounts.length, 0);
+    assert.deepEqual(gone.box.state.signedHere, {});
 });
 
 test('signs a message, and a sign-in that the site can check', async () => {

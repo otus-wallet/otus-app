@@ -478,7 +478,8 @@ async function signFor(account: Account, data: Uint8Array, shell: Shell, asker: 
     await shell.update((s) => ({
         accounts: s.accounts.map((a) => (a.address === account.address ? { ...a, signatures: (a.signatures ?? 0) + 1 } : a)),
         ...(asker && signedFor(s.sites, asker, account.address, shell.now())),
-        ...(transaction && { signedHere: { ...s.signedHere, [account.address]: [...(s.signedHere[account.address] ?? []), getBase58Decoder().decode(signature)].slice(-MAX_SIGNED_HERE) } }),
+        // Not for an account removed in the meantime: its entry went with it.
+        ...(transaction && s.accounts.some((a) => a.address === account.address) && { signedHere: { ...s.signedHere, [account.address]: [...(s.signedHere[account.address] ?? []), getBase58Decoder().decode(signature)].slice(-MAX_SIGNED_HERE) } }),
     }));
     return signature;
 }

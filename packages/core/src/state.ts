@@ -127,8 +127,10 @@ export function edited(e: Edit, state: State, now = Date.now()): Partial<State> 
             const left = state.accounts.filter((a) => a.address !== e.address);
             const sites = Object.fromEntries(Object.entries(state.sites).filter(([, site]) => site.account !== e.address));
             const removed = gone.key?.index !== undefined && !state.removed.includes(gone.address) ? [...state.removed, gone.address] : state.removed;
+            // What Otus signed with it and checked of its activity go too: added back, it starts over from then.
             const { [e.address]: _, ...signedHere } = state.signedHere;
-            return { accounts: left, sites, removed, signedHere, active: state.active === e.address ? (left[0]?.address ?? null) : state.active };
+            const outside = Object.fromEntries(Object.entries(state.outside).filter(([key]) => !key.endsWith(` ${e.address}`)));
+            return { accounts: left, sites, removed, signedHere, outside, active: state.active === e.address ? (left[0]?.address ?? null) : state.active };
         }
         case 'use': {
             if (!has(e.address)) return null;

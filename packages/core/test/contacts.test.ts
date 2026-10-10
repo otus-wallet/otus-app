@@ -153,6 +153,8 @@ test('the wallet in use takes every connected site with it, unless it is watch-o
 test('a Ledger account comes to sign now; a removed account takes its kept signatures with it', () => {
     const ledger = edited({ edit: 'ledger', address: FRIEND, path: "44'/501'/0'/0'", label: 'Flex' }, state(), 1_800_000_000_000);
     assert.equal(ledger?.accounts?.find((a) => a.address === FRIEND)?.since, 1_800_000_000);
-    const removed = edited({ edit: 'remove', address: MINE }, state({ signedHere: { [MINE]: ['a'], [WATCHED]: ['b'] } }));
+    const checked = { seen: '1', gaps: [], flagged: [], unseen: false };
+    const removed = edited({ edit: 'remove', address: MINE }, state({ signedHere: { [MINE]: ['a'], [WATCHED]: ['b'] }, outside: { [`solana:mainnet ${MINE}`]: checked, [`solana:devnet ${MINE}`]: checked, [`solana:mainnet ${WATCHED}`]: checked } }));
     assert.deepEqual(removed?.signedHere, { [WATCHED]: ['b'] });
+    assert.deepEqual(removed?.outside, { [`solana:mainnet ${WATCHED}`]: checked });
 });
