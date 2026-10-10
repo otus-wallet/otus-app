@@ -57,13 +57,13 @@ export function rows(read: (Activity | { unreadable: string })[], n: Naming): Ro
     return read.map((a) => ('unreadable' in a ? unreadable(a.unreadable) : row(a, n, a.other ? (copies.get(a.other) ?? null) : null)));
 }
 
-/** How the page cuts an address short: four characters a side, or, for one like another on the page or known, as far as
- *  where they part (apart()). */
+/** How the page cuts an address short: four characters a side, or, for one like others on the page or known, as far as
+ *  where it parts from each of them (apart()). */
 export function cuts(read: (Activity | { unreadable: string })[], known: Address[]): (a: string) => string {
     const seen = [...new Set([...known, ...read.flatMap((a) => ('kind' in a && a.other ? [a.other] : []))])];
     return (a) => {
-        const twin = seen.find((x) => x !== a && alike(x, a));
-        return twin ? apart(a, twin) : short(a);
+        const twins = seen.filter((x) => x !== a && alike(x, a));
+        return twins.length ? apart(a, ...twins) : short(a);
     };
 }
 
@@ -225,13 +225,17 @@ function namesFor(a: Activity, n: Naming): Names {
 // A name for an address when Otus has one: a contact's, a program's (yours goes by its address, tagged).
 const named = (n: Naming, a: Address) => (n.who(a).includes(a) ? null : n.who(a));
 
-/** An address cut short where it parts from one made to look like it, not just at four characters a side: the ones a
- *  copy matches. "EhPya…mBFDX" against "EhPyS…7BFDX". */
-export function apart(a: string, b: string): string {
-    let head = 0;
-    while (head < a.length && a[head] === b[head]) head++;
-    let tail = 0;
-    while (tail < a.length && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
+/** An address cut short where it parts from those made to look like it, not just at four characters a side: the ones a
+ *  copy matches. "EhPya…mBFDX" against "EhPyS…7BFDX"; against several, as far as the one it shares most with. */
+export function apart(a: string, ...like: string[]): string {
+    let [head, tail] = [0, 0];
+    for (const b of like) {
+        let h = 0;
+        while (h < a.length && a[h] === b[h]) h++;
+        let t = 0;
+        while (t < a.length && a[a.length - 1 - t] === b[b.length - 1 - t]) t++;
+        [head, tail] = [Math.max(head, h), Math.max(tail, t)];
+    }
     const [h, t] = [Math.max(4, head + 1), Math.max(4, tail + 1)];
     return h + t >= a.length ? a : `${a.slice(0, h)}…${a.slice(-t)}`;
 }

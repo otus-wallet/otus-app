@@ -13,6 +13,7 @@ import { signs, type State } from '@otus-wallet/core/state.ts';
 import { lockedOf, nextSeed, standingOf, type StakeAccount, type Standing } from '@otus-wallet/core/stake/stakes.ts';
 import type { Validator } from '@otus-wallet/core/stake/validators.ts';
 import { Logo } from '../components/icons.tsx';
+import { nameOr } from '@otus-wallet/core/view/names.ts';
 import { Addressed } from '../components/you.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
@@ -38,7 +39,7 @@ export function StakeScreen({ state, go }: { state: State; go: (to: Screen) => v
     const terms = useStakeTerms(rpc);
     const validators = useValidators(rpc, networkOf(state.settings), epoch.data?.epoch);
     const byVote = useMemo(() => new Map((validators.data ?? []).map((v) => [v.vote, v])), [validators.data]);
-    const nameOf = (vote: Address | null) => (vote === null ? 'Not delegated' : (byVote.get(vote)?.name ?? vote));
+    const nameOf = (vote: Address | null) => (vote === null ? 'Not delegated' : nameOr(byVote.get(vote)?.name, vote));
     const logos = logosShown(state);
 
     if (doing) {
@@ -171,7 +172,7 @@ function NewStake({ state, terms, validators, error, back, start }: { state: Sta
             landed: 'Staked',
             where: 'Stake',
         };
-        start(job, `${decimal(units, 9)} SOL with ${open.name ?? vote}`);
+        start(job, `${decimal(units, 9)} SOL with ${nameOr(open.name, vote)}`);
     };
     return (
         <Sheet bar={<Bar title="Stake SOL" back={back} />}>

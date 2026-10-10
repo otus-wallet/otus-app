@@ -20,7 +20,7 @@ const fullUsd = (n: number) => n.toLocaleString('en-US', { style: 'currency', cu
 const large = (n: number, whole: string, compact: (n: number) => string) => (Math.abs(n) >= 1000 ? { value: compact(n), full: whole } : { value: whole });
 const day = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
-/** How a token's facts are read: who an address is (its name, or the address in short), your wallet's address, the
+/** How a token's facts are read: who an address is (its name, or the address whole), your wallet's address, the
  *  token's symbol, the epoch (when its transfer fee is changing), and now (Unix seconds). */
 export type TokenNaming = { who(a: Address): string; wallet: Address; symbol: string; epoch: bigint | null; now: number };
 

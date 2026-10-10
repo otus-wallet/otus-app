@@ -10,7 +10,7 @@ import type { Tone } from '@otus-wallet/sdk/review/assess';
 import { story, type Names } from '@otus-wallet/sdk/review/effects';
 import type { Explained } from '@otus-wallet/sdk/review/explain';
 import type { Inside, ProposalTold, Unread } from '@otus-wallet/sdk/review/squads';
-import { YOU } from './names.ts';
+import { atAddresses, YOU } from './names.ts';
 
 /** A proposal as the window shows it: which, what you do to it, what it does, then how its votes stand. */
 export type ProposalView = { title: string; you: string; lines: Line[]; after: string };
@@ -63,6 +63,20 @@ const whole = (n: Names, a: Address) => {
     return named === 'you' ? `${a}${YOU}` : named;
 };
 
+
+/** A proposal line's words, and the addresses it ends with (who gets what the vault sends, a member, who may spend; each
+ *  may be marked yours, and a list parted by commas), for the window to show each whole on a line of its own. An
+ *  address in the words (a mint, a program) stays among them. */
+export function partiesOf(line: string): { words: string; parties: string[] } {
+    const at = atAddresses(line);
+    let first = at.length; // the first of the addresses the line ends with, if any
+    for (let i = at.length - 2; i >= 1; i -= 2) {
+        const after = at[i + 1].startsWith(YOU) ? at[i + 1].slice(YOU.length) : at[i + 1];
+        if (!(i === at.length - 2 ? after === '' : /^,\s*$/.test(after))) break;
+        first = i;
+    }
+    return { words: at.slice(0, first).join(''), parties: at.filter((_, i) => i >= first && i % 2 === 1) };
+}
 
 // What it would do, as lines.
 function lines(inside: Inside, base: Names): Line[] {

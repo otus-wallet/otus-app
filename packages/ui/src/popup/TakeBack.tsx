@@ -12,7 +12,7 @@ import type { Lifetime } from '@otus-wallet/core/send/transfer.ts';
 import { explorerOf, type Settings } from '@otus-wallet/core/settings.ts';
 import type { Account } from '@otus-wallet/core/state.ts';
 import { Icon } from '../components/icons.tsx';
-import { Addressed } from '../components/you.tsx';
+import { Tagged } from '../components/you.tsx';
 import { Approve } from '../review/Approve.tsx';
 import { Answer, Block, Frame, Heading, Left, Steps, useNow } from '../review/Frame.tsx';
 import { filled, MARK } from '../review/tone.ts';
@@ -136,7 +136,7 @@ const Taken = ({ job, title }: { job: Job; title: string }) => (
     <Block>
         <Heading>{job.doing}</Heading>
         <p className="text-sm font-bold">
-            <Addressed text={title} />
+            <Tagged text={title} />
         </p>
     </Block>
 );

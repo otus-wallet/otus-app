@@ -1,5 +1,5 @@
 // A transaction's three steps: where your balances go, what each program does, and the verdict.
-import { useEffect, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useState } from 'react';
 
 import { Button } from '../components/ui/button.tsx';
 import { Checkbox } from '../components/ui/checkbox.tsx';
@@ -11,8 +11,8 @@ import { cn } from '../lib/cn.ts';
 import type { AssetChange, InstructionView, ProgramView, Tone, TransactionView } from '@otus-wallet/core/view.ts';
 import { Block, Heading, Notice, WATCH_ONLY } from './Frame.tsx';
 import { filled, MARK, text } from './tone.ts';
-import { Tagged, YouTag } from '../components/you.tsx';
-import { YOU } from '@otus-wallet/core/view/names.ts';
+import { Tagged, YouTag, YourWallet } from '../components/you.tsx';
+import { partiesOf } from '@otus-wallet/core/view/squads.ts';
 
 const Count = ({ n, one, many }: { n: number; one: string; many: string }) => <>{`${n} ${n === 1 ? one : many}`}</>;
 
@@ -109,26 +109,25 @@ function Asset({ change }: { change: AssetChange }) {
     );
 }
 
-// A proposal's line: its words, then each address on a line of its own, whole, its ends marked as Receive marks them
-// (what people compare), yours tagged "you".
+// A proposal's line: its words, any address among them cut short; then the addresses it ends with (who gets what the
+// vault sends, a member, who may spend), each on a line of its own, whole, its ends marked as Receive marks them (what
+// people compare), your wallet tagged "you".
 function Yours({ text: line }: { text: string }) {
-    const parts = line.split(new RegExp(`([1-9A-HJ-NP-Za-km-z]{32,44})(${YOU.replace(/[()]/g, '\\$&')})?`));
-    const out: ReactNode[] = [];
-    for (let i = 0; i < parts.length; i += 3) {
-        const words = parts[i].replace(/^[,\s]+$/, ''); // what only parts two addresses goes
-        if (words) out.push(<span key={i}>{words}</span>);
-        const address = parts[i + 1];
-        if (!address) continue;
-        out.push(
-            <span key={`a${i}`} className="mt-0.5 block font-bold text-ink">
-                <span className="text-ok">{address.slice(0, 4)}</span>
-                {address.slice(4, -4)}
-                <span className="text-ok">{address.slice(-4)}</span>
-                {parts[i + 2] && <YouTag />}
-            </span>,
-        );
-    }
-    return <>{out}</>;
+    const wallet = useContext(YourWallet);
+    const { words, parties } = partiesOf(line);
+    return (
+        <>
+            {words && <Tagged text={words} />}
+            {parties.map((address, i) => (
+                <span key={i} className="mt-0.5 block font-bold text-ink">
+                    <span className="text-ok">{address.slice(0, 4)}</span>
+                    {address.slice(4, -4)}
+                    <span className="text-ok">{address.slice(-4)}</span>
+                    {address === wallet && <YouTag />}
+                </span>
+            ))}
+        </>
+    );
 }
 
 export function Balances({ t }: { t: TransactionView }) {

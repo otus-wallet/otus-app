@@ -1,17 +1,25 @@
 // Words as Otus writes them, each address in them whole: here cut short, and yours marked with a green "you" tag.
-import { atAddresses, YOU } from '@otus-wallet/core/view/names.ts';
+import { createContext, useContext } from 'react';
+
+import { atAddresses, endsYours, YOU } from '@otus-wallet/core/view/names.ts';
 import { ShortAddress, type Cut } from './address.tsx';
 
+/** The wallet a screen speaks for: only its own address, right before " (you)", is tagged yours. */
+export const YourWallet = createContext<string | null>(null);
+
 /**
- * Words with each address in them cut short (whole on hover, copied on a click), and each of yours marked: the
- * address, then a "you" tag. `still`: inside something a click already opens, so the addresses are only cut short.
+ * Words with each address in them cut short (whole on hover, copied on a click), and your wallet's marked: the
+ * address, then a "you" tag. " (you)" after anything else (words a program or a token's maker wrote) stays words.
+ * `still`: inside something a click already opens, so the addresses are only cut short.
  */
 export function Tagged({ text: words, cut, still = false }: { text: string; cut?: Cut; still?: boolean }) {
+    const wallet = useContext(YourWallet);
+    const parts = words.split(YOU);
     return (
         <>
-            {words.split(YOU).map((part, i) => (
+            {parts.map((part, i) => (
                 <span key={i}>
-                    {i > 0 && <YouTag />}
+                    {i > 0 && (endsYours(parts[i - 1], wallet) ? <YouTag /> : YOU)}
                     <Addressed text={part} cut={cut} still={still} />
                 </span>
             ))}

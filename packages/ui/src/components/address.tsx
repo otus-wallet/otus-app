@@ -27,7 +27,10 @@ export function ShortAddress({ address, name, cut = short, still = false }: { ad
     const copy = (e: SyntheticEvent) => {
         hold(e);
         e.stopPropagation();
-        void navigator.clipboard.writeText(address).then(() => setCopied(true));
+        navigator.clipboard.writeText(address).then(
+            () => setCopied(true),
+            () => {}, // not copied (the page lost the focus): no "Copied"
+        );
     };
     const key = (e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && copy(e);
     // Gone as the pointer leaves it: addresses sit close, and one's tooltip must not cover the next.

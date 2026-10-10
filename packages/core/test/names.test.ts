@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { address } from '@solana/kit';
 
-import { atAddresses } from '../src/view/names.ts';
+import { atAddresses, endsYours, nameOr } from '../src/view/names.ts';
 
 const A = address('2apBGMsS6ti9RyF5TwQTDswXBWskiJP2LD4cUEDqYJjk');
 const B = address('AxJkHRY3puoofyj7Pn512M1SGBgWroXMkEdNPQypkzbu');
@@ -24,7 +24,33 @@ test('what only looks like an address stays in the words', () => {
     assert.deepEqual(atAddresses(A.slice(0, 31)), [A.slice(0, 31)]); // too short
     assert.deepEqual(atAddresses('1'.repeat(44)), ['1'.repeat(44)]); // base58, but not 32 bytes
     assert.deepEqual(atAddresses(`${A.slice(0, 20)}0${A.slice(21)}`), [`${A.slice(0, 20)}0${A.slice(21)}`]); // a character base58 has not
-    assert.deepEqual(atAddresses(`${A}…`), ['', A, '…']);
+    // Cut to fit, what is left of an address may still read as another one: one an ellipsis ends is not taken.
+    assert.deepEqual(atAddresses(`${A.slice(0, 43)}…`), [`${A.slice(0, 43)}…`]);
+    assert.deepEqual(atAddresses(`${A}…`), [`${A}…`]);
+    // Bytes in hex: base58 has every hex character, but no address is made of them alone.
+    const hex = 'c4f1b9e2d3a7568190fe2b3c4d5e6f708192a3b4c5d6e7f8';
+    for (let n = 32; n <= 44; n++) assert.deepEqual(atAddresses(`data ${hex.slice(0, n)}`), [`data ${hex.slice(0, n)}`]);
+});
+
+test('" (you)" tags only your wallet\'s address, whole, right before it', () => {
+    assert.equal(endsYours(`paid by ${A}`, A), true);
+    assert.equal(endsYours(A, A), true);
+    assert.equal(endsYours(`paid by ${B}`, A), false); // another address: words a program wrote can say " (you)" too
+    assert.equal(endsYours('Refund to you', A), false);
+    assert.equal(endsYours(`${A} and more`, A), false); // not right before it
+    assert.equal(endsYours(`x${A}`, A), false); // part of a longer word
+    assert.equal(endsYours(`paid by ${A}`, null), false); // no wallet to tag
+    assert.equal(endsYours('', A), false);
+});
+
+test("someone else's name for an address, unless it holds an address of its own", () => {
+    assert.equal(nameOr('PYUSD', A), 'PYUSD');
+    assert.equal(nameOr('', A), A);
+    assert.equal(nameOr(null, A), A);
+    assert.equal(nameOr(undefined, A), A);
+    assert.equal(nameOr(B, A), A); // a symbol that is an address: cut short, it would pass for one
+    assert.equal(nameOr(`USD ${B}`, A), A);
+    assert.equal(nameOr('11111111', A), '11111111'); // too short to be one
 });
 
 test('hostile words: long, with no address, or with many', () => {

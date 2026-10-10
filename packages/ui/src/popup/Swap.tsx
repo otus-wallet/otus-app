@@ -17,6 +17,7 @@ import type { Route } from '@otus-wallet/core/swap/route.ts';
 import { askedWire } from '@otus-wallet/core/swap/terms.ts';
 import { cachedToken, search, type TokenInfo } from '@otus-wallet/core/tokens.ts';
 import { Icon } from '../components/icons.tsx';
+import { nameOr } from '@otus-wallet/core/view/names.ts';
 import { Addressed } from '../components/you.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
@@ -42,9 +43,9 @@ type Side = { mint: Address; symbol: string; name: string; icon: string | null; 
 
 const SOL: Side = { mint: WSOL, symbol: 'SOL', name: 'Solana', icon: null, verified: true, decimals: 9, price: null };
 const USD_COIN: Side = { mint: USDC, symbol: 'USDC', name: 'USD Coin', icon: null, verified: true, decimals: 6, price: null };
-const sideOf = (a: Holding): Side => ({ mint: address(a.native ? WSOL : a.mint), symbol: a.native ? 'SOL' : a.symbol || short(a.mint), name: a.name, icon: a.verified ? a.icon : null, verified: a.verified, decimals: a.decimals, price: a.price });
+const sideOf = (a: Holding): Side => ({ mint: address(a.native ? WSOL : a.mint), symbol: a.native ? 'SOL' : nameOr(a.symbol, short(a.mint)), name: a.name, icon: a.verified ? a.icon : null, verified: a.verified, decimals: a.decimals, price: a.price });
 // Only a verified token's icon is fetched, as everywhere in Otus: anyone can put any address in an unverified one's.
-const sideFrom = (t: TokenInfo): Side | null => (t.decimals === null ? null : { mint: address(t.id), symbol: t.symbol || short(t.id), name: t.name, icon: t.verified ? t.icon : null, verified: t.verified, decimals: t.decimals, price: t.usdPrice });
+const sideFrom = (t: TokenInfo): Side | null => (t.decimals === null ? null : { mint: address(t.id), symbol: nameOr(t.symbol, short(t.id)), name: t.name, icon: t.verified ? t.icon : null, verified: t.verified, decimals: t.decimals, price: t.usdPrice });
 
 export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => void }) {
     const account = current(state);

@@ -11,7 +11,7 @@ import type { Review } from '@otus-wallet/sdk/review/review';
 import type { Names } from '@otus-wallet/sdk/review/effects';
 import { explain } from '@otus-wallet/sdk/review/explain';
 import { notice, squadsTold, type ProposalTold } from '@otus-wallet/sdk/review/squads';
-import { proposalViews } from '../src/view/squads.ts';
+import { partiesOf, proposalViews } from '../src/view/squads.ts';
 import { fakeChain, key } from './helpers.ts';
 
 // Real Squads v4 instructions and the accounts they name, read from mainnet on 2026-10-05.
@@ -131,4 +131,14 @@ test('tokens sent from the vault: "from vault", to the owner whole; no word on a
 test('your address shows whole, marked yours, for the window to tag', () => {
     const lines = proposalViews([told({ steps: ['setup'], inside: { kind: 'setup', threshold: 1, members: [{ key: names.wallet, permissions: 7 }], timeLock: 0 } })], names)[0].lines.map((l) => l.text);
     assert.deepEqual(lines, [`Member who may propose, vote, execute: ${names.wallet} (you)`, 'It takes 1 approval']);
+});
+
+test('a proposal line: the addresses it ends with apart, each to show whole; a mint or a program in its words stays there', () => {
+    const [mint, to, other, me] = [key(41), key(42), key(43), key(44)];
+    assert.deepEqual(partiesOf(`5 ${mint} from vault to ${to}`), { words: `5 ${mint} from vault to `, parties: [to] }); // an unverified token, by its mint
+    assert.deepEqual(partiesOf(`Members: ${to}, ${me} (you), ${other}`), { words: 'Members: ', parties: [to, me, other] });
+    assert.deepEqual(partiesOf(`Who may use it: ${me} (you)`), { words: 'Who may use it: ', parties: [me] });
+    assert.deepEqual(partiesOf(`Calls ${mint} with 2 accounts`), { words: `Calls ${mint} with 2 accounts`, parties: [] }); // mid-line: words
+    assert.deepEqual(partiesOf('To any address'), { words: 'To any address', parties: [] });
+    assert.deepEqual(partiesOf(`${to} and ${other}`), { words: `${to} and `, parties: [other] }); // "and" parts them: the first is words
 });

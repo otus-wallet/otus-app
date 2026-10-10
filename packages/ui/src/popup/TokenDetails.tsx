@@ -13,6 +13,7 @@ import type { State } from '@otus-wallet/core/state.ts';
 import { solFacts, tokenFacts, type TokenFact } from '@otus-wallet/core/view/token.ts';
 import { Icon } from '../components/icons.tsx';
 import { ShortAddress } from '../components/address.tsx';
+import { nameOr } from '@otus-wallet/core/view/names.ts';
 import { Addressed, YouTag } from '../components/you.tsx';
 import { cn } from '../lib/cn.ts';
 import { CopyAddress, Fact, Tip } from './common.tsx';
@@ -31,7 +32,7 @@ function MintDetails({ asset, state }: { asset: Holding; state: State }) {
     const who = (a: Address) => (a === wallet ? a : (names.get(a) ?? PROGRAM_NAMES.get(a) ?? a)); // yours tagged by the fact
     return (
         <Details label="Mint" address={mint} state={state}>
-            {read.data?.terms && <Facts facts={tokenFacts(read.data.terms, read.data.metadata, { who, wallet, symbol: asset.symbol || mint, epoch: read.data.epoch, now: Date.now() / 1000 }, market)} />}
+            {read.data?.terms && <Facts facts={tokenFacts(read.data.terms, read.data.metadata, { who, wallet, symbol: nameOr(asset.symbol, mint), epoch: read.data.epoch, now: Date.now() / 1000 }, market)} />}
             {read.data && !read.data.terms && <span className="text-warn">Otus could not read this mint</span>}
             {/* Shown under what was read before, too: that may be behind. */}
             {read.error && <span className="text-warn">{`The RPC did not answer: ${said(read.error)}`}</span>}
@@ -81,7 +82,9 @@ function Facts({ facts }: { facts: TokenFact[] }) {
                     <span className={cn('inline-flex items-center gap-0.5', f.warn && 'text-warn')}>
                         {f.full ? (
                             <Tip text={f.full}>
-                                <span className="cursor-default">{f.value}</span>
+                                <span className="cursor-default">
+                                    <Addressed text={f.value} still />
+                                </span>
                             </Tip>
                         ) : (
                             <Value fact={f} />

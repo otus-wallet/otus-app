@@ -14,7 +14,8 @@ import { Settings } from './Settings.tsx';
 import { platform } from '@otus-wallet/core/platform.ts';
 import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
 import type { State } from '@otus-wallet/core/state.ts';
-import { useOtus } from './store.ts';
+import { YourWallet } from '../components/you.tsx';
+import { current, useOtus } from './store.ts';
 import { StakeScreen } from './Stake.tsx';
 import { SwapScreen } from './Swap.tsx';
 import { WalletScreen } from './WalletScreen.tsx';
@@ -60,7 +61,11 @@ function Screens() {
     if (state.accounts.length === 0) return <Empty setUp={() => void setUp()} />;
     // Each screen starts over when the wallet in use changes, as the setup tab can do: nothing typed or confirmed for one
     // wallet carries over to another.
-    return <Fragment key={state.active ?? ''}>{shown(screen, state, keys, go)}</Fragment>;
+    return (
+        <Fragment key={state.active ?? ''}>
+            <YourWallet.Provider value={current(state).address}>{shown(screen, state, keys, go)}</YourWallet.Provider>
+        </Fragment>
+    );
 }
 
 function shown(screen: Screen, state: State, keys: KeyStatus, go: (to: Screen) => void) {

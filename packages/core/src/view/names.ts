@@ -17,21 +17,37 @@ const SYMBOLS: Record<string, string> = { [USDC]: 'USDC', [USDT]: 'USDT' };
 
 // How the transaction's accounts and tokens read: names for addresses, symbols and decimals for mints. A symbol only
 // for a verified token: anyone can call a token "USDC", so any other goes by its address.
-/** How a line marks an address as yours, for the window to tag: "FioY…KWv1 (you)". */
+/** How a line marks an address as yours, for the window to tag: "<your address> (you)". */
 export const YOU = ' (you)';
 
-// A whole address in words: base58, 32 to 44 characters, a word of its own (not the start of a signature).
-const WHOLE = /(?<![1-9A-HJ-NP-Za-km-z])([1-9A-HJ-NP-Za-km-z]{32,44})(?![1-9A-HJ-NP-Za-km-z])/;
+// A whole address in words: base58, 32 to 44 characters, a word of its own (not the start of a signature), and not cut
+// short by an ellipsis (words cut to fit end in one: what is left of an address may still read as another).
+const WHOLE = /(?<![1-9A-HJ-NP-Za-km-z])([1-9A-HJ-NP-Za-km-z]{32,44})(?![1-9A-HJ-NP-Za-km-z…])/;
+
+// Bytes as Otus writes them, hex: base58 has every one of its characters, and no address is made of them alone (but the
+// System Program's, all ones: hex has a letter).
+const HEX = /^[0-9]*[a-f][0-9a-f]*$/;
 
 /** Words split around each whole address in them, for the window to cut short: the addresses at the odd places. A word
- *  that only looks like one (not 32 bytes) stays in the words. */
+ *  that only looks like one (not 32 bytes, or hex) stays in the words. */
 export function atAddresses(words: string): string[] {
     const out = [''];
     for (const [i, w] of words.split(WHOLE).entries()) {
-        if (i % 2 && isAddress(w)) out.push(w, '');
+        if (i % 2 && isAddress(w) && !HEX.test(w)) out.push(w, '');
         else out[out.length - 1] += w;
     }
     return out;
+}
+
+/** Someone else's name for an address (a token's symbol, a validator's name), or the address when there is none, or
+ *  when the name holds an address of its own: cut short, it would pass for the one it names. */
+export const nameOr = (name: string | null | undefined, address: string): string => (name && atAddresses(name).length === 1 ? name : address);
+
+/** Whether words end with the wallet's own address, whole: what " (you)" after them may tag. Words a program or a
+ *  token's maker wrote can say " (you)" too, but not after your address. */
+export function endsYours(words: string, wallet: string | null): boolean {
+    const at = atAddresses(words);
+    return wallet !== null && at.length > 1 && at[at.length - 1] === '' && at[at.length - 2] === wallet;
 }
 
 /** `tagged`: you named by your address, marked yours, where the window has room for no more than a line. */

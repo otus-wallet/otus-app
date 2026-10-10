@@ -4,6 +4,7 @@
 import { useState } from 'react';
 
 import { Tile } from '../components/icons.tsx';
+import { YourWallet } from '../components/you.tsx';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../components/ui/select.tsx';
 import { short } from '../dom.ts';
 import type { AccountView, Approval, Life, TransactionView } from '@otus-wallet/core/view.ts';
@@ -23,7 +24,11 @@ export function Approve({ approval, answers, expiry, life }: { approval: Approva
     const [shown] = useState(Date.now);
     const left = expiry ?? (life && 'until' in life ? { from: shown, until: life.until } : undefined);
     const died = life !== undefined && 'expired' in life;
-    return approval.kind === 'transaction' ? <Transaction t={approval} answers={answers} expiry={left} died={died} /> : <Single a={approval} answers={answers} />;
+    return (
+        <YourWallet.Provider value={approval.account.address}>
+            {approval.kind === 'transaction' ? <Transaction t={approval} answers={answers} expiry={left} died={died} /> : <Single a={approval} answers={answers} />}
+        </YourWallet.Provider>
+    );
 }
 
 const WATCH_ONLY_CONNECT = 'Watch only: choose a wallet that signs';
