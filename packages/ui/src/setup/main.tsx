@@ -5,6 +5,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { Shield } from '../components/shield.tsx';
+import { TooltipProvider } from '../components/ui/tooltip.tsx';
 import { stayOpen } from '../open.ts';
 import { again, forget, Setup } from './Setup.tsx';
 
@@ -14,7 +15,9 @@ stayOpen({ whileFocused: true });
 createRoot(document.getElementById('app')!).render(
     <StrictMode>
         <Shield>
-            <Setup />
+            <TooltipProvider delayDuration={150}>
+                <Setup />
+            </TooltipProvider>
         </Shield>
     </StrictMode>,
 );
