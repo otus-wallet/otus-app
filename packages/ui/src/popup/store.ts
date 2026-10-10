@@ -5,14 +5,16 @@ import { isSolanaError, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, type Address } 
 import { useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
-import { historyPage, NoHistory } from '@otus-wallet/sdk/activity/history';
+import { historyPage, NoHistory, PAGE } from '@otus-wallet/sdk/activity/history';
 import { summarize, type Activity } from '@otus-wallet/sdk/activity/summary';
 import { access } from '@otus-wallet/sdk/access/access';
 import { tokensTerms, tokenTerms } from '@otus-wallet/sdk/access/mint';
 import { rpcAt, timedOut } from '@otus-wallet/sdk/rpc';
 import { platform } from '@otus-wallet/core/platform.ts';
 import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
-import { load, save, type Edit, type State } from '@otus-wallet/core/state.ts';
+import { load, save, signs, type Edit, type State } from '@otus-wallet/core/state.ts';
+import { lookOutside, outsideKey } from '@otus-wallet/core/outside.ts';
+import { networkOf, walletRpc } from '@otus-wallet/core/settings.ts';
 import { ask } from '../ask.ts';
 import { holdings, type Holdings } from '@otus-wallet/core/holdings.ts';
 import { epochOf, stakeRent, stakesOf } from '@otus-wallet/core/stake/stakes.ts';
@@ -62,18 +64,19 @@ export function useHoldings(rpc: string, address: Address, mainnet = true): Hold
 export type ActivityPage = { rows: (Activity | { unreadable: string })[]; next: string | null; at: number };
 
 const FRESH = 60_000; // ms a page of activity is taken as current
+const FIRST = 25; // transactions the first page holds: what is checked for ones signed outside Otus, at one request's cost
 
 /**
- * A wallet's activity, newest first: a page of 10 when shown (the one kept this session, when it is under a minute
- * old), then each next page as asked for. One request a page; never read in the background, nor again on its own.
- * Left, what it reads is dropped and it keeps its first page only, as old as it is, so coming back reads one page at
- * most.
+ * A wallet's activity, newest first: the first page, of 25, as the popup opens for a wallet that signs and when shown
+ * (the one kept this session, when it is under a minute old), then each next page of 10 as asked for. One request a
+ * page; never again on its own. Left, what it reads is dropped and it keeps its first page only, as old as it is, so
+ * coming back reads one page at most.
  */
 export function useActivity(rpc: string, address: Address) {
     const read = useInfiniteQuery({
         queryKey: activityKey(rpc, address),
         queryFn: async ({ pageParam, signal }): Promise<ActivityPage> => {
-            const page = await historyPage(rpc, address, pageParam ?? undefined, signal);
+            const page = await historyPage(rpc, address, pageParam ?? undefined, signal, pageParam ? PAGE : FIRST);
             return { rows: page.items.map((i) => ('unreadable' in i ? i : summarize(i, address))), next: page.next, at: Date.now() };
         },
         initialPageParam: null as string | null,
@@ -91,6 +94,50 @@ export function useActivity(rpc: string, address: Address) {
             });
     }, [rpc, address]);
     return read;
+}
+
+/**
+ * The wallet in use, when it signs: its activity read as the popup opens, and as more of it is read, checked for
+ * transactions it signed that Otus did not. No request of its own.
+ */
+export function useLookOutside(state: State) {
+    const wallet = current(state).address;
+    const key = outsideKey(networkOf(state.settings), wallet);
+    const read = useActivity(walletRpc(state.settings), wallet);
+    const more = read.hasNextPage;
+    useEffect(() => {
+        const rows = read.data?.pages.flatMap((p) => p.rows).filter((r): r is Activity => !('unreadable' in r));
+        // Every row with its slot and signatures, or none checked: a page kept by an older build has neither.
+        if (rows?.every((r) => typeof r.slot === 'bigint' && r.signatures)) lookedOutside(key, wallet, rows, more);
+    }, [read.data, more, key, wallet]);
+}
+
+let looking: Promise<unknown> = Promise.resolve();
+
+// A wallet's activity as read → what is checked of it, kept: one check at a time, each from what is stored then. Only
+// the popup writes these, and only for accounts Otus still has.
+function lookedOutside(key: string, wallet: Address, rows: Activity[], more: boolean) {
+    looking = looking
+        .then(async () => {
+            const { outside, signedHere, accounts } = await load();
+            const account = accounts.find((a) => a.address === wallet);
+            if (!account || !signs(account)) return;
+            const { now } = lookOutside(rows, wallet, outside[key], new Set(signedHere[wallet] ?? []), account.since, more);
+            if (JSON.stringify(now) === JSON.stringify(outside[key])) return;
+            const kept = Object.fromEntries(Object.entries(outside).filter(([k]) => accounts.some((a) => k.endsWith(` ${a.address}`))));
+            await save({ outside: { ...kept, [key]: now } });
+        })
+        .catch(() => {}); // not kept: checked again as the activity is read again
+}
+
+/** Activity seen: what was found signed outside Otus no longer marks its tab. */
+export function seenOutside(key: string) {
+    looking = looking
+        .then(async () => {
+            const { outside } = await load();
+            if (outside[key]?.unseen) await save({ outside: { ...outside, [key]: { ...outside[key], unseen: false } } });
+        })
+        .catch(() => {});
 }
 
 const ACCESS_FRESH = 5 * 60_000; // ms who else has access is taken as current: it changes only when you sign

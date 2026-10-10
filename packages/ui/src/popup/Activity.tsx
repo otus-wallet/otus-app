@@ -9,6 +9,7 @@ import type { Activity } from '@otus-wallet/sdk/activity/summary';
 import { USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
 import { explorerOf, networkOf, walletRpc } from '@otus-wallet/core/settings.ts';
+import { outsideKey } from '@otus-wallet/core/outside.ts';
 import type { State } from '@otus-wallet/core/state.ts';
 import { cachedToken } from '@otus-wallet/core/tokens.ts';
 import { Button } from '../components/ui/button.tsx';
@@ -22,7 +23,7 @@ import { cuts, rows, type Naming, type Part, type Row } from '@otus-wallet/core/
 import type { Screen } from './App.tsx';
 import { TabBar, Tip } from './common.tsx';
 import { WalletBar } from './Lobby.tsx';
-import { current, said, useAccess, useActivity, useHeldNow } from './store.ts';
+import { current, said, seenOutside, useAccess, useActivity, useHeldNow } from './store.ts';
 
 export const KNOWN_SYMBOLS: Record<string, string> = { [USDC]: 'USDC', [USDT]: 'USDT', [WSOL]: 'wSOL' };
 
@@ -49,6 +50,11 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
     const cut = useMemo(() => cuts(history, naming.known), [history, naming]);
     const [open, setOpen] = useState<string | null>(null);
     const explorer = explorerOf(state.settings);
+    // Transactions the wallet signed outside Otus: tagged, and seen once shown.
+    const key = outsideKey(networkOf(state.settings), account.address);
+    const checked = state.outside[key];
+    const outside = useMemo(() => new Set(checked?.flagged ?? []), [checked]);
+    useEffect(() => void (checked?.unseen && seenOutside(key)), [checked, key]);
 
     // The next page, once the end of the list is in view.
     const end = useRef<HTMLDivElement>(null);
@@ -78,7 +84,7 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
                         <ul>
                             {items.map((row, i) => {
                                 const id = row.signature ?? `${day}#${i}`;
-                                return <Item key={id} row={row} open={open === id} flip={() => setOpen(open === id ? null : id)} explorer={explorer} cut={cut} />;
+                                return <Item key={id} row={row} open={open === id} flip={() => setOpen(open === id ? null : id)} explorer={explorer} cut={cut} outside={!!row.signature && outside.has(row.signature)} />;
                             })}
                         </ul>
                     </div>
@@ -93,7 +99,7 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
                 )}
                 <div ref={end} className="h-px shrink-0" />
             </section>
-            <TabBar at="activity" go={go} />
+            <TabBar at="activity" go={go} state={state} />
         </main>
     );
 }
@@ -158,8 +164,8 @@ const Parts = ({ parts, plain, cut }: { parts: Part[]; plain: boolean; cut: Cut 
 );
 const DETAIL = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', dim: 'text-ink-3' } as const;
 
-// One transaction: its line, and opened, all it told.
-function Item({ row, open, flip, explorer, cut }: { row: Row; open: boolean; flip: () => void; explorer: ReturnType<typeof explorerOf>; cut: Cut }) {
+// One transaction: its line, and opened, all it told. `outside`: the wallet signed it, and Otus did not.
+function Item({ row, open, flip, explorer, cut, outside }: { row: Row; open: boolean; flip: () => void; explorer: ReturnType<typeof explorerOf>; cut: Cut; outside: boolean }) {
     const when = row.time === null ? null : new Date(row.time * 1000);
     return (
         <li className="activity-row border-t border-dashed border-rule-2">
@@ -170,6 +176,7 @@ function Item({ row, open, flip, explorer, cut }: { row: Row; open: boolean; fli
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className={cn('text-sm font-bold [overflow-wrap:anywhere]', TONE[row.tone])}>
                         <Parts parts={row.title} plain={row.tone === 'plain'} cut={cut} />
+                        {outside && <span className="outside ml-1.5 inline-block rounded-[3px] border border-warn-bd bg-warn-bg px-1.5 align-[1px] text-2xs leading-[16px] font-bold text-warn">outside Otus</span>}
                     </span>
                     {row.sub.length > 0 && (
                         <span className={cn('text-xs', row.tone === 'warn' ? 'text-warn [overflow-wrap:anywhere]' : 'truncate text-ink-3')}>

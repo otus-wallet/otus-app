@@ -87,7 +87,7 @@ export function Lobby({ state, go }: { state: State; go: (to: Screen) => void })
                     </>
                 )}
             </section>
-            <TabBar at="lobby" go={go} />
+            <TabBar at="lobby" go={go} state={state} />
         </main>
     );
 }

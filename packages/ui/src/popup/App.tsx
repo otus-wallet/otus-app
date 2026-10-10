@@ -13,9 +13,9 @@ import { Send } from './Send.tsx';
 import { Settings } from './Settings.tsx';
 import { platform } from '@otus-wallet/core/platform.ts';
 import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
-import type { State } from '@otus-wallet/core/state.ts';
+import { signs, type State } from '@otus-wallet/core/state.ts';
 import { YourWallet } from '../components/you.tsx';
-import { current, useOtus } from './store.ts';
+import { current, useLookOutside, useOtus } from './store.ts';
 import { StakeScreen } from './Stake.tsx';
 import { SwapScreen } from './Swap.tsx';
 import { WalletScreen } from './WalletScreen.tsx';
@@ -63,9 +63,16 @@ function Screens() {
     // wallet carries over to another.
     return (
         <Fragment key={state.active ?? ''}>
+            {signs(current(state)) && <Lookout state={state} />}
             <YourWallet.Provider value={current(state).address}>{shown(screen, state, keys, go)}</YourWallet.Provider>
         </Fragment>
     );
+}
+
+// The wallet in use, when it signs: its activity read as the popup opens, to tell what it signed outside Otus.
+function Lookout({ state }: { state: State }) {
+    useLookOutside(state);
+    return null;
 }
 
 function shown(screen: Screen, state: State, keys: KeyStatus, go: (to: Screen) => void) {

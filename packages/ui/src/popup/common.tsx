@@ -7,6 +7,10 @@ import { Icon, Logo } from '../components/icons.tsx';
 import { USDC, USDT, WSOL, type Holding } from '@otus-wallet/core/holdings.ts';
 import { cn } from '../lib/cn.ts';
 import type { Screen } from './App.tsx';
+import { outsideKey } from '@otus-wallet/core/outside.ts';
+import { networkOf } from '@otus-wallet/core/settings.ts';
+import type { State } from '@otus-wallet/core/state.ts';
+import { current } from './store.ts';
 import { trendOf } from '@otus-wallet/core/money.ts';
 
 /** A screen: its bar on top, then a body that scrolls, and what stays at the bottom. */
@@ -32,7 +36,10 @@ export function Bar({ title, back }: { title: string; back?: () => void }) {
 }
 
 /** The bar at the bottom of the lobby, Activity and Settings: one tap from each to the others. */
-export function TabBar({ at, go }: { at: 'lobby' | 'activity' | 'settings'; go: (to: Screen) => void }) {
+/** Home, Activity, Settings. Activity bears an amber dot while it holds transactions the wallet signed outside Otus
+ *  that it has not shown yet. */
+export function TabBar({ at, go, state }: { at: 'lobby' | 'activity' | 'settings'; go: (to: Screen) => void; state: State }) {
+    const outside = state.outside[outsideKey(networkOf(state.settings), current(state).address)]?.unseen === true;
     const tabs = [
         ['lobby', 'home', 'Home'],
         ['activity', 'history', 'Activity'],
@@ -48,7 +55,10 @@ export function TabBar({ at, go }: { at: 'lobby' | 'activity' | 'settings'; go: 
                     onClick={() => at !== to && go(to)}
                     className={cn('flex h-[52px] flex-1 cursor-pointer flex-col items-center justify-center gap-[5px]', at === to ? 'text-ink' : 'text-ink-3 hover:text-ink-2')}
                 >
-                    <Icon name={icon} size={16} stroke={2.2} />
+                    <span className="relative">
+                        <Icon name={icon} size={16} stroke={2.2} />
+                        {to === 'activity' && outside && <span aria-label="Signed outside Otus" className="outside absolute -top-[3px] -right-[5px] size-[7px] rounded-full bg-warn" />}
+                    </span>
                     <span className="pixel text-xs tracking-[0.04em]">{label}</span>
                 </button>
             ))}

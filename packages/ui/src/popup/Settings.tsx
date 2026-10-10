@@ -25,7 +25,7 @@ export function Settings({ state, keys, go }: { state: State; keys: KeyStatus; g
     const apps = Object.keys(state.sites).length;
     const network = networkName(networkOf(state.settings));
     return (
-        <Sheet bar={<Bar title="Settings" />} foot={<TabBar at="settings" go={go} />}>
+        <Sheet bar={<Bar title="Settings" />} foot={<TabBar at="settings" go={go} state={state} />}>
             <Accordion type="single" collapsible className="sections flex flex-col gap-2">
                 {keys.vault && (
                     <Section id="lock" icon="lock" title="Auto-lock" value={minutes === 0 ? 'At once' : minutes === 60 ? '1 h' : `${minutes} min`}>
