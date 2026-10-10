@@ -177,11 +177,6 @@ function Item({ row, open, flip, explorer, cut, outside }: { row: Row; open: boo
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className={cn('text-sm font-bold [overflow-wrap:anywhere]', TONE[row.tone])}>
                         <Parts parts={row.title} plain={row.tone === 'plain'} cut={cut} />
-                        {outside && (
-                            <span aria-label="Signed outside Otus" className="outside ml-1.5 inline-grid size-[15px] place-items-center rounded-[3px] border border-warn-bd bg-warn-bg align-[-2px] text-warn">
-                                <Icon name="bang" size={9} stroke={3} />
-                            </span>
-                        )}
                     </span>
                     {row.sub.length > 0 && (
                         <span className={cn('text-xs', row.tone === 'warn' ? 'text-warn [overflow-wrap:anywhere]' : 'truncate text-ink-3')}>
@@ -189,7 +184,17 @@ function Item({ row, open, flip, explorer, cut, outside }: { row: Row; open: boo
                         </span>
                     )}
                 </span>
-                {when && <span className="shrink-0 self-start pt-0.5 text-xs text-ink-3">{when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
+                {/* Signed outside Otus: a mark before the time, in line with the others down the list. */}
+                {(outside || when) && (
+                    <span className="flex shrink-0 items-center gap-2 self-start pt-0.5 text-xs text-ink-3">
+                        {outside && (
+                            <span aria-label="Signed outside Otus" className="outside grid size-[15px] place-items-center rounded-[3px] border border-warn-bd bg-warn-bg text-warn">
+                                <Icon name="bang" size={9} stroke={3} />
+                            </span>
+                        )}
+                        {when?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                )}
             </button>
             {open && (
                 <div className="details flex flex-col gap-1 pb-3 pl-11 text-xs">
