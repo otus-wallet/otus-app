@@ -26,12 +26,13 @@ export function TokenDetails({ asset, state }: { asset: Holding; state: State })
 function MintDetails({ asset, state }: { asset: Holding; state: State }) {
     const mint = asset.mint as Address;
     const read = useTokenTerms(walletRpc(state.settings), mint);
+    const market = networkOf(state.settings) === 'solana:mainnet' ? (cachedToken(mint)?.market ?? null) : null; // from the answer that priced it
     const wallet = current(state).address;
     const names = new Map<string, string>([...state.contacts, ...state.accounts].map((k) => [k.address, k.label]));
     const who = (a: Address) => (a === wallet ? `${short(a)}${YOU}` : (names.get(a) ?? PROGRAM_NAMES.get(a) ?? short(a)));
     return (
         <Details label="Mint" address={mint} state={state}>
-            {read.data?.terms && <Facts facts={tokenFacts(read.data.terms, read.data.metadata, { who, symbol: asset.symbol || short(mint), epoch: read.data.epoch, now: Date.now() / 1000 })} />}
+            {read.data?.terms && <Facts facts={tokenFacts(read.data.terms, read.data.metadata, { who, symbol: asset.symbol || short(mint), epoch: read.data.epoch, now: Date.now() / 1000 }, market)} />}
             {read.data && !read.data.terms && <span className="text-warn">Otus could not read this mint</span>}
             {!read.data && read.error && <span className="text-warn">{`The RPC did not answer: ${said(read.error)}`}</span>}
         </Details>

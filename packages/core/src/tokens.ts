@@ -8,10 +8,14 @@ import { latin } from '@otus-wallet/sdk/review/sites';
 
 import { OTUS_RPC } from './settings.ts';
 
-export type TokenInfo = { id: string; name: string; symbol: string; icon: string | null; verified: boolean; usdPrice: number | null; change24h: number | null; decimals: number | null; supply?: Supply | null }; // change24h: percent
+export type TokenInfo = { id: string; name: string; symbol: string; icon: string | null; verified: boolean; usdPrice: number | null; change24h: number | null; decimals: number | null; supply?: Supply | null; market?: Market | null }; // change24h: percent
 
 /** A token's supply as Jupiter counts it, in whole tokens: all of it, and what circulates. */
 export type Supply = { total: number; circulating: number };
+
+/** A token's market as Jupiter counts it: how many hold it, what share its top holders have (percent), the liquidity
+ *  of its pools (dollars), and when its first pool opened (ms); each null when not said. */
+export type Market = { holders: number | null; topHolders: number | null; liquidity: number | null; firstPool: number | null };
 
 const THROUGH_OTUS = `${OTUS_RPC}/tokens`;
 const JUPITER = 'https://api.jup.ag/tokens/v2/search';
@@ -63,7 +67,7 @@ export const cachedToken = (mint: string): TokenInfo | null => looked.get(mint) 
 
 // One of Jupiter's answers, read with care: its names come from token makers.
 function info(t: unknown): TokenInfo | null {
-    const v = t as { id?: unknown; name?: unknown; symbol?: unknown; icon?: unknown; isVerified?: unknown; usdPrice?: unknown; decimals?: unknown; stats24h?: { priceChange?: unknown }; totalSupply?: unknown; circSupply?: unknown };
+    const v = t as { id?: unknown; name?: unknown; symbol?: unknown; icon?: unknown; isVerified?: unknown; usdPrice?: unknown; decimals?: unknown; stats24h?: { priceChange?: unknown }; totalSupply?: unknown; circSupply?: unknown; holderCount?: unknown; liquidity?: unknown; audit?: { topHoldersPercentage?: unknown }; firstPool?: { createdAt?: unknown } };
     if (typeof v?.id !== 'string' || !isAddress(v.id)) return null; // a mint's address, or nothing
     return {
         id: v.id,
@@ -75,7 +79,26 @@ function info(t: unknown): TokenInfo | null {
         change24h: finite(v.stats24h?.priceChange),
         decimals: Number.isInteger(v.decimals) && (v.decimals as number) >= 0 && (v.decimals as number) <= 255 ? (v.decimals as number) : null, // a mint keeps them in one byte
         supply: supplyOf(finite(v.totalSupply), finite(v.circSupply)),
+        market: marketOf(v),
     };
+}
+
+const SOLANA_BEGAN = Date.UTC(2020, 2, 16); // mainnet's first block: no pool opened before it
+
+// Each count only when it is one: a whole number of holders, a share between 0 and 100, liquidity not below 0, and a
+// pool opened between Solana's start and now.
+function marketOf(v: { holderCount?: unknown; liquidity?: unknown; audit?: { topHoldersPercentage?: unknown }; firstPool?: { createdAt?: unknown } }): Market | null {
+    const holders = Number.isSafeInteger(v.holderCount) && (v.holderCount as number) >= 0 ? (v.holderCount as number) : null;
+    const share = finite(v.audit?.topHoldersPercentage);
+    const liquidity = finite(v.liquidity);
+    const opened = typeof v.firstPool?.createdAt === 'string' ? Date.parse(v.firstPool.createdAt) : NaN;
+    const market: Market = {
+        holders,
+        topHolders: share !== null && share >= 0 && share <= 100 ? share : null,
+        liquidity: liquidity !== null && liquidity >= 0 ? liquidity : null,
+        firstPool: opened >= SOLANA_BEGAN && opened <= Date.now() ? opened : null,
+    };
+    return Object.values(market).some((x) => x !== null) ? market : null;
 }
 
 // All of it and what circulates, both counted, and no more circulating than there is.

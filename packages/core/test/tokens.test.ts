@@ -84,3 +84,17 @@ test('a supply is kept only when both counts are numbers and no more circulates 
     const read = await tokens(ids, true);
     assert.deepEqual(ids.map((id) => read.get(id)?.supply), [{ total: 635_536_709.6, circulating: 588_792_064.7 }, null, null, null]);
 });
+
+test('a market is kept count by count: whole holders, a share from 0 to 100, liquidity not below 0, a pool since Solana began', async (t) => {
+    const ids = [key(52), key(53), key(54)];
+    const answers = [
+        { holderCount: 838_628, liquidity: 5_602_336.3, audit: { topHoldersPercentage: 15.44 }, firstPool: { createdAt: '2024-01-29T17:33:29Z' } },
+        { holderCount: 1.5, liquidity: -1, audit: { topHoldersPercentage: 101 }, firstPool: { createdAt: '2019-01-01T00:00:00Z' } },
+        { holderCount: '9', liquidity: 'lots', audit: 'none', firstPool: { createdAt: 'yesterday' } },
+    ];
+    t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify(ids.map((id, i) => ({ id, symbol: 'T', isVerified: true, ...answers[i] })))));
+    const read = await tokens(ids, true);
+    assert.deepEqual(read.get(ids[0])?.market, { holders: 838_628, topHolders: 15.44, liquidity: 5_602_336.3, firstPool: Date.UTC(2024, 0, 29, 17, 33, 29) });
+    assert.equal(read.get(ids[1])?.market, null); // none of it fits
+    assert.equal(read.get(ids[2])?.market, null);
+});

@@ -5,7 +5,7 @@ import type { Address } from '@solana/kit';
 import type { Fee, MetadataState, MintTerms } from '@otus-wallet/sdk/access/mint';
 import { amount } from '@otus-wallet/sdk/format';
 import { TOKEN_2022_PROGRAM_ADDRESS } from '@otus-wallet/sdk/programs/addresses';
-import type { Supply } from '../tokens.ts';
+import type { Market, Supply } from '../tokens.ts';
 
 /** One line: its name, what it says, the address it names (to copy), and `warn` when someone else can take yours, it
  *  is stopped now, or Otus cannot tell. What can stop it later (a freeze or pause authority, a hook) is said plainly:
@@ -23,8 +23,8 @@ const METADATA: Record<MetadataState, TokenFact> = {
     unreadable: { name: 'Metadata', value: 'Unreadable', warn: true },
 };
 
-/** A mint's terms, and whether its metadata can change, in lines. */
-export function tokenFacts(terms: MintTerms, metadata: MetadataState | null, n: TokenNaming): TokenFact[] {
+/** A mint's terms, whether its metadata can change, and its market when known, in lines. */
+export function tokenFacts(terms: MintTerms, metadata: MetadataState | null, n: TokenNaming, market: Market | null = null): TokenFact[] {
     const { who } = n;
     const facts: TokenFact[] = [];
     // An address's line, when there is one; `none`: what it says without.
@@ -78,7 +78,18 @@ export function tokenFacts(terms: MintTerms, metadata: MetadataState | null, n: 
     if (others.length) facts.push({ name: 'Extensions', value: others.join(', ') });
     if (terms.unknown.length) facts.push({ name: 'Unreadable', value: terms.unknown.length === 1 ? 'An extension' : `${terms.unknown.length} extensions`, warn: true });
     facts.push({ name: 'Supply', value: `${amount(terms.supply, terms.decimals, false)} ${n.symbol}` });
+    if (market) facts.push(...marketFacts(market));
     facts.push({ name: 'Program', value: terms.program === TOKEN_2022_PROGRAM_ADDRESS ? 'Token-2022' : 'Token' });
+    return facts;
+}
+
+/** A token's market in lines: how many hold it, its top holders' share, its pools' liquidity, when its first opened. */
+export function marketFacts(m: Market): TokenFact[] {
+    const facts: TokenFact[] = [];
+    if (m.holders !== null) facts.push({ name: 'Holders', value: m.holders.toLocaleString('en-US') });
+    if (m.topHolders !== null) facts.push({ name: 'Top holders', value: `${m.topHolders.toLocaleString('en-US', { maximumFractionDigits: 1 })}% of supply` });
+    if (m.liquidity !== null) facts.push({ name: 'Liquidity', value: m.liquidity.toLocaleString('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 }) });
+    if (m.firstPool !== null) facts.push({ name: 'First pool', value: new Date(m.firstPool).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) });
     return facts;
 }
 
