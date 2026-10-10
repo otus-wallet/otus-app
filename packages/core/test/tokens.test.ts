@@ -76,3 +76,11 @@ test("a verified token's icon comes through Otus's server while mainnet is read 
     assert.equal((await tokens([OTHER_WAY], false)).get(OTHER_WAY)?.icon, 'https://example.com/t.png');
     assert.equal((await search('t', true)).find((x) => x.id === key(47))?.icon, 'https://example.com/t.png', 'unverified: left as it is, and never shown');
 });
+
+test('a supply is kept only when both counts are numbers and no more circulates than there is', async (t) => {
+    const ids = [key(48), key(49), key(50), key(51)];
+    const supplies = [{ totalSupply: 635_536_709.6, circSupply: 588_792_064.7 }, { totalSupply: 10, circSupply: 11 }, { totalSupply: '10', circSupply: 5 }, { totalSupply: 10 }];
+    t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify(ids.map((id, i) => ({ id, symbol: 'T', isVerified: true, ...supplies[i] })))));
+    const read = await tokens(ids, true);
+    assert.deepEqual(ids.map((id) => read.get(id)?.supply), [{ total: 635_536_709.6, circulating: 588_792_064.7 }, null, null, null]);
+});

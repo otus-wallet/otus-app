@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { historyPage, NoHistory } from '@otus-wallet/sdk/activity/history';
 import { summarize, type Activity } from '@otus-wallet/sdk/activity/summary';
 import { access } from '@otus-wallet/sdk/access/access';
-import { tokenTerms } from '@otus-wallet/sdk/access/mint';
+import { tokensTerms, tokenTerms } from '@otus-wallet/sdk/access/mint';
 import { rpcAt, timedOut } from '@otus-wallet/sdk/rpc';
 import { platform } from '@otus-wallet/core/platform.ts';
 import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
@@ -112,8 +112,27 @@ export function useAccess(rpc: string, address: Address, state: State) {
 
 const MINT_FRESH = 10 * 60_000; // ms a token's terms are taken as current: its authorities hardly ever change
 
-/** A token's terms and whether its metadata can change, read onchain once its details are opened: one request. */
+const AHEAD = 50; // tokens whose details are read ahead: their mints and metadata accounts fill one request
+
+/** A token's terms and whether its metadata can change: read ahead with the wallet's other tokens, or on its own once
+ *  its details are opened. */
 export const useTokenTerms = (rpc: string, mint: Address) => useQuery({ queryKey: ['mintTerms', rpc, mint], queryFn: () => tokenTerms(rpcAt(rpc), mint), staleTime: MINT_FRESH, refetchOnReconnect: false });
+
+/** Reads ahead the details of the tokens a wallet shows, the first AHEAD of them in one request, at most every ten
+ *  minutes: each opens complete, at once. */
+export function useDetailsAhead(rpc: string, mints: Address[]) {
+    const ahead = mints.slice(0, AHEAD).toSorted();
+    useQuery({
+        queryKey: ['mintTermsAhead', rpc, ahead.join(',')],
+        queryFn: async () => {
+            for (const [mint, terms] of await tokensTerms(rpcAt(rpc), ahead)) queries.setQueryData(['mintTerms', rpc, mint], terms);
+            return ahead.length;
+        },
+        enabled: ahead.length > 0,
+        staleTime: MINT_FRESH,
+        refetchOnReconnect: false,
+    });
+}
 
 const STAKE_FRESH = 30_000; // ms a wallet's stake accounts, and the epoch, are taken as current
 const VALIDATORS_FRESH = 10 * 60_000; // ms the validators are

@@ -1,6 +1,7 @@
 // The lobby: everything on it belongs to the wallet in use. Its icon opens what you can do with it; its name, the list
 // of all wallets. The balance in the middle, Receive, Send and Swap under it, then the wallet's tokens; at the bottom,
 // the way to its activity and to settings.
+import type { Address } from '@solana/kit';
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { platform } from '@otus-wallet/core/platform.ts';
@@ -14,21 +15,26 @@ import { cn } from '../lib/cn.ts';
 import type { Screen } from './App.tsx';
 import { CopyAddress, IconButton, Seal, TabBar, Tip, TokenLogo, Trend } from './common.tsx';
 import { amount, balanceSize, dayChange, dollars, NOTHING, price, trendOf } from '@otus-wallet/core/money.ts';
-import { current, said, useHoldings } from './store.ts';
+import { current, said, useDetailsAhead, useHoldings } from './store.ts';
 import { TokenDetails } from './TokenDetails.tsx';
 
 export function Lobby({ state, go }: { state: State; go: (to: Screen) => void }) {
     const account = current(state);
     const mainnet = networkOf(state.settings) === 'solana:mainnet';
-    const r = useHoldings(walletRpc(state.settings), account.address, mainnet);
+    const rpc = walletRpc(state.settings);
+    const r = useHoldings(rpc, account.address, mainnet);
     const read = r && !(r instanceof Error) ? r : null;
     const { usd, sol, assets } = read ?? NOTHING; // while it is read, or when it cannot be: zeros, in grey
     const day = mainnet && read && dayChange(read);
     // Off mainnet nothing has a price: the balance is its SOL.
     const total = mainnet ? dollars(usd) : `${amount({ units: sol, decimals: 9 })} SOL`;
-    const [open, setOpen] = useState<string | null>(null); // the token whose details are shown, by mint
-    // A token's line, opened on a click: SOL, which has no mint, only says what you hold.
-    const line = (a: Holding, dim = false) => (a.native ? <Asset key="native" asset={a} dim={dim} /> : <Asset key={a.mint} asset={a} dim={dim} open={open === a.mint} flip={() => setOpen(open === a.mint ? null : a.mint)} details={<TokenDetails asset={a} state={state} />} />);
+    const [open, setOpen] = useState<string | null>(null); // the token whose details are shown, by mint ('native' for SOL)
+    useDetailsAhead(rpc, read ? assets.filter((a) => !a.native).map((a) => a.mint as Address) : []);
+    // A token's line, its details opened on a click.
+    const line = (a: Holding, dim = false) => {
+        const id = a.native ? 'native' : a.mint;
+        return <Asset key={id} asset={a} dim={dim} open={open === id} flip={() => setOpen(open === id ? null : id)} details={<TokenDetails asset={a} state={state} />} />;
+    };
     return (
         <main className="flex h-full flex-col">
             <WalletBar state={state} go={go} />

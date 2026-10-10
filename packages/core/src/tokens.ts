@@ -8,7 +8,10 @@ import { latin } from '@otus-wallet/sdk/review/sites';
 
 import { OTUS_RPC } from './settings.ts';
 
-export type TokenInfo = { id: string; name: string; symbol: string; icon: string | null; verified: boolean; usdPrice: number | null; change24h: number | null; decimals: number | null }; // change24h: percent
+export type TokenInfo = { id: string; name: string; symbol: string; icon: string | null; verified: boolean; usdPrice: number | null; change24h: number | null; decimals: number | null; supply?: Supply | null }; // change24h: percent
+
+/** A token's supply as Jupiter counts it, in whole tokens: all of it, and what circulates. */
+export type Supply = { total: number; circulating: number };
 
 const THROUGH_OTUS = `${OTUS_RPC}/tokens`;
 const JUPITER = 'https://api.jup.ag/tokens/v2/search';
@@ -60,7 +63,7 @@ export const cachedToken = (mint: string): TokenInfo | null => looked.get(mint) 
 
 // One of Jupiter's answers, read with care: its names come from token makers.
 function info(t: unknown): TokenInfo | null {
-    const v = t as { id?: unknown; name?: unknown; symbol?: unknown; icon?: unknown; isVerified?: unknown; usdPrice?: unknown; decimals?: unknown; stats24h?: { priceChange?: unknown } };
+    const v = t as { id?: unknown; name?: unknown; symbol?: unknown; icon?: unknown; isVerified?: unknown; usdPrice?: unknown; decimals?: unknown; stats24h?: { priceChange?: unknown }; totalSupply?: unknown; circSupply?: unknown };
     if (typeof v?.id !== 'string' || !isAddress(v.id)) return null; // a mint's address, or nothing
     return {
         id: v.id,
@@ -71,7 +74,13 @@ function info(t: unknown): TokenInfo | null {
         usdPrice: finite(v.usdPrice),
         change24h: finite(v.stats24h?.priceChange),
         decimals: Number.isInteger(v.decimals) && (v.decimals as number) >= 0 && (v.decimals as number) <= 255 ? (v.decimals as number) : null, // a mint keeps them in one byte
+        supply: supplyOf(finite(v.totalSupply), finite(v.circSupply)),
     };
+}
+
+// All of it and what circulates, both counted, and no more circulating than there is.
+function supplyOf(total: number | null, circulating: number | null): Supply | null {
+    return total !== null && circulating !== null && circulating >= 0 && circulating <= total ? { total, circulating } : null;
 }
 
 // The real mints of the symbols scams like most to borrow, checked with Jupiter: a token by one of these
