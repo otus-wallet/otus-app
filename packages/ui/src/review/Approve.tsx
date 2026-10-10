@@ -1,10 +1,12 @@
 // The approval window's answers: connect, sign a message, sign in, or a transaction in three steps. It shows what the
 // background sends and answers yes or no; it decides nothing itself. It is drawn only while Otus is unlocked: the
 // lock is the shield's, over the whole page.
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Tile } from '../components/icons.tsx';
+import { AddressCut } from '../components/address.tsx';
 import { YourWallet } from '../components/you.tsx';
+import { addressesIn, cutAmong } from '@otus-wallet/core/view/names.ts';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../components/ui/select.tsx';
 import { short } from '../dom.ts';
 import type { AccountView, Approval, Life, TransactionView } from '@otus-wallet/core/view.ts';
@@ -24,12 +26,19 @@ export function Approve({ approval, answers, expiry, life }: { approval: Approva
     const [shown] = useState(Date.now);
     const left = expiry ?? (life && 'until' in life ? { from: shown, until: life.until } : undefined);
     const died = life !== undefined && 'expired' in life;
+    // Addresses that look alike in what it asks, yours among them, cut as far as where they part.
+    const cut = useMemo(() => cutAmong([approval.account.address, ...addressesIn(approval, NOT_WORDS)]), [approval]);
     return (
         <YourWallet.Provider value={approval.account.address}>
-            {approval.kind === 'transaction' ? <Transaction t={approval} answers={answers} expiry={left} died={died} /> : <Single a={approval} answers={answers} />}
+            <AddressCut.Provider value={cut}>
+                {approval.kind === 'transaction' ? <Transaction t={approval} answers={answers} expiry={left} died={died} /> : <Single a={approval} answers={answers} />}
+            </AddressCut.Provider>
         </YourWallet.Provider>
     );
 }
+
+// What a request holds that is not words: the transaction's bytes, its hash, what a Ledger signs.
+const NOT_WORDS = new Set(['wire', 'hash', 'ledger']);
 
 const WATCH_ONLY_CONNECT = 'Watch only: choose a wallet that signs';
 

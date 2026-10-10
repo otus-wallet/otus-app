@@ -1,18 +1,22 @@
 // An address as words name it: cut short, and whole in a tooltip; a click copies it.
 import { short } from '@otus-wallet/sdk/format';
-import { useEffect, useRef, useState, type KeyboardEvent, type SyntheticEvent } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type KeyboardEvent, type SyntheticEvent } from 'react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip.tsx';
 
 /** How an address is cut short: four characters a side, or more where it must read apart from one alike. */
 export type Cut = (address: string) => string;
 
+/** How the screen cuts its addresses short, knowing which look alike there: four characters a side by default. */
+export const AddressCut = createContext<Cut>(short);
+
 /**
  * An address cut short, or by its `name` when Otus knows it by one; whole in a tooltip on hover; a click copies it, and
  * the tooltip says so for a moment, then shows it again. `still`: inside something a click already opens, so only cut
  * short.
  */
-export function ShortAddress({ address, name, cut = short, still = false }: { address: string; name?: string; cut?: Cut; still?: boolean }) {
+export function ShortAddress({ address, name, cut, still = false }: { address: string; name?: string; cut?: Cut; still?: boolean }) {
+    const screen = useContext(AddressCut);
     const [copied, setCopied] = useState(false);
     const trigger = useRef<HTMLSpanElement>(null);
     useEffect(() => {
@@ -20,7 +24,7 @@ export function ShortAddress({ address, name, cut = short, still = false }: { ad
         const t = setTimeout(() => setCopied(false), 500);
         return () => clearTimeout(t);
     }, [copied]);
-    const shown = name ?? cut(address);
+    const shown = name ?? (cut ?? screen)(address);
     if (still) return <span className="whitespace-nowrap">{shown}</span>;
     // Kept open through the click, which a tooltip otherwise closes on (as a press on its trigger, and as one outside it).
     const hold = (e: SyntheticEvent | Event) => e.preventDefault();

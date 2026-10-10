@@ -3,7 +3,7 @@
 import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 import { isAddress, type Address } from '@solana/kit';
 
-import { amount, cap, quantity, SOL_DECIMALS } from '@otus-wallet/sdk/format';
+import { amount, cap, quantity, short, SOL_DECIMALS } from '@otus-wallet/sdk/format';
 import { STAKE_PROGRAM, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
 import { SYSVARS } from '@otus-wallet/sdk/review/assess';
@@ -11,6 +11,7 @@ import { defaultUnits, lamportsFor, unitLimit, unitPrice } from '@otus-wallet/sd
 import { read } from '@otus-wallet/sdk/review/changes';
 import type { Names } from '@otus-wallet/sdk/review/effects';
 import type { Review } from '@otus-wallet/sdk/review/review';
+import { alike } from '../state.ts';
 import type { Known } from '../view.ts';
 
 const SYMBOLS: Record<string, string> = { [USDC]: 'USDC', [USDT]: 'USDT' };
@@ -37,6 +38,40 @@ export function atAddresses(words: string): string[] {
         else out[out.length - 1] += w;
     }
     return out;
+}
+
+/** An address cut short where it parts from those made to look like it, not just at four characters a side: the ones a
+ *  copy matches. "EhPya…mBFDX" against "EhPyS…7BFDX"; against several, as far as the one it shares most with. */
+export function apart(a: string, ...like: string[]): string {
+    let [head, tail] = [0, 0];
+    for (const b of like) {
+        let h = 0;
+        while (h < a.length && a[h] === b[h]) h++;
+        let t = 0;
+        while (t < a.length && a[a.length - 1 - t] === b[b.length - 1 - t]) t++;
+        [head, tail] = [Math.max(head, h), Math.max(tail, t)];
+    }
+    const [h, t] = [Math.max(4, head + 1), Math.max(4, tail + 1)];
+    return h + t >= a.length ? a : `${a.slice(0, h)}…${a.slice(-t)}`;
+}
+
+/** How a screen cuts an address short: four characters a side, or, for one like others among `addresses` (first and
+ *  last characters the same, as a poisoner grinds them), as far as where it parts from each of them. */
+export function cutAmong(addresses: Iterable<string>): (a: string) => string {
+    const seen = [...new Set(addresses)];
+    return (a) => {
+        const twins = seen.filter((x) => x !== a && alike(x, a));
+        return twins.length ? apart(a, ...twins) : short(a);
+    };
+}
+
+/** Every whole address in the words of a view, wherever they sit in it; `skip`: keys whose values are not words (the
+ *  transaction's bytes, its hash). */
+export function addressesIn(value: unknown, skip: ReadonlySet<string> = new Set()): string[] {
+    if (typeof value === 'string') return atAddresses(value).filter((_, i) => i % 2 === 1);
+    if (Array.isArray(value)) return value.flatMap((v) => addressesIn(v, skip));
+    if (value && typeof value === 'object') return Object.entries(value).flatMap(([k, v]) => (skip.has(k) ? [] : addressesIn(v, skip)));
+    return [];
 }
 
 /** Someone else's name for an address (a token's symbol, a validator's name), or the address when there is none, or

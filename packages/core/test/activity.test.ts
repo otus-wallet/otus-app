@@ -30,7 +30,8 @@ import { exactJson, NoHistory, readPage, type Landed } from '@otus-wallet/sdk/ac
 import { summarize, type Activity, type Told } from '@otus-wallet/sdk/activity/summary';
 import { short } from '@otus-wallet/sdk/format';
 import { SQUADS_V4 } from '@otus-wallet/sdk/programs/squads';
-import { apart, cuts, rows, text, type Naming } from '../src/view/activity.ts';
+import { cuts, rows, text, type Naming } from '../src/view/activity.ts';
+import { apart } from '../src/view/names.ts';
 import { key, MINT } from './helpers.ts';
 
 // The wallet: a key's address, on the curve, as a wallet that signs has; a program's address never signs.

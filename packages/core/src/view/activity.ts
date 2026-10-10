@@ -10,8 +10,9 @@ import { LEGACY_MEMO_PROGRAM_ADDRESS_V1, LEGACY_MEMO_PROGRAM_ADDRESS_V3, MEMO_PR
 import type { Activity, Move, Told } from '@otus-wallet/sdk/activity/summary';
 import { LIGHTHOUSE } from '@otus-wallet/sdk/programs/addresses';
 import { alike } from '../state.ts';
-import { amount, cap, short, sol } from '@otus-wallet/sdk/format';
+import { amount, cap, sol } from '@otus-wallet/sdk/format';
 import { story, type Names } from '@otus-wallet/sdk/review/effects';
+import { cutAmong } from './names.ts';
 import type { Step } from '@otus-wallet/sdk/programs/squads';
 
 export type RowIcon = 'send' | 'receive' | 'swap' | 'plus' | 'trash' | 'key' | 'refresh' | 'shield' | 'box' | 'cross' | 'bang';
@@ -58,14 +59,8 @@ export function rows(read: (Activity | { unreadable: string })[], n: Naming): Ro
 }
 
 /** How the page cuts an address short: four characters a side, or, for one like others on the page or known, as far as
- *  where it parts from each of them (apart()). */
-export function cuts(read: (Activity | { unreadable: string })[], known: Address[]): (a: string) => string {
-    const seen = [...new Set([...known, ...read.flatMap((a) => ('kind' in a && a.other ? [a.other] : []))])];
-    return (a) => {
-        const twins = seen.filter((x) => x !== a && alike(x, a));
-        return twins.length ? apart(a, ...twins) : short(a);
-    };
-}
+ *  where it parts from each of them. */
+export const cuts = (read: (Activity | { unreadable: string })[], known: Address[]) => cutAmong([...known, ...read.flatMap((a) => ('kind' in a && a.other ? [a.other] : []))]);
 
 /**
  * The copies among the page's other sides, each with the address it copies. Of two alike (their first and last
@@ -224,21 +219,6 @@ function namesFor(a: Activity, n: Naming): Names {
 
 // A name for an address when Otus has one: a contact's, a program's (yours goes by its address, tagged).
 const named = (n: Naming, a: Address) => (n.who(a).includes(a) ? null : n.who(a));
-
-/** An address cut short where it parts from those made to look like it, not just at four characters a side: the ones a
- *  copy matches. "EhPya…mBFDX" against "EhPyS…7BFDX"; against several, as far as the one it shares most with. */
-export function apart(a: string, ...like: string[]): string {
-    let [head, tail] = [0, 0];
-    for (const b of like) {
-        let h = 0;
-        while (h < a.length && a[h] === b[h]) h++;
-        let t = 0;
-        while (t < a.length && a[a.length - 1 - t] === b[b.length - 1 - t]) t++;
-        [head, tail] = [Math.max(head, h), Math.max(tail, t)];
-    }
-    const [h, t] = [Math.max(4, head + 1), Math.max(4, tail + 1)];
-    return h + t >= a.length ? a : `${a.slice(0, h)}…${a.slice(-t)}`;
-}
 
 // How much moved, unsigned, and of what.
 const quantity = (m: Move, n: Naming) => `${amount(m.units < 0n ? -m.units : m.units, m.decimals, false)} ${m.mint === null ? 'SOL' : n.symbol(m.mint)}`;

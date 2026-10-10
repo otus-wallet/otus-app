@@ -6,7 +6,7 @@ import { Checkbox } from '../components/ui/checkbox.tsx';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../components/ui/collapsible.tsx';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.tsx';
 import { Icon, Logo } from '../components/icons.tsx';
-import { short } from '../dom.ts';
+import { ShortAddress } from '../components/address.tsx';
 import { cn } from '../lib/cn.ts';
 import type { AssetChange, InstructionView, ProgramView, Tone, TransactionView } from '@otus-wallet/core/view.ts';
 import { Block, Heading, Notice, WATCH_ONLY } from './Frame.tsx';
@@ -255,7 +255,7 @@ function Program({ program, open: first }: { program: ProgramView; open: boolean
                         <span className="flex min-w-0 items-baseline gap-1.5">
                             <span className="font-bold">{program.name}</span>
                             <span className="truncate text-xs text-ink-3" title={program.address}>
-                                {short(program.address)}
+                                <ShortAddress address={program.address} still />
                             </span>
                         </span>
                         <span className={cn('text-xs', program.subTone === 'plain' ? 'text-ink-2' : text(program.subTone))}>

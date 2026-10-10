@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { address } from '@solana/kit';
 
-import { atAddresses, endsYours, nameOr } from '../src/view/names.ts';
+import { addressesIn, apart, atAddresses, cutAmong, endsYours, nameOr } from '../src/view/names.ts';
 
 const A = address('2apBGMsS6ti9RyF5TwQTDswXBWskiJP2LD4cUEDqYJjk');
 const B = address('AxJkHRY3puoofyj7Pn512M1SGBgWroXMkEdNPQypkzbu');
@@ -61,4 +61,19 @@ test('hostile words: long, with no address, or with many', () => {
     const many = Array.from({ length: 1000 }, () => A).join(' ');
     assert.equal(atAddresses(many).filter((_, i) => i % 2).length, 1000);
     assert.deepEqual(atAddresses(`${A}‮${B}`), ['', A, '‮', B, '']); // split as given; what the words hold is the words' own business
+});
+
+test("a view's addresses, wherever its words hold them, but where bytes are", () => {
+    const view = { account: { address: A }, notes: [`to ${B}`, 'none'], deep: { more: [{ text: `${A} and ${SYSTEM}` }] }, hash: B, wire: A, count: 3 };
+    assert.deepEqual(addressesIn(view, new Set(['hash', 'wire'])), [A, B, A, SYSTEM]);
+    assert.deepEqual(addressesIn(null), []);
+});
+
+test('addresses that look alike, cut as far as where they part; the rest four a side', () => {
+    const like = `${A.slice(0, 6)}${B.slice(6, -5)}${A.slice(-5)}`; // A's ends, another middle
+    const cut = cutAmong([A, like, B]);
+    assert.notEqual(cut(A), cut(like));
+    assert.deepEqual([cut(A), cut(like)], [apart(A, like), apart(like, A)]);
+    assert.equal(cut(B), `${B.slice(0, 4)}…${B.slice(-4)}`);
+    assert.equal(cutAmong([B])(like), `${like.slice(0, 4)}…${like.slice(-4)}`); // nothing alike among them
 });
