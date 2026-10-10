@@ -1,5 +1,7 @@
 import { isAddress, type Address } from '@solana/kit';
 
+import { alike } from '@otus-wallet/sdk/format';
+
 import { pathBytes } from './ledger/solana.ts';
 import { platform } from './platform.ts';
 import { DEFAULT_SETTINGS, settingsOf, type Settings } from './settings.ts';
@@ -192,16 +194,7 @@ export function lookalike(state: State, address: string): { address: string; lab
     return known.find((k) => k.address !== address && alike(k.address, address)) ?? null;
 }
 
-// At least six characters alike between the start and the end, two or more at each: "7xKX…gAsU" passes for the
-// other. Two random addresses are, about once in 10^10.
-export function alike(a: string, b: string): boolean {
-    const n = Math.min(a.length, b.length);
-    let head = 0;
-    while (head < n && a[head] === b[head]) head++;
-    let tail = 0;
-    while (tail < n - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
-    return head >= 2 && tail >= 2 && head + tail >= 6;
-}
+export { alike }; // the SDK's: how the review tells a copy of an address from the address
 
 /** A transfer made in Otus landed at this address: one more. */
 export const sentTo = (state: State, address: Address): Partial<State> => ({ sent: { ...state.sent, [address]: (Object.hasOwn(state.sent, address) ? state.sent[address] : 0) + 1 } });

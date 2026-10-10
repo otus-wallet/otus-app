@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 
 import { getTransferSolInstruction } from '@solana-program/system';
-import { createNoopSigner, type MaybeEncodedAccount } from '@solana/kit';
+import { createNoopSigner, isAddress, type Address, type MaybeEncodedAccount } from '@solana/kit';
 
 import assert from 'node:assert/strict';
 
@@ -16,7 +16,8 @@ import { account, DRAIN, DRAIN_AFTER, DRAIN_BEFORE, fakeChain, key, PAYER, RECIP
 // What the window shows for a transaction, on a cluster, for a signer, from a site you signed for before or never.
 async function view(bytes: Uint8Array, before: MaybeEncodedAccount[], after: MaybeEncodedAccount[], o: { cluster?: Cluster; signer?: Signer; signedBefore?: number | null; simulation?: Partial<Simulation>; kept?: { address: string; label: string }[] } = {}) {
     const chain = fakeChain(before, after, o.simulation);
-    const r = await review(bytes, { wallet: PAYER, signedBefore: o.signedBefore === undefined ? 0 : o.signedBefore, host: 'app.example.com' }, chain);
+    const contacts = new Map((o.kept ?? []).map((k) => [k.address as Address, k.label])); // as the extension passes them
+    const r = await review(bytes, { wallet: PAYER, signedBefore: o.signedBefore === undefined ? 0 : o.signedBefore, host: 'app.example.com', contacts }, chain);
     const p = await prepare(r, PAYER, chain);
     const site = siteView('https://app.example.com', { account: PAYER, signatures: 3 });
     return describe(r, p, { site, account: { label: 'Me', address: PAYER }, signer: o.signer ?? 'ready', cluster: o.cluster ?? 'solana:mainnet', known: { tokens: new Map(), decimals: new Map() }, kept: o.kept });
@@ -73,4 +74,14 @@ test('your other wallets and contacts it names go to the window, by your names; 
     const after = [account(PAYER, SYSTEM, 2n * SOL - SOL / 10n - 5_000n), account(key(2), SYSTEM, SOL / 10n)];
     const kept = [{ address: PAYER, label: 'Me' }, { address: key(2), label: 'Bob' }, { address: key(3), label: 'Ana' }];
     assert.deepEqual((await view(send, before, after, { kept })).kept, [{ address: key(2), label: 'Bob' }]);
+});
+
+test('your SOL to a copy of a contact\'s address: critical, said whole, and the contact goes to the window to cut it apart', async () => {
+    const bob = key(2);
+    const copy = Array.from({ length: 60 }, (_, i) => `${bob.slice(0, 5)}${key(80 + i).slice(5, -5)}${bob.slice(-5)}`).find((x) => x !== bob && isAddress(x)) as Address;
+    const send = transaction([getTransferSolInstruction({ source: createNoopSigner(PAYER), destination: copy, amount: SOL / 10n })]);
+    const t = await view(send, [account(PAYER, SYSTEM, 2n * SOL)], [account(PAYER, SYSTEM, 2n * SOL - SOL / 10n - 5_000n), account(copy, SYSTEM, SOL / 10n)], { kept: [{ address: bob, label: 'Bob' }] });
+    assert.equal(t.verdict, 'danger');
+    assert.deepEqual(t.findings.find((f) => f.title === "This address looks like Bob's"), { tone: 'danger', title: "This address looks like Bob's", note: `${copy} is not Bob's` });
+    assert.deepEqual(t.kept, [{ address: bob, label: 'Bob' }]); // not in it, but its copy is
 });

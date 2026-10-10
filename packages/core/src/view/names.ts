@@ -11,7 +11,7 @@ import { defaultUnits, lamportsFor, unitLimit, unitPrice } from '@otus-wallet/sd
 import { read } from '@otus-wallet/sdk/review/changes';
 import type { Names } from '@otus-wallet/sdk/review/effects';
 import type { Review } from '@otus-wallet/sdk/review/review';
-import { alike } from '../state.ts';
+import { alike } from '@otus-wallet/sdk/format';
 import type { Known } from '../view.ts';
 
 const SYMBOLS: Record<string, string> = { [USDC]: 'USDC', [USDT]: 'USDT' };

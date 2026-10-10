@@ -9,7 +9,7 @@ import { LEGACY_MEMO_PROGRAM_ADDRESS_V1, LEGACY_MEMO_PROGRAM_ADDRESS_V3, MEMO_PR
 
 import type { Activity, Move, Told } from '@otus-wallet/sdk/activity/summary';
 import { LIGHTHOUSE } from '@otus-wallet/sdk/programs/addresses';
-import { alike } from '../state.ts';
+import { alike } from '@otus-wallet/sdk/format';
 import { amount, cap, sol } from '@otus-wallet/sdk/format';
 import { story, type Names } from '@otus-wallet/sdk/review/effects';
 import { cutAmong } from './names.ts';
