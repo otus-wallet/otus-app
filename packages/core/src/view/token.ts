@@ -83,12 +83,15 @@ export function tokenFacts(terms: MintTerms, metadata: MetadataState | null, n: 
     return facts;
 }
 
-/** A token's market in lines: how many hold it, its top holders' share, its pools' liquidity, when its first opened. */
+/** A token's market in lines: its market cap, how many hold it, its top holders' share, its pools' liquidity, when its
+ *  first pool opened. */
 export function marketFacts(m: Market): TokenFact[] {
     const facts: TokenFact[] = [];
+    const usd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 });
+    if (m.cap !== null) facts.push({ name: 'Market cap', value: usd(m.cap) });
     if (m.holders !== null) facts.push({ name: 'Holders', value: m.holders.toLocaleString('en-US') });
     if (m.topHolders !== null) facts.push({ name: 'Top holders', value: `${m.topHolders.toLocaleString('en-US', { maximumFractionDigits: 1 })}% of supply` });
-    if (m.liquidity !== null) facts.push({ name: 'Liquidity', value: m.liquidity.toLocaleString('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 }) });
+    if (m.liquidity !== null) facts.push({ name: 'Liquidity', value: usd(m.liquidity) });
     if (m.firstPool !== null) facts.push({ name: 'First pool', value: new Date(m.firstPool).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) });
     return facts;
 }

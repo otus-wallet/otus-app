@@ -13,9 +13,10 @@ export type TokenInfo = { id: string; name: string; symbol: string; icon: string
 /** A token's supply as Jupiter counts it, in whole tokens: all of it, and what circulates. */
 export type Supply = { total: number; circulating: number };
 
-/** A token's market as Jupiter counts it: how many hold it, what share its top holders have (percent), the liquidity
- *  of its pools (dollars), and when its first pool opened (ms); each null when not said. */
-export type Market = { holders: number | null; topHolders: number | null; liquidity: number | null; firstPool: number | null };
+/** A token's market as Jupiter counts it: what what circulates is worth (dollars), how many hold it, what share its top
+ *  holders have (percent), the liquidity of its pools (dollars), and when its first pool opened (ms); each null when not
+ *  said. */
+export type Market = { cap: number | null; holders: number | null; topHolders: number | null; liquidity: number | null; firstPool: number | null };
 
 const THROUGH_OTUS = `${OTUS_RPC}/tokens`;
 const JUPITER = 'https://api.jup.ag/tokens/v2/search';
@@ -67,7 +68,7 @@ export const cachedToken = (mint: string): TokenInfo | null => looked.get(mint) 
 
 // One of Jupiter's answers, read with care: its names come from token makers.
 function info(t: unknown): TokenInfo | null {
-    const v = t as { id?: unknown; name?: unknown; symbol?: unknown; icon?: unknown; isVerified?: unknown; usdPrice?: unknown; decimals?: unknown; stats24h?: { priceChange?: unknown }; totalSupply?: unknown; circSupply?: unknown; holderCount?: unknown; liquidity?: unknown; audit?: { topHoldersPercentage?: unknown }; firstPool?: { createdAt?: unknown } };
+    const v = t as { id?: unknown; name?: unknown; symbol?: unknown; icon?: unknown; isVerified?: unknown; usdPrice?: unknown; decimals?: unknown; stats24h?: { priceChange?: unknown }; totalSupply?: unknown; circSupply?: unknown; mcap?: unknown; holderCount?: unknown; liquidity?: unknown; audit?: { topHoldersPercentage?: unknown }; firstPool?: { createdAt?: unknown } };
     if (typeof v?.id !== 'string' || !isAddress(v.id)) return null; // a mint's address, or nothing
     return {
         id: v.id,
@@ -85,14 +86,15 @@ function info(t: unknown): TokenInfo | null {
 
 const SOLANA_BEGAN = Date.UTC(2020, 2, 16); // mainnet's first block: no pool opened before it
 
-// Each count only when it is one: a whole number of holders, a share between 0 and 100, liquidity not below 0, and a
-// pool opened between Solana's start and now.
-function marketOf(v: { holderCount?: unknown; liquidity?: unknown; audit?: { topHoldersPercentage?: unknown }; firstPool?: { createdAt?: unknown } }): Market | null {
+// Each count only when it is one: a whole number of holders, a share between 0 and 100, a cap and liquidity not below
+// 0, and a pool opened between Solana's start and now.
+function marketOf(v: { mcap?: unknown; holderCount?: unknown; liquidity?: unknown; audit?: { topHoldersPercentage?: unknown }; firstPool?: { createdAt?: unknown } }): Market | null {
     const holders = Number.isSafeInteger(v.holderCount) && (v.holderCount as number) >= 0 ? (v.holderCount as number) : null;
     const share = finite(v.audit?.topHoldersPercentage);
-    const liquidity = finite(v.liquidity);
+    const [cap, liquidity] = [finite(v.mcap), finite(v.liquidity)];
     const opened = typeof v.firstPool?.createdAt === 'string' ? Date.parse(v.firstPool.createdAt) : NaN;
     const market: Market = {
+        cap: cap !== null && cap >= 0 ? cap : null,
         holders,
         topHolders: share !== null && share >= 0 && share <= 100 ? share : null,
         liquidity: liquidity !== null && liquidity >= 0 ? liquidity : null,

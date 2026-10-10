@@ -94,14 +94,15 @@ test('SOL: native, no mint; its supply and what circulates in whole SOL, when re
     assert.deepEqual(solFacts(null).map((f) => f.name), ['Type', 'Program']);
 });
 
-test('its market, between its supply and its program: holders, the top holders’ share, liquidity, the first pool', () => {
-    const market = { holders: 838_628, topHolders: 15.44, liquidity: 5_602_336.3, firstPool: Date.UTC(2024, 0, 29, 17, 33, 29) };
+test('its market, between its supply and its program: market cap, holders, the top holders’ share, liquidity, the first pool', () => {
+    const market = { cap: 1_241_445_666.9, holders: 838_628, topHolders: 15.44, liquidity: 5_602_336.3, firstPool: Date.UTC(2024, 0, 29, 17, 33, 29) };
     assert.deepEqual(marketFacts(market), [
+        { name: 'Market cap', value: '$1.2B' },
         { name: 'Holders', value: '838,628' },
         { name: 'Top holders', value: '15.4% of supply' },
         { name: 'Liquidity', value: '$5.6M' },
         { name: 'First pool', value: '29 Jan 2024' },
     ]);
-    assert.deepEqual(marketFacts({ holders: null, topHolders: null, liquidity: 980, firstPool: null }), [{ name: 'Liquidity', value: '$980' }]);
-    assert.deepEqual(tokenFacts(terms(), null, naming(), market).map((f) => f.name), ['Mint authority', 'Freeze authority', 'Supply', 'Holders', 'Top holders', 'Liquidity', 'First pool', 'Program']);
+    assert.deepEqual(marketFacts({ cap: null, holders: null, topHolders: null, liquidity: 980, firstPool: null }), [{ name: 'Liquidity', value: '$980' }]);
+    assert.deepEqual(tokenFacts(terms(), null, naming(), market).map((f) => f.name), ['Mint authority', 'Freeze authority', 'Supply', 'Market cap', 'Holders', 'Top holders', 'Liquidity', 'First pool', 'Program']);
 });
