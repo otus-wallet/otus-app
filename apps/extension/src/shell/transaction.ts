@@ -128,7 +128,15 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     // the transaction's.
     const preparing = Promise.all([prepare(r, account.address, way.chain, way.context.own === true, bare, way.trade), idlTold(r, way.chain)]);
     preparing.catch(() => {}); // heard through `prepared`, below
-    const known = await squadsIn(r, reading).then(async (squads) => ({ ...(await tokenInfo(r, way, shell, mintsInside(squads))), squads }));
+    // Shown once the tokens of what moves for you are named (most are, from before); the rest, a route's pools' named
+    // only in the programs' details, come with the final form. Asked first, yours get a search of their own.
+    const squads = await squadsIn(r, reading);
+    const moved = [...new Set([...mintsMoved(r), ...mintsInside(squads)])];
+    const first = tokenInfo(r, way, shell, moved);
+    const rest = mintsOf(r).filter((m) => !moved.includes(m));
+    const others = rest.length ? tokenInfo(r, way, shell, rest) : Promise.resolve(null);
+    const known = { ...(await first), squads };
+    const every = others.then((o): Known => (o ? { tokens: new Map([...known.tokens, ...o.tokens]), decimals: new Map([...known.decimals, ...o.decimals]) } : known));
     // A site's transaction tells nothing of its blockhash's age, and may come with little of its minute left (a Jupiter
     // order, about half): the network is asked instead, while the user decides.
     const away = way.cluster !== networkOf(settings); // for another network than the wallet shows: said in the window
@@ -136,9 +144,9 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     const kept: Kept[] = [...accounts.map(({ address, label }) => ({ address, label, kind: 'wallet' as const })), ...contacts.map(({ address, label }) => ({ address, label, kind: 'contact' as const })), ...yours.sent.map((address) => ({ address, label: '', kind: 'sent' as const }))];
     const shown = { site: way.site, account: accountView(account), signer: signerOf(account), cluster: way.cluster, known, expiry: null, recipient: way.recipient, later: way.later, away, kept };
     const blocked = unsignable ? LEDGER_V1 : undefined;
-    const prepared = preparing.then(([p, told]): { p: Prepared; approval: TransactionView } => {
+    const prepared = preparing.then(async ([p, told]): Promise<{ p: Prepared; approval: TransactionView }> => {
         ready?.(p); // refused as prepared: the window says no before it can be approved
-        const view = describe(r, p, { ...shown, known: { ...known, told } });
+        const view = describe(r, p, { ...shown, known: { ...(await every), squads, told } });
         // A Ledger signs in the window, on approval: it gets the very message to sign, and its signature comes back.
         const ledger = account.ledger && { path: account.ledger.path, message: getBase64Decoder().decode(messageOf(p.bytes)) };
         return { p, approval: { ...view, ...(ledger && !blocked && { ledger }), ...(blocked && { blocked }) } };
@@ -359,12 +367,18 @@ function idlTold(r: Review, chain: Chain): Promise<Map<number, IdlInstruction>> 
     return Promise.race([toldByIdl(r, chain).catch(() => none), new Promise<typeof none>((done) => setTimeout(() => done(none), IDL_WAIT))]);
 }
 
-// What the window needs of the transaction's tokens: their decimals and, on mainnet, their names and prices (on
-// another cluster the same addresses are other tokens). Never fails the review: without them, amounts show as units.
-async function tokenInfo(r: Review, way: Way, shell: Shell, more: Address[] = []): Promise<Known> {
-    const mints = [...new Set([...mintsOf(r), ...more])];
+// What the window needs of these tokens: their decimals and, on mainnet, their names and prices (on another cluster
+// the same addresses are other tokens). Never fails the review: without them, amounts show as units.
+async function tokenInfo(r: Review, way: Way, shell: Shell, asked: Address[]): Promise<Known> {
+    const mints = [...new Set(asked)];
     const [decimals, tokens] = await Promise.all([decimalsOf(r, mints, way.chain), way.cluster === 'solana:mainnet' ? shell.tokens(mints) : Promise.resolve(new Map())]);
     return { tokens, decimals };
+}
+
+// The mints of what moves for you or for others from what you give: what the balances show.
+function mintsMoved(r: Review): Address[] {
+    const assets = [...r.assessment.flows.map((f) => f.asset), ...r.assessment.payouts.flatMap((p) => p.amounts.map((a) => a.asset))];
+    return [...new Set(assets.filter((a): a is Address => a !== 'SOL'))];
 }
 
 // Every mint the transaction moves or names: of the token accounts it writes, and the mints among its accounts.
