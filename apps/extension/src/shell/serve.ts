@@ -342,7 +342,7 @@ export function swapOwn(bytes: Uint8Array, address: string, asked: Asked, shell:
             // (more than you hold, a price gone) says so.
             const ready = (p: Prepared) => {
                 if (p.unguarded === 'the simulation failed') throw new Refused('the swap would fail as it is now (check what you hold, and quote it again), so nothing was sent');
-                if (p.unguarded !== null || p.holds.length === 0) throw new Refused(`Otus could not lock this swap (${(p.unguarded ?? 'nothing to hold').toLowerCase()}), so nothing was sent`);
+                if (p.unguarded !== null || p.holds.length === 0) throw new Refused(`${p.unguarded === null || p.unguarded === 'nothing of yours to hold' ? 'Otus found nothing of yours to guard in this swap' : p.unguarded}, so nothing was sent`);
             };
             const { r, p, signature: signedOnDevice } = await approved(bytes, account, way, shell, checks, undefined, ready);
             if (!(signedOnDevice && onDevice(account))) await unexpired(r, chain);

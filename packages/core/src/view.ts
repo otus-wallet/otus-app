@@ -204,8 +204,7 @@ const UNSAID = new Set(['nothing of yours to hold', 'the simulation failed']);
 function guards(p: Prepared): TransactionView['guards'] {
     if (p.unguarded === null) return { held: true, text: p.holds.length === 1 ? 'One guard locks your account to what you see' : `${p.holds.length} guards lock your accounts to what you see` };
     if (p.units !== null || UNSAID.has(p.unguarded)) return { held: false, text: '' };
-    const why = p.unguarded.charAt(0).toLowerCase() + p.unguarded.slice(1);
-    return { held: false, text: `None: ${why}`, why };
+    return { held: false, text: `None: ${p.unguarded}`, why: p.unguarded };
 }
 
 // What Otus added to the transaction, or changed in it: its guards, and the limits and priority fee it set, in the

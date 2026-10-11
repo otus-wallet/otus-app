@@ -601,7 +601,7 @@ test('a transaction another account must sign too is signed, but not sent while 
     const signed = getTransactionDecoder().decode(bytes(transactions[0]));
     assert.ok(signed.signatures[w.me] && !signed.signatures[key(3)]);
     const shown = w.approvals[0];
-    const why = "another account signs it too, so Otus can't lock it";
+    const why = "Otus can't add guards without breaking another account's signature";
     assert.deepEqual(shown.kind === 'transaction' && [shown.guards, shown.added], [{ held: false, text: `None: ${why}`, why }, []]); // left as it came, and why
 });
 
@@ -1204,6 +1204,6 @@ test('a swap Otus could not guard is refused before it can be approved', async (
     const base = { error: null, logs: [], fee: 5000n, unitsConsumed: null, loaded: null, inner: [], innerListed: true };
     const w = await wallet({ chain: { simulate: async (_tx, watch) => ({ ...base, after: watch.map((address) => ({ exists: false as const, address })), ...(++simulations > 1 && { error: { InstructionError: [9, { Custom: 1 }] } as never }) }) } });
     const reply = (await swapOwn(await swapFor(w.me), w.me, ASKED, w.shell)) as { error: string };
-    assert.match(reply.error, /could not lock this swap/);
+    assert.equal(reply.error, "Otus can't add guards because the transaction fails with them, so nothing was sent");
     assert.equal(w.sent.length, 0);
 });
