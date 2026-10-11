@@ -78,7 +78,7 @@ export type TransactionView = {
     programs: ProgramView[];
     findings: Line[];
     fee: string;
-    guards: { held: boolean; text: string }; // whether guards hold the outcome, and how many or why not; empty when it goes without saying
+    guards: { held: boolean; text: string; why?: string }; // whether guards hold the outcome, and how many or why not; empty when it goes without saying
     added: string[]; // what Otus added to the transaction or changed in it
     cluster: Cluster;
     expiry: Expiry | null; // null for a durable transaction, which waits for its nonce instead
@@ -192,15 +192,20 @@ function summary(verdict: Verdict, findings: Finding[]): Pick<TransactionView, '
     return { title: 'Looks safe', sub: 'No warnings', chip: { text: 'All clear', tone: 'ok' } };
 }
 
-// Whether guards hold the outcome, in words. Without them, why, where it matters: something of yours moves, or a
-// program Otus doesn't know gets you. Nothing to hold, or a failure found already, goes without saying.
 /** Why a transfer a Ledger shows in clear goes without guards: its own screen shows it whole. */
 export const LEDGER_CLEAR = 'its Ledger shows it in clear';
 
-// Guards are said when there are some; why there are none is Otus's business, not the user's (it read as noise).
+// Why Otus left a transaction as it came that go without saying: nothing to hold, or a failure the verdict says already.
+const UNSAID = new Set(['nothing of yours to hold', 'the simulation failed']);
+
+// Whether guards hold the outcome, in words. Left as it came (no limits set either), why, unless it goes without
+// saying; one Otus set limits on and needs none (its own that only takes access back, a transfer a Ledger shows in
+// clear) says nothing of them.
 function guards(p: Prepared): TransactionView['guards'] {
-    if (p.unguarded !== null) return { held: false, text: '' };
-    return { held: true, text: p.holds.length === 1 ? 'One guard locks your account to what you see' : `${p.holds.length} guards lock your accounts to what you see` };
+    if (p.unguarded === null) return { held: true, text: p.holds.length === 1 ? 'One guard locks your account to what you see' : `${p.holds.length} guards lock your accounts to what you see` };
+    if (p.units !== null || UNSAID.has(p.unguarded)) return { held: false, text: '' };
+    const why = p.unguarded.charAt(0).toLowerCase() + p.unguarded.slice(1);
+    return { held: false, text: `None: ${why}`, why };
 }
 
 // What Otus added to the transaction, or changed in it: its guards, and the limits and priority fee it set, in the

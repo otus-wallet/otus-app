@@ -227,6 +227,12 @@ export function Programs({ t }: { t: TransactionView }) {
                     <Program key={program.address} program={program} open={t.programs.length === 1} />
                 ))}
             </ul>
+            {t.added.length === 0 && t.guards.why && (
+                <Block>
+                    <Heading>Added by Otus</Heading>
+                    <p className="text-xs text-ink-2">Nothing: {t.guards.why}</p>
+                </Block>
+            )}
             {t.added.length > 0 && (
                 <Block>
                     <Heading>Added by Otus</Heading>

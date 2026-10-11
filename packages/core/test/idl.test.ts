@@ -40,9 +40,9 @@ test('a program Otus doesn’t know: a warning, a notice once its own IDL descri
     const KAMINO = 'KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD' as Address;
     assert.deepEqual(said(await unknownCall({ calls: [SYSTEM, KAMINO], told: 'evil' })), ['danger', 'danger: An unknown program uses your signature in Kamino Lend', 'notice: Evil is not a program Otus knows']);
     assert.deepEqual(said(await unknownCall({ listed: false })), ['danger', "danger: Otus can't see what an unknown program does with your signature", `warn: ${unknown}`]);
-    // Without guards its own IDL binds nothing: a warning still; the Guards line says nothing.
+    // Without guards its own IDL binds nothing: a warning still; the Guards line says why there are none.
     const loose = await unknownCall({ cosigned: true });
-    assert.deepEqual([loose.guards.held, loose.guards.text], [false, '']);
+    assert.deepEqual([loose.guards.held, loose.guards.text], [false, "None: another account signs it too, so Otus can't lock it"]);
     assert.deepEqual(said(loose), ['warn', `warn: ${unknown}`]);
     assert.deepEqual(said(await unknownCall({ cosigned: true, told: 'evil' })), ['warn', 'warn: Evil is not a program Otus knows']);
     // A name borrowed from a program Otus knows.

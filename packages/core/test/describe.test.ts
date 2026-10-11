@@ -100,3 +100,15 @@ test("a Squads proposal you vote on that adds a copy of a contact's address: cri
     assert.equal((await shown([{ address: copy, label: 'Bob', kind: 'contact' }])).findings.some((f) => f.title.startsWith('This address looks like')), false); // Bob's own
     assert.deepEqual((await shown([{ address: bob, label: '', kind: 'sent' }])).changes.map((c) => c.title), ['This address looks like one you sent to']);
 });
+
+test('a compute limit says what the simulation used; left as it came for a failure the verdict says, Guards say nothing', async () => {
+    const { getSetComputeUnitLimitInstruction } = await import('@solana-program/compute-budget');
+    const send = transaction([getSetComputeUnitLimitInstruction({ units: 1_400_000 }), getTransferSolInstruction({ source: createNoopSigner(PAYER), destination: key(2), amount: SOL / 10n })]);
+    const before = [account(PAYER, SYSTEM, 2n * SOL)];
+    const after = [account(PAYER, SYSTEM, 2n * SOL - SOL / 10n - 5_000n), account(key(2), SYSTEM, SOL / 10n)];
+    const used = await view(send, before, after, { simulation: { unitsConsumed: 301_777n } });
+    const budget = used.programs.find((p) => p.name === 'Compute Budget');
+    assert.equal(budget?.instructions[0].args, '1,400,000 CU · 301,777 used');
+    const failed = await view(send, before, after, { simulation: { error: { InstructionError: [1, { Custom: 1 }] } } });
+    assert.deepEqual([failed.guards, failed.added], [{ held: false, text: '' }, []]);
+});

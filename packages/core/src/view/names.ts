@@ -163,6 +163,7 @@ export function names(r: Review, known: Known, wallet: Address, mainnet: boolean
         token,
         program: (a) => PROGRAM_NAMES.get(a) ?? a,
         priorityFee: price === null ? null : lamportsFor(price, unitLimit(r.message) ?? defaultUnits(r.message)),
+        unitsUsed: r.simulation.unitsConsumed,
         payer: r.signers[0],
         changes: changesOf,
         icon: (mint) => {

@@ -601,7 +601,8 @@ test('a transaction another account must sign too is signed, but not sent while 
     const signed = getTransactionDecoder().decode(bytes(transactions[0]));
     assert.ok(signed.signatures[w.me] && !signed.signatures[key(3)]);
     const shown = w.approvals[0];
-    assert.deepEqual(shown.kind === 'transaction' && shown.guards, { held: false, text: '' }); // no guards, and nothing said of why
+    const why = "another account signs it too, so Otus can't lock it";
+    assert.deepEqual(shown.kind === 'transaction' && [shown.guards, shown.added], [{ held: false, text: `None: ${why}`, why }, []]); // left as it came, and why
 });
 
 test('a send the network refuses, or one that expires before it lands, is said in words on both ways in', async () => {
