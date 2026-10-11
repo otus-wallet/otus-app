@@ -494,7 +494,29 @@ test('reviews a transaction on the network that knows its blockhash, and refuses
     result(await guessed.call('signTransaction', { account: guessed.me, transactions: [guessed.transfer()] }));
     const shown = guessed.approvals[0];
     assert.equal(shown.kind === 'transaction' && shown.network, 'devnet');
+    assert.equal(guessed.firsts.length, 1); // reviewed on mainnet first, as the wallet shows: that review is never shown
     assert.equal((await wallet({ validOn: [] })).approvals.length, 0);
+});
+
+test('a site’s transaction is reviewed while its network is checked, and shown only once the check says so', async () => {
+    const CHECK = 150; // ms the network takes to say the blockhash is its own
+    const w = await wallet({ slow: 40, chain: { valid: () => new Promise((r) => setTimeout(() => r(true), CHECK)) } });
+    const asked = performance.now();
+    result(await w.call('signTransaction', { account: w.me, chain: 'solana:mainnet', transactions: [w.transfer()] }));
+    const shown = w.shownAt.first[0] - asked;
+    assert.ok(shown >= CHECK, `shown after ${shown} ms, before the check`);
+    assert.ok(shown < CHECK + 2 * 40, `shown after ${shown} ms: the review waited for the check`); // it takes two round trips or more
+});
+
+test('a review on the network guessed that fails does not refuse a transaction for another', async () => {
+    const devnet = 'https://api.devnet.solana.com';
+    const w = await wallet({ validOn: [devnet] });
+    const chain = w.shell.chain;
+    // Mainnet, where it is reviewed first, does not answer for its accounts.
+    w.shell.chain = (rpc) => (rpc === devnet ? chain(rpc) : { ...chain(rpc), accounts: () => Promise.reject(new Error('mainnet did not answer')) });
+    result(await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] }));
+    const shown = w.approvals[0];
+    assert.equal(shown.kind === 'transaction' && shown.network, 'devnet');
 });
 
 test('a connected site signs in with its account only; another site cannot learn which accounts Otus holds', async () => {

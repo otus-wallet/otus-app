@@ -95,7 +95,9 @@ async function landsOn(m: Message, chain: Chain): Promise<boolean> {
 /** `blockhash`: for a transaction Otus built without one, the blockhash it gets, read while it is reviewed (a
  *  simulation takes any). */
 /** `bare`: why Otus adds no guards, for what needs none (a transaction of its own that only takes access back). */
-export type Way = { cluster: Cluster; chain: Chain; site: SiteView; recipient?: Address; later?: boolean; blockhash?: Promise<string>; bare?: string; trade?: bigint; context: Pick<Context, 'signedBefore' | 'programsBefore' | 'host' | 'own' | 'to'> };
+/** `confirmed`: for a cluster guessed, the check that it is the transaction's, made while it is reviewed there: nothing
+ *  is shown before it says so, and what it throws ends the request, a review's failure on another network aside. */
+export type Way = { cluster: Cluster; chain: Chain; site: SiteView; recipient?: Address; later?: boolean; blockhash?: Promise<string>; bare?: string; trade?: bigint; confirmed?: Promise<unknown>; context: Pick<Context, 'signedBefore' | 'programsBefore' | 'host' | 'own' | 'to'> };
 
 /**
  * A transaction for this account → reviewed; refused by `checks` when whoever asked says so; shown as reviewed at once,
@@ -109,7 +111,10 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     // Yours, and the addresses you keep: what lands with them is not someone else's.
     const { accounts, contacts, sent, settings } = await shell.load();
     const yours = { wallets: accounts.map((a) => a.address), contacts: new Map(contacts.map((c) => [c.address, c.label])), sent: Object.keys(sent) as Address[] };
-    const [reviewed, blockhash] = await Promise.all([review(bytes, { ...way.context, ...yours, wallet: account.address }, way.chain), way.blockhash]);
+    const reviewing = Promise.all([review(bytes, { ...way.context, ...yours, wallet: account.address }, way.chain), way.blockhash]);
+    reviewing.catch(() => {}); // heard below, once the cluster is confirmed
+    await way.confirmed;
+    const [reviewed, blockhash] = await reviewing;
     const r = blockhash === undefined ? reviewed : await stamped(reviewed, blockhash);
     await notMainnet(r, way.cluster, settings, shell);
     await checks(r);

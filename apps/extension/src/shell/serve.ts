@@ -143,6 +143,15 @@ async function handle(request: Request, state: State, shell: Shell): Promise<unk
 
 const reviewing = new Set<string>(); // sites whose transaction is being reviewed or decided
 
+// A transaction for another cluster than the one guessed, and which it is.
+class Elsewhere extends Error {
+    found: { cluster: Cluster; chain: Chain };
+    constructor(found: { cluster: Cluster; chain: Chain }) {
+        super(`the transaction is for ${found.cluster}`);
+        this.found = found;
+    }
+}
+
 // What is known of a site asked to connect: from its host, and from what was kept of it when it was disconnected.
 const siteLines = (origin: string, state: State, shell: Shell): Line[] =>
     siteFindings({ host: new URL(origin).host, signedBefore: state.disconnected.find((d) => d.origin === origin)?.since ?? null, now: Math.floor(shell.now() / 1000) }, true).map((f) => ({ title: f.text, note: f.note ?? '', tone: f.level }));
@@ -160,9 +169,21 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
     try {
         window = shell.early?.({ kind: 'pending', site: siteView(origin, site), account: accountView(account) });
         const asking = window ? { ...shell, approve: window.approve } : shell;
-        const { cluster, chain } = await clusterOf(bytes, request.chain, state.settings, shell);
-        const way = { cluster, chain, site: siteView(origin, site), later: !request.send, context: { signedBefore: site.since ?? null, programsBefore: site.programs, host: new URL(origin).host } };
-        decided = { ...(await approved(bytes, account, way, asking, () => {}, outcome.follow)), chain, cluster };
+        const reviewed = (cluster: Cluster, chain: Chain, confirmed?: Promise<unknown>) => {
+            const way = { cluster, chain, site: siteView(origin, site), later: !request.send, confirmed, context: { signedBefore: site.since ?? null, programsBefore: site.programs, host: new URL(origin).host } };
+            return approved(bytes, account, way, asking, () => {}, outcome.follow).then((d) => ({ ...d, chain, cluster }));
+        };
+        // Reviewed on the network the site names, or the wallet shows, while that is checked to be the transaction's;
+        // on the one it is, when it is another.
+        const guess = request.chain ?? networkOf(state.settings);
+        const chain = shell.chain(rpcFor(guess, state.settings));
+        const checked = clusterOf(bytes, request.chain, state.settings, shell);
+        try {
+            decided = await reviewed(guess, chain, checked.then((found) => found.cluster === guess || Promise.reject(new Elsewhere(found))));
+        } catch (e) {
+            if (!(e instanceof Elsewhere)) throw e;
+            decided = await reviewed(e.found.cluster, e.found.chain);
+        }
     } catch (e) {
         window?.close(); // ended before the user answered: the window goes with it
         throw e;
