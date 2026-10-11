@@ -42,7 +42,7 @@ test('a program Otus doesn’t know: a warning, a notice once its own IDL descri
     assert.deepEqual(said(await unknownCall({ listed: false })), ['danger', "danger: Otus can't see what an unknown program does with your signature", `warn: ${unknown}`]);
     // Without guards its own IDL binds nothing: a warning still; the Guards line says why there are none.
     const loose = await unknownCall({ cosigned: true });
-    assert.deepEqual([loose.guards.held, loose.guards.text], [false, "None: Otus can't add guards without breaking another account's signature"]);
+    assert.deepEqual([loose.guards.held, loose.guards.text], [false, "None: Otus can't add guards because another account must sign the transaction too"]);
     assert.deepEqual(said(loose), ['warn', `warn: ${unknown}`]);
     assert.deepEqual(said(await unknownCall({ cosigned: true, told: 'evil' })), ['warn', 'warn: Evil is not a program Otus knows']);
     // A name borrowed from a program Otus knows.

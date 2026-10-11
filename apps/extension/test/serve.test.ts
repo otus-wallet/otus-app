@@ -603,7 +603,7 @@ test('a transaction another account must sign too is signed, but not sent while 
     const signed = getTransactionDecoder().decode(bytes(transactions[0]));
     assert.ok(signed.signatures[w.me] && !signed.signatures[key(3)]);
     const shown = w.approvals[0];
-    const why = "Otus can't add guards without breaking another account's signature";
+    const why = "Otus can't add guards because another account must sign the transaction too";
     assert.deepEqual(shown.kind === 'transaction' && [shown.guards, shown.added], [{ held: false, text: `None: ${why}`, why }, []]); // left as it came, and why
 });
 
