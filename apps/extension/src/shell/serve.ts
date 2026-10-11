@@ -171,7 +171,7 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
         window = shell.early?.({ kind: 'pending', site: siteView(origin, site), account: accountView(account) });
         const asking = window ? { ...shell, approve: window.approve } : shell;
         const reviewed = (cluster: Cluster, chain: Chain, confirmed?: Promise<unknown>) => {
-            const way = { cluster, chain, site: siteView(origin, site), later: !request.send, confirmed, context: { signedBefore: site.since ?? null, programsBefore: site.programs, host: new URL(origin).host } };
+            const way = { cluster, chain, site: siteView(origin, site), later: !request.send, confirmed, kept: state, context: { signedBefore: site.since ?? null, programsBefore: site.programs, host: new URL(origin).host } };
             return approved(bytes, account, way, asking, () => {}, outcome.follow).then((d) => ({ ...d, chain, cluster }));
         };
         // Reviewed on the network the site names, or the wallet shows, while that is checked to be the transaction's;

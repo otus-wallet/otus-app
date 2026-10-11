@@ -8,12 +8,12 @@ const KEY = 'mainnetTables';
 const MOST = 64; // tables kept: the latest read or used
 const MOST_ENTRIES = 256; // what a lookup table holds at most
 
-let kept: Promise<Map<Address, readonly Address[]>> | null = null;
-const all = () =>
-    (kept ??= chrome.storage.session.get(KEY).then(
-        (stored) => new Map<Address, readonly Address[]>(listed(stored[KEY])),
-        () => new Map<Address, readonly Address[]>(),
-    ));
+// Read as the worker starts, before any request: storage waits while Chrome opens a window, as a request's does.
+const kept: Promise<Map<Address, readonly Address[]>> = chrome.storage.session.get(KEY).then(
+    (stored) => new Map<Address, readonly Address[]>(listed(stored[KEY])),
+    () => new Map<Address, readonly Address[]>(),
+);
+const all = () => kept;
 
 // What was stored, as stored: pairs of a table and its entries, every one an address; anything else is left out.
 function listed(stored: unknown): [Address, Address[]][] {

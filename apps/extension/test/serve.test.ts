@@ -511,6 +511,15 @@ test('a site’s transaction is reviewed while its network is checked, and shown
     assert.ok(shown < CHECK + 2 * 40, `shown after ${shown} ms: the review waited for the check`); // it takes two round trips or more
 });
 
+test('a site’s transaction is reviewed with what the request read, not reading storage again while its window opens', async () => {
+    const w = await wallet({ early: true });
+    const reads: number[] = [];
+    const load = w.shell.load;
+    w.shell.load = () => (reads.push(performance.now()), load());
+    result(await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] }));
+    assert.equal(reads.filter((at) => at < w.shownAt.first[0]).length, 1); // the request's own, before the window
+});
+
 test('a review on the network guessed that fails does not refuse a transaction for another', async () => {
     const devnet = 'https://api.devnet.solana.com';
     const w = await wallet({ validOn: [devnet] });

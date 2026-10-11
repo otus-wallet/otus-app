@@ -40,7 +40,7 @@ import { networkOf, rpcFor, type Settings } from '@otus-wallet/core/settings.ts'
 import { accountView, describe, LEDGER_CLEAR, type Known, type Life, type Outcome, type Signer, type SiteView, type TransactionView } from '@otus-wallet/core/view.ts';
 import type { Answer } from './approvals.ts';
 import type { Shell } from './serve.ts';
-import type { Account } from '@otus-wallet/core/state.ts';
+import type { Account, State as Stored } from '@otus-wallet/core/state.ts';
 import type { Kept } from '@otus-wallet/core/view/names.ts';
 
 /** The user said no. */
@@ -97,7 +97,8 @@ async function landsOn(m: Message, chain: Chain): Promise<boolean> {
 /** `bare`: why Otus adds no guards, for what needs none (a transaction of its own that only takes access back). */
 /** `confirmed`: for a cluster guessed, the check that it is the transaction's, made while it is reviewed there: nothing
  *  is shown before it says so, and what it throws ends the request, a review's failure on another network aside. */
-export type Way = { cluster: Cluster; chain: Chain; site: SiteView; recipient?: Address; later?: boolean; blockhash?: Promise<string>; bare?: string; trade?: bigint; confirmed?: Promise<unknown>; context: Pick<Context, 'signedBefore' | 'programsBefore' | 'host' | 'own' | 'to'> };
+/** `kept`: what Otus keeps, as the request read it a moment before: storage waits while Chrome opens a window. */
+export type Way = { cluster: Cluster; chain: Chain; site: SiteView; recipient?: Address; later?: boolean; blockhash?: Promise<string>; bare?: string; trade?: bigint; confirmed?: Promise<unknown>; kept?: Pick<Stored, 'accounts' | 'contacts' | 'sent' | 'settings'>; context: Pick<Context, 'signedBefore' | 'programsBefore' | 'host' | 'own' | 'to'> };
 
 /**
  * A transaction for this account → reviewed; refused by `checks` when whoever asked says so; shown as reviewed at once,
@@ -109,7 +110,7 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     // A Ledger's Solana app misreads v1: shown all the same, so the user hears why it cannot be signed.
     const unsignable = account.ledger !== undefined && (await decode(bytes)).message.version === 1;
     // Yours, and the addresses you keep: what lands with them is not someone else's.
-    const { accounts, contacts, sent, settings } = await shell.load();
+    const { accounts, contacts, sent, settings } = way.kept ?? (await shell.load());
     const yours = { wallets: accounts.map((a) => a.address), contacts: new Map(contacts.map((c) => [c.address, c.label])), sent: Object.keys(sent) as Address[] };
     // Mainnet's lookup tables as kept, read only past what they held: on another network, one may start over.
     const reading = way.cluster === 'solana:mainnet' && shell.tables ? { ...way.chain, tables: shell.tables } : way.chain;
