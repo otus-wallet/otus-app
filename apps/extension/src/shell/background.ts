@@ -11,7 +11,7 @@ import { send } from '@otus-wallet/core/send/send.ts';
 import { throughSender } from '@otus-wallet/core/swap/sender.ts';
 import { askedFrom, type Asked } from '@otus-wallet/core/swap/terms.ts';
 import { lockMinutes, OTUS_RPC, rpcFor, walletRpc } from '@otus-wallet/core/settings.ts';
-import { tokens } from '@otus-wallet/core/tokens.ts';
+import { keepTokens, tokens } from '@otus-wallet/core/tokens.ts';
 import type { Approval, Life } from '@otus-wallet/core/view.ts';
 import { answerOf, approve, early, kept, type Answer } from './approvals.ts';
 import { keysCall, lock, LOCK_ALARM, locked, prune, shielded, sign } from './keys.ts';
@@ -19,6 +19,9 @@ import { mainnetTables } from './tables.ts';
 import { own, serve, stakeOwn, swapOwn, takeBack } from './serve.ts';
 import { edited, load, update, type Edit, type State } from '@otus-wallet/core/state.ts';
 
+void keepTokens(); // what Jupiter said of tokens, kept while the worker sleeps
+const WARM_EVERY = 60_000; // ms
+let warmed = 0;
 const shell = {
     load,
     update,
@@ -32,6 +35,14 @@ const shell = {
     now: Date.now,
     fast: throughSender,
     tables: mainnetTables,
+    // At most once a minute: what the request reads is the blockhash, which tells nothing of the site.
+    warm: () => {
+        if (Date.now() - warmed < WARM_EVERY) return;
+        warmed = Date.now();
+        void load()
+            .then(({ settings }) => rpcChain(rpcAt(walletRpc(settings))).latest())
+            .catch(() => {});
+    },
     settled: () => void chrome.storage.session.set({ settled: Date.now() }),
 };
 const PAGES = new URL(chrome.runtime.getURL('')).origin;

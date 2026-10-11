@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { install, type Platform } from '../src/platform.ts';
 import { OTUS_RPC } from '../src/settings.ts';
 import { cachedToken, search, tokens } from '../src/tokens.ts';
 import { key } from './helpers.ts';
@@ -167,4 +168,31 @@ test('an answer that is not a list of tokens prices none', async (t) => {
     t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ tokens: [{ id: key(61), usdPrice: 1 }] })));
     const read = await tokens([key(61)], true).catch(() => null);
     assert.equal(read?.get(key(61))?.usdPrice ?? null, null);
+});
+
+test('a worker keeps what Jupiter said a while: woken again, a fresh answer is not asked twice; an old or garbled one is', async (t) => {
+    const session: Record<string, unknown> = {};
+    install({ storage: { session: { get: async (k: string) => ({ [k]: session[k] }), set: async (part: object) => void Object.assign(session, structuredClone(part)) } } } as unknown as Platform);
+    const asked: string[] = [];
+    t.mock.method(globalThis, 'fetch', async (url: string) => {
+        const query = new URL(url).searchParams.get('query') ?? '';
+        asked.push(query);
+        return new Response(JSON.stringify(query.split(',').filter((m) => m === key(80)).map((id) => ({ id, name: 'Kept', symbol: 'KPT', isVerified: true, icon: 'https://example.com/kpt.png' }))));
+    });
+    const worker = async (n: number) => (await import(`../src/tokens.ts?worker=${n}`)) as typeof import('../src/tokens.ts');
+    const one = await worker(1);
+    await one.keepTokens();
+    await one.tokens([key(80), key(81)], true);
+    await new Promise((done) => setImmediate(done));
+    // Woken again: both answered from what was kept, as Jupiter's were read, its icon through Otus's server.
+    const two = await worker(2);
+    await two.keepTokens();
+    const again = await two.tokens([key(80), key(81)], true);
+    assert.deepEqual([asked.length, again.get(key(80))?.symbol, again.get(key(80))?.icon, again.get(key(81))], [1, 'KPT', `${OTUS_RPC}/icon/${key(80)}`, null]);
+    // Older than ten minutes, an answer for another mint, or garbled: asked again.
+    session.tokens = [[key(80), { id: key(80), name: 'Kept', symbol: 'KPT' }, Date.now() - 11 * 60_000, true], [key(81), { id: key(82), name: 'Other', symbol: 'OTH' }, Date.now(), true], 'garbage', [key(83), null, Date.now(), 'yes'], [key(84), null, Date.now(), true]];
+    const three = await worker(3);
+    await three.keepTokens();
+    await three.tokens([key(80), key(81), key(83), key(84)], true);
+    assert.deepEqual(asked.at(-1)?.split(',').sort(), [key(80), key(81), key(83)].sort()); // key(84): fresh, unknown to Jupiter
 });

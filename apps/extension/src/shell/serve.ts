@@ -49,6 +49,7 @@ export type Shell = {
     now(): number; // ms since 1970
     fast?(chain: Chain): Chain; // the chain a swap lands through: Helius Sender's, by Otus's server; without it, the chain itself
     tables?: Tables; // mainnet's lookup tables, kept: read again only past what they held
+    warm?(): void; // the wallet's network reached ahead, for a site's first request to find the connection open
     settled?(): void; // a transaction Otus signed landed, failed onchain, or went out unseen yet: Otus's pages read again what it changed
 };
 
@@ -84,6 +85,7 @@ async function handle(request: Request, state: State, shell: Shell): Promise<unk
             // `v1`: whether the account can sign v1 transactions, for the site to build what it can (a Ledger cannot).
             const site = state.sites[origin];
             const known = site && accountOf(state, site.account);
+            if (known) shell.warm?.(); // its page opened: a request may follow
             if (known) return { accounts: [known.address], v1: !known.ledger };
             if (request.silent) throw new Refused('not connected');
             // The account in use, or another of yours chosen in the window, which is then the one in use: one that signs, as

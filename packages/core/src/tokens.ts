@@ -6,6 +6,7 @@ import { isAddress } from '@solana/kit';
 
 import { latin } from '@otus-wallet/sdk/review/sites';
 
+import { platform } from './platform.ts';
 import { OTUS_RPC } from './settings.ts';
 
 export type TokenInfo = { id: string; name: string; symbol: string; icon: string | null; verified: boolean; usdPrice: number | null; change24h: number | null; decimals: number | null; supply?: Supply | null; market?: Market | null }; // change24h: percent
@@ -26,10 +27,42 @@ const WAIT = 8_000; // ms for Jupiter to answer, after which the tokens go witho
 const looked = new Map<string, TokenInfo | null>(); // null: Jupiter does not know it
 const asked = new Map<string, Promise<void>>(); // mints asked, until Jupiter answers
 
+// Kept in session storage, by a worker that sleeps when idle (keepTokens): each answer as Jupiter gave it (null: it
+// does not know the mint), read again with the same care, while fresh.
+const KEPT = 'tokens';
+const FRESH = 10 * 60_000; // ms an answer is kept: prices age; names hardly
+const MOST_KEPT = 300; // answers kept: the latest
+type Kept = [mint: string, said: unknown, at: number, throughOtus: boolean];
+let kept: Kept[] | null = null; // null: nothing kept
+let restored: Promise<void> = Promise.resolve();
+
+/** Keeps what Jupiter says of mints for a while, in session storage, and takes back what was kept fresh before: for a
+ *  worker, which starts over each time it wakes. `now`: ms. */
+export function keepTokens(now = Date.now): Promise<void> {
+    kept = [];
+    restored = platform.storage.session.get(KEPT).then(
+        (stored) => {
+            const list = Array.isArray(stored[KEPT]) ? (stored[KEPT] as unknown[]) : [];
+            for (const entry of list) {
+                if (!Array.isArray(entry) || entry.length !== 4) continue;
+                const [mint, said, at, throughOtus] = entry as Kept;
+                if (typeof mint !== 'string' || !isAddress(mint) || typeof at !== 'number' || !(now() - at < FRESH) || typeof throughOtus !== 'boolean') continue;
+                const t = said === null ? null : info(said);
+                if (said !== null && t?.id !== mint) continue; // not an answer for this mint
+                kept!.push([mint, said, at, throughOtus]);
+                if (!looked.has(mint)) looked.set(mint, t && served(t, throughOtus));
+            }
+        },
+        () => {}, // nothing kept: asked again
+    );
+    return restored;
+}
+
 /** What Jupiter says of these mints, through Otus's server or not; an empty answer for those it does not know, or
  *  when it does not answer. A mint asked already, and not answered yet, is waited for rather than asked again: its own
  *  search, not the others asked with it. */
 export async function tokens(mints: string[], throughOtus: boolean): Promise<Map<string, TokenInfo | null>> {
+    await restored;
     const wanted = [...new Set(mints)];
     const asking = wanted.filter((m) => !looked.has(m) && !asked.has(m));
     let before: Promise<void> = Promise.resolve(); // one search after another
@@ -48,9 +81,17 @@ async function ask(batch: string[], throughOtus: boolean): Promise<void> {
     try {
         const response = await fetch(`${throughOtus ? THROUGH_OTUS : JUPITER}?query=${batch.join(',')}`, { method: methodFor(throughOtus), credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(WAIT) });
         if (!response.ok) throw new Error(`Jupiter answered ${response.status}`);
-        const found = new Map((await response.json() as unknown[]).flatMap((t) => (info(t) ? [[info(t)!.id, served(info(t)!, throughOtus)] as const] : [])));
-        for (const m of batch) looked.set(m, found.get(m) ?? null);
+        const said = new Map((await response.json() as unknown[]).flatMap((t) => (info(t) ? [[info(t)!.id, t] as const] : [])));
+        for (const m of batch) looked.set(m, said.has(m) ? served(info(said.get(m))!, throughOtus) : null);
+        if (kept) keep(batch.map((m): Kept => [m, said.get(m) ?? null, Date.now(), throughOtus]));
     } catch {} // no names or prices beats no balances
+}
+
+// Answers kept, the latest last, in place of any kept before for the same mints.
+function keep(answers: Kept[]) {
+    const mints = new Set(answers.map(([m]) => m));
+    kept = [...kept!.filter(([m]) => !mints.has(m)), ...answers].slice(-MOST_KEPT);
+    void platform.storage.session.set({ [KEPT]: kept }).catch(() => {}); // kept in memory still
 }
 
 /** Tokens whose name or symbol matches a few words, as Jupiter finds them (the swap's picker), through Otus's server or

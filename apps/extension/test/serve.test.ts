@@ -104,6 +104,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
     const outcomes: Outcome[] = []; // what approved windows heard
     const settled = { count: 0 }; // how many times Otus's pages were told a transaction landed
     const following = { count: 0 }; // windows kept after a yes, to hear how it goes
+    const warmed = { count: 0 }; // times the network was reached ahead
     // `early`: windows opened before the review, and why each ended unanswered (true: on a no); 'no': the user says no
     // at once, in the window still waiting for the review.
     const opened: { first: Approval; at: number; closed: string | boolean }[] = [];
@@ -132,6 +133,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
         tokens: async (mints) => (looked.push(mints), new Map()),
         now: () => NOW,
         settled: () => void settled.count++,
+        warm: () => void warmed.count++,
         ...(o.early && {
             early: (first: Approval) => {
                 const window: (typeof opened)[number] = { first, at: performance.now(), closed: false };
@@ -157,7 +159,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
             ),
         );
     const call = (method: string, params: object, origin = ORIGIN) => serve({ method, params }, origin, shell);
-    return { me, pair, box, approvals, firsts, shownAt, sent, looked, outcomes, settled, following, opened, transfer, call, shell };
+    return { me, pair, box, approvals, firsts, shownAt, sent, looked, outcomes, settled, following, warmed, opened, transfer, call, shell };
 }
 
 const result = <T>(reply: Reply): T => {
@@ -652,6 +654,7 @@ test('connecting silently answers only a site connected already; disconnecting f
     assert.deepEqual(result(await w.call('connect', { silent: true })), { accounts: [w.me], v1: true });
     assert.deepEqual(await w.call('connect', { silent: true }, 'https://new.app'), { ok: false, error: 'not connected' });
     assert.equal(w.approvals.length, 0);
+    assert.equal(w.warmed.count, 1); // the connected site's page opened: its network reached ahead; not for another
     assert.equal(result(await w.call('disconnect', {})), null);
     assert.deepEqual(w.box.state.sites, {});
 });
