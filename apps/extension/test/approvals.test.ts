@@ -8,6 +8,8 @@ const created: { id: number; url: string }[] = [];
 const removed: number[] = [];
 let connected: (port: unknown) => void = () => {};
 let closed: (window: number) => void = () => {};
+let refusing = false; // Chrome refuses to open a window
+let opening: Promise<void> = Promise.resolve(); // what a window waits for to open
 const chrome = {
     runtime: {
         id: 'otus',
@@ -16,7 +18,12 @@ const chrome = {
     },
     windows: {
         getLastFocused: async () => ({ left: 0, top: 0, width: 1200 }),
-        create: async ({ url }: { url: string }) => (created.push({ id: 100 + created.length, url }), { id: 100 + created.length - 1 }),
+        create: async ({ url }: { url: string }) => {
+            await opening;
+            if (refusing) throw new Error('Chrome would not open it');
+            created.push({ id: 100 + created.length, url });
+            return { id: 100 + created.length - 1 };
+        },
         remove: async (id: number) => void removed.push(id),
         onRemoved: { addListener: (f: typeof closed) => (closed = f) },
     },
@@ -126,4 +133,111 @@ test('asked as before, the window shows the form and its yes counts at once', as
     assert.deepEqual(w.heard, [form('message', 'https://d.app')]);
     w.say({ approve: true });
     assert.deepEqual(await state(answer), { answered: true });
+});
+
+test('a window that does not open is the error, for its approve and as its no', async () => {
+    refusing = true;
+    const window = early(form('pending', 'https://e.app'));
+    await assert.rejects(window.no, /would not open/);
+    await assert.rejects(window.approve(form('transaction', 'https://e.app'), undefined, new Promise(() => {})), /would not open/);
+    await assert.rejects(approve(form('message', 'https://e.app')), /would not open/);
+    refusing = false;
+});
+
+test('a yes with someone to tell keeps the window, and tells it how it goes; a no closes it, telling no one', async () => {
+    const heard: unknown[] = [];
+    const answer = approve(form('message', 'https://f.app'), undefined, undefined, (tell) => tell({ phase: 'sending' } as never));
+    await tick();
+    const w = page();
+    const before = removed.length;
+    w.say({ approve: true });
+    assert.deepEqual(await state(answer), { answered: true });
+    await tick();
+    assert.equal(removed.length, before); // kept
+    assert.deepEqual(w.heard.at(-1), { outcome: { phase: 'sending' } });
+    let told = false;
+    const no = approve(form('message', 'https://g.app'), undefined, undefined, () => void (told = true));
+    await tick();
+    page().say({ approve: false });
+    assert.deepEqual(await state(no), { answered: false });
+    await tick();
+    assert.deepEqual([removed.at(-1), told, heard.length], [created.at(-1)!.id, false, 0]);
+});
+
+test('closed before Chrome opens it, the window goes once it does', async () => {
+    let open: () => void = () => {};
+    opening = new Promise((r) => (open = r));
+    const window = early(form('pending', 'https://h.app'));
+    window.close();
+    const count = created.length;
+    open();
+    opening = Promise.resolve();
+    await tick();
+    assert.equal(created.length, count + 1);
+    assert.equal(removed.at(-1), created.at(-1)!.id);
+});
+
+test('while pending, a yes is nothing, nor kept for later, and a connect’s is a no; the site’s other requests wait', async () => {
+    const window = early(form('pending', 'https://i.app'));
+    assert.throws(() => early(form('message', 'https://i.app')), /already asking you/);
+    await assert.rejects(approve(form('message', 'https://i.app')), /already asking you/);
+    await tick();
+    page().say({ approve: true, account: 'HH2vCgeHY4PNpYfACYSAAr11P1chxbMsSYbY7VzAHVx2' }); // a connect's yes: a no for anything else
+    assert.deepEqual(await state(window.no), { answered: undefined });
+    await tick();
+    assert.equal(removed.at(-1), created.at(-1)!.id);
+    const again = early(form('pending', 'https://j.app'));
+    await tick();
+    const v = page();
+    v.say({ approve: true });
+    v.say({ approve: true, signature: `${'A'.repeat(86)}==` }); // 64 bytes: a Ledger's yes
+    let final: (a: Approval) => void = () => {};
+    const answer = again.approve(form('transaction', 'https://j.app'), undefined, new Promise((r) => (final = r)));
+    final(form('transaction', 'https://j.app'));
+    await tick();
+    assert.equal(await state(answer), 'waiting'); // the yes said while pending counts for nothing now
+    v.say({ approve: true });
+    assert.deepEqual(await state(answer), { answered: true });
+});
+
+test('a window answers one request: a second approve on it is refused', async () => {
+    const window = early(form('pending', 'https://k.app'));
+    void window.approve(form('transaction', 'https://k.app'), undefined, new Promise(() => {}));
+    await assert.rejects(window.approve(form('transaction', 'https://k.app'), undefined, Promise.resolve(form('transaction', 'https://k.app'))), /one request/);
+    window.close();
+    await tick();
+});
+
+test('closed saying why, the window says it and stays until the user closes it; the site waits until then', async () => {
+    const window = early(form('pending', 'https://l.app'));
+    await tick();
+    const w = page();
+    const count = removed.length;
+    window.close('this transaction is not for mainnet');
+    assert.deepEqual(w.heard.at(-1), { ...form('pending', 'https://l.app'), refused: 'this transaction is not for mainnet' });
+    await tick();
+    assert.equal(removed.length, count);
+    assert.throws(() => early(form('pending', 'https://l.app')), /already asking you/);
+    w.say({ approve: true }); // nothing to approve: still there
+    await tick();
+    assert.equal(removed.length, count);
+    w.say({ approve: false });
+    await tick();
+    assert.equal(removed.at(-1), created.at(-1)!.id);
+    early(form('pending', 'https://l.app')).close();
+    await tick();
+});
+
+test('the no a request hears at once is only one said before the window is given what to answer', async () => {
+    const before = early(form('pending', 'https://m.app'));
+    await tick();
+    page().say({ approve: false });
+    assert.deepEqual(await state(before.no), { answered: undefined });
+    const after = early(form('pending', 'https://n.app'));
+    await tick();
+    const w = page();
+    const answer = after.approve(form('transaction', 'https://n.app'), undefined, Promise.reject(new Error('prepare failed')));
+    assert.deepEqual(await state(answer), { answered: false });
+    w.say({ approve: false });
+    assert.equal(await state(after.no), 'waiting'); // the review's own failure: the request hears that, not a no
 });

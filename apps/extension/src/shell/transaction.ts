@@ -151,7 +151,8 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     const watch = durable(r.message) ? null : watched(r.message.lifetimeToken, way.chain, shell.now);
     let answer: Answer;
     try {
-        answer = await shell.approve({ ...describe(r, null, shown), ...(blocked && { blocked }) }, watch?.follow, later, after);
+        // One that cannot be signed has nothing to follow: its window closes, whatever it answers.
+        answer = await shell.approve({ ...describe(r, null, shown), ...(blocked && { blocked }) }, watch?.follow, later, blocked ? undefined : after);
     } finally {
         watch?.stop();
     }

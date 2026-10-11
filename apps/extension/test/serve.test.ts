@@ -68,7 +68,7 @@ const LEDGER_PATH = "44'/501'/0'/0'";
 
 /** A wallet with a real key, a site connected to it, and a fake extension around serve. `chain` changes the network's
  *  answers; sends are watched without waiting between checks. */
-async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; answer?: (a: Approval, s: { state: State }) => Answer | Promise<Answer>; validOn?: string[]; chain?: Partial<Chain>; slow?: number; early?: boolean } = {}) {
+async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; answer?: (a: Approval, s: { state: State }) => Answer | Promise<Answer>; validOn?: string[]; chain?: Partial<Chain>; slow?: number; early?: boolean | 'no' } = {}) {
     const pair = await generateKeyPair();
     const me = await getAddressFromPublicKey(pair.publicKey);
     const box = {
@@ -103,21 +103,26 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
     const looked: string[][] = []; // the mints Jupiter was asked about
     const outcomes: Outcome[] = []; // what approved windows heard
     const settled = { count: 0 }; // how many times Otus's pages were told a transaction landed
-    const opened: { first: Approval; at: number; closed: boolean }[] = []; // `early`: windows opened before the review
-    const shell: Shell = {
-        load: async () => box.state,
-        update: async (change) => void (box.state = { ...box.state, ...(change(box.state) ?? {}) }),
-        // As the window: the first form shown, the final one (when it comes) the only one answered.
-        approve: async (a, _follow, later, after) => {
+    const following = { count: 0 }; // windows kept after a yes, to hear how it goes
+    // `early`: windows opened before the review, and why each ended unanswered (true: on a no); 'no': the user says no
+    // at once, in the window still waiting for the review.
+    const opened: { first: Approval; at: number; closed: string | boolean }[] = [];
+    // As the window: the first form shown, the final one (when it comes) the only one answered.
+    const asking: Shell['approve'] = async (a, _follow, later, after) => {
             firsts.push(a);
             shownAt.first.push(performance.now());
             const final = later ? await later : a;
             shownAt.final.push(performance.now());
             approvals.push(final);
             const answer = o.answer ? await o.answer(final, box) : true;
-            if (answer !== false) after?.((outcome) => outcomes.push(outcome)); // the window stays, and hears how it goes
+            if (answer !== false && after) (following.count++, after((outcome) => outcomes.push(outcome))); // the window stays, and hears how it goes
             return answer;
-        },
+    };
+    const shell: Shell = {
+        load: async () => box.state,
+        update: async (change) => void (box.state = { ...box.state, ...(change(box.state) ?? {}) }),
+        // A site's transaction asks in the window opened for it early, when there is one.
+        approve: (a, ...rest) => (o.early && a.kind === 'transaction' && a.site.origin.startsWith('https:') ? Promise.reject(new Error('asked outside its window')) : asking(a, ...rest)),
         sign: async (_account, data): Promise<SignatureBytes> => {
             if (o.locked) throw new Refused('Otus is locked');
             return signBytes(pair.privateKey, data);
@@ -129,9 +134,9 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
         settled: () => void settled.count++,
         ...(o.early && {
             early: (first: Approval) => {
-                const window = { first, at: performance.now(), closed: false };
+                const window: (typeof opened)[number] = { first, at: performance.now(), closed: false };
                 opened.push(window);
-                return { approve: shell.approve, close: () => void (window.closed = true) };
+                return { approve: asking, no: o.early === 'no' ? Promise.resolve() : new Promise<void>(() => {}), close: (why) => void (window.closed = why ?? true) };
             },
         }),
     };
@@ -152,7 +157,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
             ),
         );
     const call = (method: string, params: object, origin = ORIGIN) => serve({ method, params }, origin, shell);
-    return { me, pair, box, approvals, firsts, shownAt, sent, looked, outcomes, settled, opened, transfer, call, shell };
+    return { me, pair, box, approvals, firsts, shownAt, sent, looked, outcomes, settled, following, opened, transfer, call, shell };
 }
 
 const result = <T>(reply: Reply): T => {
@@ -740,11 +745,24 @@ test('a site’s transaction opens its window at once, saying who asks for which
     assert.equal(w.approvals[0].kind, 'transaction');
 });
 
-test('a site’s transaction that cannot be reviewed closes the window opened for it', async () => {
-    const w = await wallet({ early: true, chain: { valid: async () => Promise.reject(new Error('the RPC did not answer')) } });
+test('a site’s transaction that ends before it is shown says why in the window opened for it', async () => {
+    const w = await wallet({ early: true, chain: { valid: async () => Promise.reject(new Error('down')) } });
     assert.equal((await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] })).ok, false);
-    assert.deepEqual(w.opened.map((o) => o.closed), [true]);
-    assert.equal(w.approvals.length, 0);
+    assert.deepEqual(w.opened.map((o) => o.closed), ['Otus could not handle this request']);
+    const named = await wallet({ early: true, validOn: [] });
+    assert.deepEqual(await named.call('signTransaction', { account: named.me, chain: 'solana:mainnet', transactions: [named.transfer()] }), { ok: false, error: 'this transaction is not for mainnet' });
+    assert.deepEqual(named.opened.map((o) => o.closed), ['this transaction is not for mainnet']);
+    assert.equal(w.approvals.length + named.approvals.length, 0);
+});
+
+test('a no while a site’s transaction is reviewed ends the request at once; the site may ask again', async () => {
+    const w = await wallet({ early: 'no', slow: 100 });
+    for (let i = 0; i < 2; i++) {
+        const asked = performance.now();
+        assert.deepEqual(await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] }), { ok: false, error: 'The user rejected the request', rejected: true });
+        assert.ok(performance.now() - asked < 100, 'before the review');
+    }
+    assert.deepEqual([w.approvals.length, w.box.state.sites[ORIGIN].signatures, w.opened.map((o) => o.closed)], [0, 0, [true, true]]);
 });
 
 test('a message is shown as text with what is invisible marked, or as hex; signing it counts for the site', async () => {
@@ -899,6 +917,7 @@ test('a Ledger account signs no messages or sign-ins, asked like any other so a 
     assert.deepEqual(await own(bytes(w.transfer(w.me, w.me, 1)), w.me, key(2), w.shell), v1);
     const shown = w.approvals[2];
     assert.ok(shown.kind === 'transaction' && shown.blocked && !shown.ledger);
+    assert.equal(w.following.count, 0); // answered yes all the same, its window has nothing to follow: it closes
     // Connected, a site hears this account cannot sign v1, and builds what it can.
     w.box.state = { ...w.box.state, sites: { [ORIGIN]: { account: w.me, signatures: 0 } } };
     assert.deepEqual(result(await w.call('connect', { silent: true })), { accounts: [w.me], v1: false });

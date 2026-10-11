@@ -36,19 +36,33 @@ export type Approve = (approval: Approval, follow?: (tell: (life: Life) => void)
  *  closes it; without it, or on no, it closes. */
 export const approve: Approve = async (approval, follow, later, after) => early(approval).approve(approval, follow, later, after);
 
+/** A window opened early: see `early`. */
+export type Early = { approve: Approve; no: Promise<void>; close: (why?: string) => void };
+
 /**
  * A window opened at once, before what it asks about is ready: it shows `first` (who asks, for which account), which
- * takes no yes. `approve` then gives it what to answer, as `approve` above does, and waits for the answer; the user may
- * say no before, which it then returns. `close` ends it unanswered: for a request that fails before it is ready.
+ * takes no yes. `approve`, once, then gives it what to answer, as `approve` above does, and waits for the answer. `no`:
+ * the user said no before that, closing it or not (it never settles otherwise), or it did not open (it throws why).
+ * `close` ends it unanswered, for a request that fails before it is shown: saying why, the window stays until the user
+ * closes it, and the site's next request waits for that.
  */
-export function early(first: Approval): { approve: Approve; close: () => void } {
+export function early(first: Approval): Early {
     if ([...pending.values()].some((p) => p.approval.site.origin === first.site.origin)) throw new Refused('Otus is already asking you about a request from this site');
     const id = crypto.randomUUID();
-    let decide: (answer: Answer) => void = () => {};
-    const decided = new Promise<Answer>((d) => (decide = d));
+    let failure: unknown = null;
+    let [answered, approving] = [false, false];
+    let settle: (answer: Answer) => void = () => {};
+    const decided = new Promise<Answer>((d) => (settle = d));
+    let said: (failure: unknown) => void = () => {};
+    const no = new Promise<void>((done, fail) => (said = (failure) => (failure ? fail(failure) : done())));
+    no.catch(() => {}); // heard by whoever asks
+    const decide = (answer: Answer) => {
+        if (!answered && !approving) said(failure);
+        answered = true;
+        settle(answer);
+    };
     const asked: Pending = { approval: first, ready: false, decide };
     pending.set(id, asked);
-    let failure: unknown = null;
     const opened = openWindow(id).catch((error: unknown) => {
         failure = error;
         decide(false);
@@ -68,6 +82,8 @@ export function early(first: Approval): { approve: Approve; close: () => void } 
     });
     return {
         approve: async (approval, follow, later, after) => {
+            if (approving) throw new Error('a window answers one request');
+            approving = true;
             Object.assign(asked, { approval, ready: !later, follow, after });
             asked.told?.(approval);
             if (follow && asked.port) follow(listening(asked.port)); // the window came first: it hears from now
@@ -82,7 +98,13 @@ export function early(first: Approval): { approve: Approve; close: () => void } 
             if (failure) throw failure;
             return answer;
         },
-        close: () => decide(false),
+        no,
+        close: (why) => {
+            if (answered) return;
+            if (!why) return decide(false);
+            Object.assign(asked, { approval: { kind: 'pending', site: first.site, account: first.account, refused: why }, ready: false, after: undefined });
+            asked.told?.(asked.approval);
+        },
     };
 }
 

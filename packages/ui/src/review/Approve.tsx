@@ -52,7 +52,7 @@ function Asked({ approval, answers, expiry, died }: { approval: Approval; answer
 }
 
 // A site's transaction, as soon as it asks: who asks, for which account, and the steps, while it is reviewed; what it
-// does comes in its place. Only no is answered.
+// does comes in its place. Only no is answered. Refused before it was shown, it says why, until closed.
 const Pending = ({ a, answers }: { a: Extract<Approval, { kind: 'pending' }>; answers: Answers }) => (
     <Frame
         site={a.site}
@@ -61,15 +61,21 @@ const Pending = ({ a, answers }: { a: Extract<Approval, { kind: 'pending' }>; an
         steps={<Steps at={0} reached={0} go={() => {}} />}
         page={0}
         actions={
-            <>
-                <Answer onClick={() => answers.answer(false)}>Reject</Answer>
-                <Answer variant="default" disabled onClick={() => {}}>
-                    Next
+            a.refused ? (
+                <Answer variant="default" onClick={() => answers.answer(false)}>
+                    Close
                 </Answer>
-            </>
+            ) : (
+                <>
+                    <Answer onClick={() => answers.answer(false)}>Reject</Answer>
+                    <Answer variant="default" disabled onClick={() => {}}>
+                        Next
+                    </Answer>
+                </>
+            )
         }
     >
-        {null}
+        {a.refused && <Notice>Nothing was signed: {a.refused}.</Notice>}
     </Frame>
 );
 

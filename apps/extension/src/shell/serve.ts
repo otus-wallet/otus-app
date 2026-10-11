@@ -31,7 +31,7 @@ import { explorerOf, networkOf, rpcFor } from '@otus-wallet/core/settings.ts';
 import { signInFields, signInText } from '../siws.ts';
 import type { TokenInfo } from '@otus-wallet/core/tokens.ts';
 import { accountView, siteView, type Approval, type Life, type Line, type Outcome, type SiteView } from '@otus-wallet/core/view.ts';
-import type { Answer } from './approvals.ts';
+import type { Answer, Early } from './approvals.ts';
 import { connectSite, disconnectSite, MAX_SIGNED_HERE, onDevice, sentTo, signs, type Account, type State } from '@otus-wallet/core/state.ts';
 import { approved, channel, clusterOf, followed, landed, messageOf, Rejected, settled, signerOf, unexpired, withSignature } from './transaction.ts';
 
@@ -41,7 +41,7 @@ export type Shell = {
     load(): Promise<State>;
     update(change: (state: State) => Partial<State> | null): Promise<void>; // one after another, from state as it is then
     approve(approval: Approval, follow?: (tell: (life: Life) => void) => void, later?: Promise<Approval>, after?: (tell: (outcome: Outcome) => void) => void): Promise<Answer>; // yes or no (for a Ledger account, yes is its signature; to connect, yes may name another account); `follow`: its blockhash's life, for the window to show; `later`: the approval in its final form, which replaces the first and alone takes a yes (failing, it says no); `after`: approved, the window hears how it goes
-    early?(first: Approval): { approve: Shell['approve']; close(): void }; // the window opened at once, showing `first` until its approve gives it what to answer; close ends it unanswered
+    early?(first: Approval): Early; // the window opened at once, showing `first` until its approve gives it what to answer (see approvals.ts)
     sign(account: Account, data: Uint8Array): Promise<SignatureBytes>; // throws Refused when locked or without the key
     chain(rpc: string): Chain;
     send(signed: Uint8Array, chain: Chain): Promise<Sent>; // sent, then watched until it lands or cannot
@@ -166,7 +166,7 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
     let decided: { r: Review; p: Prepared; signature?: SignatureBytes; chain: Chain; cluster: Cluster };
     const outcome = channel<Outcome>(); // approved, the window stays and says how it goes
     // The window opens at once, saying who asks for which account, while the transaction is reviewed.
-    let window: ReturnType<NonNullable<Shell['early']>> | undefined;
+    let window: Early | undefined;
     try {
         window = shell.early?.({ kind: 'pending', site: siteView(origin, site), account: accountView(account) });
         const asking = window ? { ...shell, approve: window.approve } : shell;
@@ -179,14 +179,15 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
         const guess = request.chain ?? networkOf(state.settings);
         const chain = shell.chain(rpcFor(guess, state.settings));
         const checked = clusterOf(bytes, request.chain, state.settings, shell);
-        try {
-            decided = await reviewed(guess, chain, checked.then((found) => found.cluster === guess || Promise.reject(new Elsewhere(found))));
-        } catch (e) {
+        const deciding = reviewed(guess, chain, checked.then((found) => found.cluster === guess || Promise.reject(new Elsewhere(found)))).catch((e: unknown) => {
             if (!(e instanceof Elsewhere)) throw e;
-            decided = await reviewed(e.found.cluster, e.found.chain);
-        }
+            return reviewed(e.found.cluster, e.found.chain);
+        });
+        // A no while it is reviewed ends the request at once: the review is left to end on its own.
+        deciding.catch(() => {});
+        decided = await (window ? Promise.race([deciding, window.no.then(() => Promise.reject(new Rejected()))]) : deciding);
     } catch (e) {
-        window?.close(); // ended before the user answered: the window goes with it
+        window?.close(e instanceof Rejected ? undefined : (told(e) ?? 'Otus could not handle this request')); // ended before the user answered: the window says why, or goes on a no
         throw e;
     } finally {
         reviewing.delete(origin);
@@ -473,12 +474,18 @@ async function reply(work: () => Promise<unknown>, words: { rejected: string; fa
         return { ok: true, result: await work() };
     } catch (e) {
         if (e instanceof Rejected) return { ok: false, error: words.rejected, rejected: true };
-        if (e instanceof Refused) return { ok: false, error: e.message };
-        if (isSolanaError(e, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR)) return { ok: false, error: `the RPC refused Otus's request (HTTP ${e.context.statusCode})` };
-        if (timedOut(e)) return { ok: false, error: 'the RPC did not answer in time' };
-        console.error('Otus:', e);
-        return { ok: false, error: words.failed };
+        const error = told(e);
+        if (error === null) console.error('Otus:', e);
+        return { ok: false, error: error ?? words.failed };
     }
+}
+
+// What a failure tells the site, and the user: its words, the RPC's, or null for one Otus does not say (a no among them).
+function told(e: unknown): string | null {
+    if (e instanceof Refused) return e.message;
+    if (isSolanaError(e, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR)) return `the RPC refused Otus's request (HTTP ${e.context.statusCode})`;
+    if (timedOut(e)) return 'the RPC did not answer in time';
+    return null;
 }
 
 const accountOf = (state: State, address: string | null): Account | undefined => state.accounts.find((a) => a.address === address);
