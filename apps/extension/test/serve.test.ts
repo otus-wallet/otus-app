@@ -80,7 +80,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
             given: [],
             signedHere: {},
             outside: {},
-            disconnected: {},
+            disconnected: [],
             settings: DEFAULT_SETTINGS,
         } as State,
     };
@@ -587,18 +587,23 @@ test('connecting, a site is told by its host from the first visit, and known aga
     const past = { since: NOW / 1000 - 2 * 86_400, programs: [key(50)] };
     w.box.state = { ...w.box.state, sites: { [ORIGIN]: { account: w.me, signatures: 7, ...past } } };
     assert.equal(result(await w.call('disconnect', {})), null);
-    assert.deepEqual([w.box.state.sites[ORIGIN], w.box.state.disconnected[ORIGIN]], [undefined, past]);
+    assert.deepEqual([w.box.state.sites[ORIGIN], w.box.state.disconnected], [undefined, [{ origin: ORIGIN, ...past }]]);
     result(await w.call('connect', {}));
     assert.deepEqual(lines(w.approvals.at(-1)), ['ok:Known site']);
-    assert.deepEqual([w.box.state.sites[ORIGIN], w.box.state.disconnected[ORIGIN]], [{ account: w.me, signatures: 0, ...past }, undefined]);
+    assert.deepEqual([w.box.state.sites[ORIGIN], w.box.state.disconnected], [{ account: w.me, signatures: 0, ...past }, []]);
     // Its first transaction since is not a first one.
     result(await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] }));
     const shown = w.approvals.at(-1);
     assert.ok(shown?.kind === 'transaction' && shown.findings.some((f) => f.title === 'Known site') && !shown.findings.some((f) => f.title === 'First transaction for this site'));
-    // Signed for a few hours ago, and disconnected: new still, since then.
-    w.box.state = { ...w.box.state, sites: {}, disconnected: { [ORIGIN]: { since: NOW / 1000 - 3 * 3_600 } } };
+    // Signed for a few hours ago, and disconnected: new still, since then, connecting and signing.
+    w.box.state = { ...w.box.state, sites: {}, disconnected: [{ origin: ORIGIN, since: NOW / 1000 - 3 * 3_600 }] };
     result(await w.call('connect', {}));
     assert.deepEqual(w.approvals.at(-1)?.kind === 'connect' && w.approvals.at(-1)?.findings, [{ tone: 'notice', title: 'New site', note: 'You first signed a transaction for it 3 hours ago' }]);
+    // Its transaction too (the review tells the age by the clock, not the fake extension's).
+    w.box.state = { ...w.box.state, sites: { [ORIGIN]: { ...w.box.state.sites[ORIGIN], since: Math.floor(Date.now() / 1000) - 3 * 3_600 } } };
+    result(await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] }));
+    const again = w.approvals.at(-1);
+    assert.ok(again?.kind === 'transaction' && again.findings.some((f) => f.title === 'New site' && f.tone === 'notice'));
 });
 
 test('signing in connects a site with what was kept of it, told as connecting is; a connected one, as before', async () => {
@@ -607,22 +612,46 @@ test('signing in connects a site with what was kept of it, told as connecting is
     result(await w.call('signIn', input));
     assert.deepEqual(w.approvals.at(-1)?.kind === 'signIn' && w.approvals.at(-1)?.findings, []); // connected already
     const since = NOW / 1000 - 2 * 86_400;
-    w.box.state = { ...w.box.state, sites: {}, disconnected: { [ORIGIN]: { since } } };
+    w.box.state = { ...w.box.state, sites: {}, disconnected: [{ origin: ORIGIN, since }] };
     result(await w.call('signIn', input));
     const shown = w.approvals.at(-1);
     assert.deepEqual(shown?.kind === 'signIn' && shown.findings.map((f) => f.title), ['Known site']);
-    assert.deepEqual([w.box.state.sites[ORIGIN], w.box.state.disconnected], [{ account: w.me, signatures: 1, since }, {}]);
+    assert.deepEqual([w.box.state.sites[ORIGIN], w.box.state.disconnected], [{ account: w.me, signatures: 1, since }, []]);
+});
+
+test('a connect answered after a sign-in connected the site keeps what the sign-in brought back', async () => {
+    const since = NOW / 1000 - 2 * 86_400;
+    // While the connect window waits, the site signs in, which connects it with its past.
+    const w = await wallet({ answer: (a, box) => (a.kind === 'connect' && (box.state = { ...box.state, sites: { [ORIGIN]: { account: box.state.active!, signatures: 1, since } }, disconnected: [] }), true) });
+    w.box.state = { ...w.box.state, sites: {}, disconnected: [{ origin: ORIGIN, since }] };
+    result(await w.call('connect', {}));
+    assert.deepEqual(w.box.state.sites[ORIGIN], { account: w.me, signatures: 1, since });
+});
+
+test('an account removed while the connect window waits connects nothing', async () => {
+    const w = await wallet({ answer: (a, box) => (a.kind === 'connect' && (box.state = { ...box.state, accounts: [] }), true) });
+    w.box.state = { ...w.box.state, sites: {}, disconnected: [{ origin: ORIGIN, since: 5 }] };
+    assert.deepEqual(await w.call('connect', {}), { ok: false, error: 'no account in Otus can sign: a watched one cannot connect' });
+    assert.deepEqual([w.box.state.sites, w.box.state.disconnected], [{}, [{ origin: ORIGIN, since: 5 }]]);
+});
+
+test('a site disconnected while its transaction waits is not signed for, nor connected again', async () => {
+    const w = await wallet({ answer: (a, box) => (a.kind === 'transaction' && (box.state = { ...box.state, sites: {}, disconnected: [{ origin: ORIGIN, since: 5 }] }), true) });
+    w.box.state = { ...w.box.state, sites: { [ORIGIN]: { account: w.me, signatures: 1, since: 5 } } };
+    assert.deepEqual(await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] }), { ok: false, error: 'this site is not connected to that account' });
+    assert.deepEqual([w.box.state.sites, w.box.state.disconnected], [{}, [{ origin: ORIGIN, since: 5 }]]);
 });
 
 test('a site disconnected with nothing to keep keeps nothing; at most 200 are kept, the latest', async () => {
     const w = await wallet();
     assert.equal(result(await w.call('disconnect', {})), null); // connected, never signed for
-    assert.deepEqual(w.box.state.disconnected, {});
-    const many = Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`https://site${i}.app`, { since: i }]));
+    assert.deepEqual(w.box.state.disconnected, []);
+    // Kept in the order they went, whatever their names: the first gone is the first dropped.
+    const many = Array.from({ length: 200 }, (_, i) => ({ origin: `https://${String.fromCharCode(122 - (i % 26))}${i}.app`, since: i }));
     w.box.state = { ...w.box.state, sites: { [ORIGIN]: { account: w.me, signatures: 1, since: 999 } }, disconnected: many };
     result(await w.call('disconnect', {}));
-    const kept = Object.keys(w.box.state.disconnected);
-    assert.deepEqual([kept.length, kept[0], kept.at(-1)], [200, 'https://site1.app', ORIGIN]);
+    const kept = w.box.state.disconnected.map((d) => d.origin);
+    assert.deepEqual([kept.length, kept[0], kept.at(-1)], [200, many[1].origin, ORIGIN]);
 });
 
 test('a message is shown as text with what is invisible marked, or as hex; signing it counts for the site', async () => {

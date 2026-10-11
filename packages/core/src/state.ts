@@ -29,8 +29,8 @@ export const onDevice = (a: Account) => Boolean(a.ledger);
  *  did; none kept for a site signed for before Otus kept them. */
 export type Site = { account: Address; signatures: number; since?: number; programs?: Address[] };
 
-/** What is kept of a site once disconnected: when you first signed a transaction for it, and the programs they called. */
-export type Past = Pick<Site, 'since' | 'programs'>;
+/** A site disconnected, and what is kept of it: when you first signed a transaction for it, and the programs they called. */
+export type Gone = { origin: string } & Pick<Site, 'since' | 'programs'>;
 
 /** A transaction signed for a site on a durable nonce, which can run until that nonce moves on: the account that signed
  *  it, the nonce account and nonce it waits on, the site, and when (seconds since 1970). */
@@ -52,7 +52,7 @@ export type State = {
     accounts: Account[];
     active: Address | null;
     sites: Record<string, Site>;
-    disconnected: Record<string, Past>;
+    disconnected: Gone[];
     contacts: Contact[];
     sent: Record<string, number>;
     removed: Address[];
@@ -63,7 +63,7 @@ export type State = {
     settings: Settings;
 };
 
-const DEFAULTS: State = { accounts: [], active: null, sites: {}, disconnected: {}, contacts: [], sent: {}, removed: [], waiting: [], given: [], signedHere: {}, outside: {}, settings: DEFAULT_SETTINGS };
+const DEFAULTS: State = { accounts: [], active: null, sites: {}, disconnected: [], contacts: [], sent: {}, removed: [], waiting: [], given: [], signedHere: {}, outside: {}, settings: DEFAULT_SETTINGS };
 /** Signatures kept an account: far more than it makes between two looks at its activity. */
 export const MAX_SIGNED_HERE = 200;
 const MAX_CONTACTS = 200;
@@ -73,22 +73,26 @@ type Sites = Pick<State, 'sites' | 'disconnected'>;
 
 /** A site disconnected: its access gone, and its past kept, to tell it from a new one when it connects again. */
 export function disconnectSite(state: Sites, origin: string): Sites {
-    const { [origin]: site, ...sites } = state.sites;
+    const site = Object.hasOwn(state.sites, origin) ? state.sites[origin] : undefined;
+    const sites = Object.fromEntries(Object.entries(state.sites).filter(([o]) => o !== origin));
     if (!site || (site.since === undefined && !site.programs)) return { sites, disconnected: state.disconnected };
-    const { [origin]: _, ...others } = state.disconnected;
-    const past: Past = { ...(site.since !== undefined && { since: site.since }), ...(site.programs && { programs: site.programs }) };
-    return { sites, disconnected: Object.fromEntries([...Object.entries(others), [origin, past]].slice(-MAX_DISCONNECTED)) };
+    const gone: Gone = { origin, ...(site.since !== undefined && { since: site.since }), ...(site.programs && { programs: site.programs }) };
+    return { sites, disconnected: [...state.disconnected.filter((d) => d.origin !== origin), gone].slice(-MAX_DISCONNECTED) };
 }
 
-/** A site connected to an account, with its past when it was disconnected before. */
+/** A site connected to an account: with what it has, when connected already (a sign-in may have connected it while
+ *  the user decided), or with what was kept of it once disconnected. */
 export function connectSite(state: Sites, origin: string, account: Address): Sites {
-    const { [origin]: past, ...disconnected } = state.disconnected;
-    return { sites: { ...state.sites, [origin]: { account, signatures: 0, ...past } }, disconnected };
+    const site = Object.hasOwn(state.sites, origin) ? state.sites[origin] : undefined;
+    const gone = state.disconnected.find((d) => d.origin === origin);
+    const back = { ...(gone?.since !== undefined && { since: gone.since }), ...(gone?.programs && { programs: gone.programs }) };
+    return { sites: { ...state.sites, [origin]: site ? { ...site, account } : { account, signatures: 0, ...back } }, disconnected: state.disconnected.filter((d) => d.origin !== origin) };
 }
 
 export async function load(): Promise<State> {
     const state = (await platform.storage.local.get(DEFAULTS)) as State;
-    return { ...state, settings: settingsOf(state.settings) }; // settings saved before a newer one existed
+    // Settings saved before a newer one existed; disconnected sites kept by a build that kept them by origin, not in order.
+    return { ...state, disconnected: Array.isArray(state.disconnected) ? state.disconnected : [], settings: settingsOf(state.settings) };
 }
 export const save = (part: Partial<State>) => platform.storage.local.set(part);
 
@@ -170,7 +174,7 @@ export function edited(e: Edit, state: State, now = Date.now()): Partial<State> 
             return { accounts: [...new Set(ordered)] };
         }
         case 'disconnect': {
-            if (typeof e.origin !== 'string' || !(e.origin in state.sites)) return null;
+            if (typeof e.origin !== 'string' || !Object.hasOwn(state.sites, e.origin)) return null;
             return disconnectSite(state, e.origin);
         }
         case 'watch': {

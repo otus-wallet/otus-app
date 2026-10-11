@@ -17,7 +17,7 @@ const state = (part: Partial<State> = {}): State => ({
     given: [],
     signedHere: {},
     outside: {},
-    disconnected: {},
+    disconnected: [],
     settings: DEFAULT_SETTINGS,
     ...part,
 });
@@ -163,8 +163,11 @@ test('a Ledger account comes to sign now; a removed account takes its kept signa
 test('disconnecting a site in Settings takes its access and keeps when you first signed for it, and its programs', () => {
     const site = { account: MINE, signatures: 4, since: 1_700_000_000, programs: [STRANGER] };
     const s = after(state({ sites: { 'https://jup.ag': site, 'https://other.app': { account: MINE, signatures: 0 } } }), { edit: 'disconnect', origin: 'https://jup.ag' });
-    assert.deepEqual([s.sites, s.disconnected], [{ 'https://other.app': { account: MINE, signatures: 0 } }, { 'https://jup.ag': { since: 1_700_000_000, programs: [STRANGER] } }]);
+    assert.deepEqual([s.sites, s.disconnected], [{ 'https://other.app': { account: MINE, signatures: 0 } }, [{ origin: 'https://jup.ag', since: 1_700_000_000, programs: [STRANGER] }]]);
     // One never signed for leaves nothing; one not connected changes nothing.
     assert.deepEqual(after(s, { edit: 'disconnect', origin: 'https://other.app' }).disconnected, s.disconnected);
     assert.equal(edited({ edit: 'disconnect', origin: 'https://jup.ag' }, s), null);
+    for (const origin of ['toString', '__proto__', 'constructor']) assert.equal(edited({ edit: 'disconnect', origin }, s), null, origin);
+    // Removing the account the sites were connected to takes them; what is kept of those disconnected stays, by site.
+    assert.deepEqual(after(s, { edit: 'remove', address: MINE }).disconnected, s.disconnected);
 });

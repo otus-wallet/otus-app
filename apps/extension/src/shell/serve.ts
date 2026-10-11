@@ -93,7 +93,10 @@ async function handle(request: Request, state: State, shell: Shell): Promise<unk
             const answer = await shell.approve({ kind: 'connect', site: siteView(origin, undefined), account: accountView(active), choices: choices.map(accountView), findings });
             if (answer !== true && !(typeof answer === 'object' && 'account' in answer)) throw new Rejected();
             const account = need(choices.find((c) => c.address === (answer === true ? active.address : answer.account)), NO_SIGNER);
-            await shell.update((s) => ({ ...connectSite(s, origin, account.address), active: account.address })); // as they are now: the user may have changed them while deciding
+            // As they are now: the user may have changed them while deciding, removed that account even.
+            let removed = false;
+            await shell.update((s) => (s.accounts.some((a) => a.address === account.address && signs(a)) ? { ...connectSite(s, origin, account.address), active: account.address } : ((removed = true), null)));
+            if (removed) throw new Refused(NO_SIGNER);
             return { accounts: [account.address], v1: !account.ledger };
         }
         case 'disconnect': {
@@ -141,7 +144,7 @@ const reviewing = new Set<string>(); // sites whose transaction is being reviewe
 
 // What is known of a site asked to connect: from its host, and from what was kept of it when it was disconnected.
 const siteLines = (origin: string, state: State, shell: Shell): Line[] =>
-    siteFindings({ host: new URL(origin).host, signedBefore: state.disconnected[origin]?.since ?? null, now: Math.floor(shell.now() / 1000) }, true).map((f) => ({ title: f.text, note: f.note ?? '', tone: f.level }));
+    siteFindings({ host: new URL(origin).host, signedBefore: state.disconnected.find((d) => d.origin === origin)?.since ?? null, now: Math.floor(shell.now() / 1000) }, true).map((f) => ({ title: f.text, note: f.note ?? '', tone: f.level }));
 
 // A site's transaction, checked: its cluster, the review and the user's answer, one at a time per site; then signed,
 // and sent if asked.
@@ -500,15 +503,16 @@ const MAX_SITE_PROGRAMS = 32; // kept for a site, the latest last
 
 // A site once it got a signature: counted, connected by a sign-in (with what was kept of it, if it was disconnected),
 // known from the day after its first transaction, and the programs its transactions call kept.
-function signedFor(state: Pick<State, 'sites' | 'disconnected'>, { origin, connects = false, programs }: Asker, address: Address, now: number): Pick<State, 'sites' | 'disconnected'> | null {
+function signedFor(state: Pick<State, 'sites' | 'disconnected'>, { origin, connects = false, programs }: Asker, address: Address, now: number): Partial<Pick<State, 'sites' | 'disconnected'>> | null {
     if (!connects && state.sites[origin]?.account !== address) return null;
-    const { sites, disconnected } = state.sites[origin] ? state : connectSite(state, origin, address);
+    const restored = !Object.hasOwn(state.sites, origin); // connected by this sign-in: what was kept of it comes back
+    const { sites, disconnected } = restored ? connectSite(state, origin, address) : state;
     const site = sites[origin];
     const same = site.account === address;
     const since = (same ? site.since : undefined) ?? (programs ? Math.floor(now / 1000) : undefined);
     const kept = same ? site.programs : undefined;
     const called = programs ? [...(kept ?? []).filter((p) => !programs.includes(p)), ...programs].slice(-MAX_SITE_PROGRAMS) : kept; // the latest used last
-    return { sites: { ...sites, [origin]: { account: address, signatures: same ? site.signatures + 1 : 1, ...(since !== undefined && { since }), ...(called && { programs: called }) } }, disconnected };
+    return { sites: { ...sites, [origin]: { account: address, signatures: same ? site.signatures + 1 : 1, ...(since !== undefined && { since }), ...(called && { programs: called }) } }, ...(restored && { disconnected }) };
 }
 
 const MAX_USABLE = 32; // transactions waiting, and delegates given, kept: the latest
