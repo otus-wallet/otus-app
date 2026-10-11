@@ -65,7 +65,7 @@ const LEDGER_PATH = "44'/501'/0'/0'";
 
 /** A wallet with a real key, a site connected to it, and a fake extension around serve. `chain` changes the network's
  *  answers; sends are watched without waiting between checks. */
-async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; answer?: (a: Approval, s: { state: State }) => Answer | Promise<Answer>; validOn?: string[]; chain?: Partial<Chain>; slow?: number } = {}) {
+async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; answer?: (a: Approval, s: { state: State }) => Answer | Promise<Answer>; validOn?: string[]; chain?: Partial<Chain>; slow?: number; early?: boolean } = {}) {
     const pair = await generateKeyPair();
     const me = await getAddressFromPublicKey(pair.publicKey);
     const box = {
@@ -100,6 +100,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
     const looked: string[][] = []; // the mints Jupiter was asked about
     const outcomes: Outcome[] = []; // what approved windows heard
     const settled = { count: 0 }; // how many times Otus's pages were told a transaction landed
+    const opened: { first: Approval; at: number; closed: boolean }[] = []; // `early`: windows opened before the review
     const shell: Shell = {
         load: async () => box.state,
         update: async (change) => void (box.state = { ...box.state, ...(change(box.state) ?? {}) }),
@@ -123,6 +124,13 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
         tokens: async (mints) => (looked.push(mints), new Map()),
         now: () => NOW,
         settled: () => void settled.count++,
+        ...(o.early && {
+            early: (first: Approval) => {
+                const window = { first, at: performance.now(), closed: false };
+                opened.push(window);
+                return { approve: shell.approve, close: () => void (window.closed = true) };
+            },
+        }),
     };
     // A transfer of 0.001 SOL to key(2) from `from`, its fee paid by `payer`.
     const transfer = (from: Address = me, payer: Address = from, version: 0 | 1 = 0) =>
@@ -141,7 +149,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
             ),
         );
     const call = (method: string, params: object, origin = ORIGIN) => serve({ method, params }, origin, shell);
-    return { me, pair, box, approvals, firsts, shownAt, sent, looked, outcomes, settled, transfer, call, shell };
+    return { me, pair, box, approvals, firsts, shownAt, sent, looked, outcomes, settled, opened, transfer, call, shell };
 }
 
 const result = <T>(reply: Reply): T => {
@@ -598,7 +606,8 @@ test('connecting, a site is told by its host from the first visit, and known aga
     // Signed for a few hours ago, and disconnected: new still, since then, connecting and signing.
     w.box.state = { ...w.box.state, sites: {}, disconnected: [{ origin: ORIGIN, since: NOW / 1000 - 3 * 3_600 }] };
     result(await w.call('connect', {}));
-    assert.deepEqual(w.approvals.at(-1)?.kind === 'connect' && w.approvals.at(-1)?.findings, [{ tone: 'notice', title: 'New site', note: 'You first signed a transaction for it 3 hours ago' }]);
+    const connecting = w.approvals.at(-1);
+    assert.deepEqual(connecting?.kind === 'connect' && connecting.findings, [{ tone: 'notice', title: 'New site', note: 'You first signed a transaction for it 3 hours ago' }]);
     // Its transaction too (the review tells the age by the clock, not the fake extension's).
     w.box.state = { ...w.box.state, sites: { [ORIGIN]: { ...w.box.state.sites[ORIGIN], since: Math.floor(Date.now() / 1000) - 3 * 3_600 } } };
     result(await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] }));
@@ -610,7 +619,8 @@ test('signing in connects a site with what was kept of it, told as connecting is
     const w = await wallet();
     const input = { statement: 'Sign in', uri: ORIGIN, version: '1', nonce: 'abc12345', issuedAt: '2026-10-03T12:00:00Z' };
     result(await w.call('signIn', input));
-    assert.deepEqual(w.approvals.at(-1)?.kind === 'signIn' && w.approvals.at(-1)?.findings, []); // connected already
+    const first = w.approvals.at(-1);
+    assert.deepEqual(first?.kind === 'signIn' && first.findings, []); // connected already
     const since = NOW / 1000 - 2 * 86_400;
     w.box.state = { ...w.box.state, sites: {}, disconnected: [{ origin: ORIGIN, since }] };
     result(await w.call('signIn', input));
@@ -652,6 +662,23 @@ test('a site disconnected with nothing to keep keeps nothing; at most 200 are ke
     result(await w.call('disconnect', {}));
     const kept = w.box.state.disconnected.map((d) => d.origin);
     assert.deepEqual([kept.length, kept[0], kept.at(-1)], [200, many[1].origin, ORIGIN]);
+});
+
+test('a site’s transaction opens its window at once, saying who asks for which account; the review comes in it', async () => {
+    const w = await wallet({ early: true, slow: 40 });
+    const asked = performance.now();
+    result(await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] }));
+    assert.deepEqual(w.opened.map((o) => [o.first, o.closed]), [[{ kind: 'pending', site: { origin: ORIGIN, host: 'jup.ag', note: 'Connected', tone: 'plain' }, account: { label: 'Me', address: w.me } }, false]]);
+    assert.ok(w.opened[0].at - asked < 20, `opened after ${w.opened[0].at - asked} ms`); // before any answer of the network
+    assert.ok(w.shownAt.first[0] - asked > 2 * 40); // the review, round trips later, in that window
+    assert.equal(w.approvals[0].kind, 'transaction');
+});
+
+test('a site’s transaction that cannot be reviewed closes the window opened for it', async () => {
+    const w = await wallet({ early: true, chain: { valid: async () => Promise.reject(new Error('the RPC did not answer')) } });
+    assert.equal((await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] })).ok, false);
+    assert.deepEqual(w.opened.map((o) => o.closed), [true]);
+    assert.equal(w.approvals.length, 0);
 });
 
 test('a message is shown as text with what is invisible marked, or as hex; signing it counts for the site', async () => {

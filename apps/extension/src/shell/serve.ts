@@ -41,6 +41,7 @@ export type Shell = {
     load(): Promise<State>;
     update(change: (state: State) => Partial<State> | null): Promise<void>; // one after another, from state as it is then
     approve(approval: Approval, follow?: (tell: (life: Life) => void) => void, later?: Promise<Approval>, after?: (tell: (outcome: Outcome) => void) => void): Promise<Answer>; // yes or no (for a Ledger account, yes is its signature; to connect, yes may name another account); `follow`: its blockhash's life, for the window to show; `later`: the approval in its final form, which replaces the first and alone takes a yes (failing, it says no); `after`: approved, the window hears how it goes
+    early?(first: Approval): { approve: Shell['approve']; close(): void }; // the window opened at once, showing `first` until its approve gives it what to answer; close ends it unanswered
     sign(account: Account, data: Uint8Array): Promise<SignatureBytes>; // throws Refused when locked or without the key
     chain(rpc: string): Chain;
     send(signed: Uint8Array, chain: Chain): Promise<Sent>; // sent, then watched until it lands or cannot
@@ -154,10 +155,17 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
     reviewing.add(origin);
     let decided: { r: Review; p: Prepared; signature?: SignatureBytes; chain: Chain; cluster: Cluster };
     const outcome = channel<Outcome>(); // approved, the window stays and says how it goes
+    // The window opens at once, saying who asks for which account, while the transaction is reviewed.
+    let window: ReturnType<NonNullable<Shell['early']>> | undefined;
     try {
+        window = shell.early?.({ kind: 'pending', site: siteView(origin, site), account: accountView(account) });
+        const asking = window ? { ...shell, approve: window.approve } : shell;
         const { cluster, chain } = await clusterOf(bytes, request.chain, state.settings, shell);
         const way = { cluster, chain, site: siteView(origin, site), later: !request.send, context: { signedBefore: site.since ?? null, programsBefore: site.programs, host: new URL(origin).host } };
-        decided = { ...(await approved(bytes, account, way, shell, () => {}, outcome.follow)), chain, cluster };
+        decided = { ...(await approved(bytes, account, way, asking, () => {}, outcome.follow)), chain, cluster };
+    } catch (e) {
+        window?.close(); // ended before the user answered: the window goes with it
+        throw e;
     } finally {
         reviewing.delete(origin);
     }

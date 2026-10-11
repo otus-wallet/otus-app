@@ -13,7 +13,7 @@ import { askedFrom, type Asked } from '@otus-wallet/core/swap/terms.ts';
 import { lockMinutes, OTUS_RPC, rpcFor, walletRpc } from '@otus-wallet/core/settings.ts';
 import { tokens } from '@otus-wallet/core/tokens.ts';
 import type { Approval, Life } from '@otus-wallet/core/view.ts';
-import { answerOf, approve, kept, type Answer } from './approvals.ts';
+import { answerOf, approve, early, kept, type Answer } from './approvals.ts';
 import { keysCall, lock, LOCK_ALARM, locked, prune, shielded, sign } from './keys.ts';
 import { own, serve, stakeOwn, swapOwn, takeBack } from './serve.ts';
 import { edited, load, update, type Edit, type State } from '@otus-wallet/core/state.ts';
@@ -22,6 +22,7 @@ const shell = {
     load,
     update,
     approve,
+    early,
     sign,
     chain: (rpc: string) => rpcChain(rpcAt(rpc)),
     send: async (signed: Uint8Array, chain: Chain) => send(signed, chain, undefined, (await load()).settings.preflight !== false),

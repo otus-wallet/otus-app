@@ -56,6 +56,7 @@ export type Approval =
     | { kind: 'connect'; site: SiteView; account: AccountView; choices: AccountView[]; findings: Line[] } // choices: your accounts that sign, to connect another; the one in use may not be one; findings: what is known of the site
     | { kind: 'message'; site: SiteView; account: AccountView; text: string; findings: Line[]; signer: Signer } // findings: data, not words
     | { kind: 'signIn'; site: SiteView; account: AccountView; fields: [string, string][]; findings: Line[]; signer: Signer } // findings: what is known of the site, when signing in connects it
+    | { kind: 'pending'; site: SiteView; account: AccountView } // a site's transaction, while it is reviewed: who asks, for which account
     | TransactionView;
 
 export type TransactionView = {

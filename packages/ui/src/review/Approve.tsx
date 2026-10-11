@@ -37,12 +37,41 @@ export function Approve({ approval, answers, expiry, life }: { approval: Approva
         <YourWallet.Provider value={approval.account.address}>
             <AddressNames.Provider value={names}>
                 <AddressCut.Provider value={cut}>
-                    {approval.kind === 'transaction' ? <Transaction t={approval} answers={answers} expiry={left} died={died} /> : <Single a={approval} answers={answers} />}
+                    <Asked approval={approval} answers={answers} expiry={left} died={died} />
                 </AddressCut.Provider>
             </AddressNames.Provider>
         </YourWallet.Provider>
     );
 }
+
+// The page for what is asked.
+function Asked({ approval, answers, expiry, died }: { approval: Approval; answers: Answers; expiry?: Expiry; died: boolean }) {
+    if (approval.kind === 'transaction') return <Transaction t={approval} answers={answers} expiry={expiry} died={died} />;
+    if (approval.kind === 'pending') return <Pending a={approval} answers={answers} />;
+    return <Single a={approval} answers={answers} />;
+}
+
+// A site's transaction, as soon as it asks: who asks, for which account, and the steps, while it is reviewed; what it
+// does comes in its place. Only no is answered.
+const Pending = ({ a, answers }: { a: Extract<Approval, { kind: 'pending' }>; answers: Answers }) => (
+    <Frame
+        site={a.site}
+        account={a.account}
+        network={null}
+        steps={<Steps at={0} reached={0} go={() => {}} />}
+        page={0}
+        actions={
+            <>
+                <Answer onClick={() => answers.answer(false)}>Reject</Answer>
+                <Answer variant="default" disabled onClick={() => {}}>
+                    Next
+                </Answer>
+            </>
+        }
+    >
+        {null}
+    </Frame>
+);
 
 const WATCH_ONLY_CONNECT = 'Watch only: choose a wallet that signs';
 
@@ -64,7 +93,7 @@ const Rights = ({ rights }: { rights: string[] }) => (
 );
 
 // Connect, sign a message, sign in: one page each. To connect, the account can be another of yours, chosen on top.
-function Single({ a, answers: { answer } }: { a: Exclude<Approval, TransactionView>; answers: Answers }) {
+function Single({ a, answers: { answer } }: { a: Exclude<Approval, TransactionView | { kind: 'pending' }>; answers: Answers }) {
     const signs = a.kind !== 'connect';
     const signer = signs ? a.signer : 'ready';
     const armed = useArmed(a);
