@@ -9,9 +9,11 @@ import {
     appendTransactionMessageInstruction,
     blockhash,
     compileTransaction,
+    compressTransactionMessageUsingAddressLookupTables,
     createNoopSigner,
     createTransactionMessage,
     generateKeyPair,
+    getAddressEncoder,
     getAddressFromPublicKey,
     getBase58Encoder,
     getBase64Decoder,
@@ -36,6 +38,7 @@ import {
 import { LIGHTHOUSE } from '@otus-wallet/sdk/programs/addresses';
 import { Refused, type Reply } from '@otus-wallet/core/protocol.ts';
 import { decode } from '@otus-wallet/sdk/review/decode';
+import { LOOKUP_TABLE_PROGRAM } from '@otus-wallet/sdk/review/resolve';
 import { transfer as sendTransfer } from '@otus-wallet/core/send/transfer.ts';
 import { send } from '@otus-wallet/core/send/send.ts';
 import { DEFAULT_SETTINGS, OTUS_RPC } from '@otus-wallet/core/settings.ts';
@@ -95,7 +98,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
     });
     // `slow`: every answer of the network takes that many ms, as a round trip does.
     const chain: Chain = o.slow
-        ? (Object.fromEntries(Object.entries(quick).map(([k, f]) => [k, async (...args: unknown[]) => (await new Promise((r) => setTimeout(r, o.slow)), (f as (...a: unknown[]) => unknown)(...args))])) as Chain)
+        ? (Object.fromEntries(Object.entries(quick).map(([k, f]) => [k, async (...args: unknown[]) => (await new Promise((r) => setTimeout(r, o.slow)), (f as (...a: unknown[]) => unknown)(...args))])) as unknown as Chain)
         : quick;
     const looked: string[][] = []; // the mints Jupiter was asked about
     const outcomes: Outcome[] = []; // what approved windows heard
@@ -517,6 +520,38 @@ test('a review on the network guessed that fails does not refuse a transaction f
     result(await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] }));
     const shown = w.approvals[0];
     assert.equal(shown.kind === 'transaction' && shown.network, 'devnet');
+});
+
+test('mainnet’s lookup tables are kept: read once, then only past what they held; another network’s are not', async () => {
+    const TABLE = key(60);
+    const data = new Uint8Array(56 + 32);
+    data.set([1, 0, 0, 0]); // a lookup table, never deactivated, holding key(2)
+    data.fill(0xff, 4, 12);
+    data.set(getAddressEncoder().encode(key(2)), 56);
+    const signed = async (network: 'solana:mainnet' | 'solana:devnet') => {
+        const w = await wallet({ validOn: [network === 'solana:mainnet' ? OTUS_RPC : 'https://api.devnet.solana.com'] });
+        const kept = new Map<Address, readonly Address[]>();
+        const read: Address[][] = [];
+        w.shell.tables = { get: async (t) => kept.get(t), set: (t, e) => void kept.set(t, e) };
+        const chain = w.shell.chain;
+        w.shell.chain = (rpc) => {
+            const c = chain(rpc);
+            return { ...c, accounts: async (a) => (read.push([...a]), a.includes(TABLE) ? { slot: 1n, accounts: [account(TABLE, LOOKUP_TABLE_PROGRAM, 1n, data)] } : c.accounts(a)) };
+        };
+        // The transfer, its recipient from the table.
+        const message = pipe(
+            createTransactionMessage({ version: 0 }),
+            (m) => setTransactionMessageFeePayer(w.me, m),
+            (m) => setTransactionMessageLifetimeUsingBlockhash({ blockhash: blockhash(key(9)), lastValidBlockHeight: 0n }, m),
+            (m) => appendTransactionMessageInstruction(getTransferSolInstruction({ source: createNoopSigner(w.me), destination: key(2), amount: lamports(1_000_000n) }), m),
+            (m) => compressTransactionMessageUsingAddressLookupTables(m, { [TABLE]: [key(2)] }),
+        );
+        const tx = base64(new Uint8Array(getTransactionEncoder().encode(compileTransaction(message))));
+        for (let i = 0; i < 2; i++) result(await w.call('signTransaction', { account: w.me, chain: network, transactions: [tx] }));
+        return { kept, tables: read.filter((r) => r.includes(TABLE)).length };
+    };
+    assert.deepEqual(await signed('solana:mainnet'), { kept: new Map([[TABLE, [key(2)]]]), tables: 1 });
+    assert.deepEqual(await signed('solana:devnet'), { kept: new Map(), tables: 2 });
 });
 
 test('a connected site signs in with its account only; another site cannot learn which accounts Otus holds', async () => {

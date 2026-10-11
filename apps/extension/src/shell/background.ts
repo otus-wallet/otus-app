@@ -15,6 +15,7 @@ import { tokens } from '@otus-wallet/core/tokens.ts';
 import type { Approval, Life } from '@otus-wallet/core/view.ts';
 import { answerOf, approve, early, kept, type Answer } from './approvals.ts';
 import { keysCall, lock, LOCK_ALARM, locked, prune, shielded, sign } from './keys.ts';
+import { mainnetTables } from './tables.ts';
 import { own, serve, stakeOwn, swapOwn, takeBack } from './serve.ts';
 import { edited, load, update, type Edit, type State } from '@otus-wallet/core/state.ts';
 
@@ -30,6 +31,7 @@ const shell = {
     tokens: async (mints: string[]) => tokens(mints, rpcFor('solana:mainnet', (await load()).settings) === OTUS_RPC),
     now: Date.now,
     fast: throughSender,
+    tables: mainnetTables,
     settled: () => void chrome.storage.session.set({ settled: Date.now() }),
 };
 const PAGES = new URL(chrome.runtime.getURL('')).origin;

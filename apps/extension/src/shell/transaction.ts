@@ -111,7 +111,9 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     // Yours, and the addresses you keep: what lands with them is not someone else's.
     const { accounts, contacts, sent, settings } = await shell.load();
     const yours = { wallets: accounts.map((a) => a.address), contacts: new Map(contacts.map((c) => [c.address, c.label])), sent: Object.keys(sent) as Address[] };
-    const reviewing = Promise.all([review(bytes, { ...way.context, ...yours, wallet: account.address }, way.chain), way.blockhash]);
+    // Mainnet's lookup tables as kept, read only past what they held: on another network, one may start over.
+    const reading = way.cluster === 'solana:mainnet' && shell.tables ? { ...way.chain, tables: shell.tables } : way.chain;
+    const reviewing = Promise.all([review(bytes, { ...way.context, ...yours, wallet: account.address }, reading), way.blockhash]);
     reviewing.catch(() => {}); // heard below, once the cluster is confirmed
     await way.confirmed;
     const [reviewed, blockhash] = await reviewing;
@@ -125,7 +127,7 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     // the transaction's.
     const preparing = Promise.all([prepare(r, account.address, way.chain, way.context.own === true, bare, way.trade), idlTold(r, way.chain)]);
     preparing.catch(() => {}); // heard through `prepared`, below
-    const known = await squadsIn(r, way.chain).then(async (squads) => ({ ...(await tokenInfo(r, way, shell, mintsInside(squads))), squads }));
+    const known = await squadsIn(r, reading).then(async (squads) => ({ ...(await tokenInfo(r, way, shell, mintsInside(squads))), squads }));
     // A site's transaction tells nothing of its blockhash's age, and may come with little of its minute left (a Jupiter
     // order, about half): the network is asked instead, while the user decides.
     const away = way.cluster !== networkOf(settings); // for another network than the wallet shows: said in the window

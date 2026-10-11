@@ -8,7 +8,7 @@ import { STAKE_PROGRAM_ADDRESS } from '@solana-program/stake';
 import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
-import type { Chain } from '@otus-wallet/sdk/chain';
+import type { Chain, Tables } from '@otus-wallet/sdk/chain';
 import { gate } from '../gate.ts';
 import { intake, type Cluster, type Request } from '@otus-wallet/core/intake.ts';
 import { NO_KEY, Refused, type Reply } from '@otus-wallet/core/protocol.ts';
@@ -48,6 +48,7 @@ export type Shell = {
     tokens(mints: string[]): Promise<Map<string, TokenInfo | null>>; // names and prices, from Jupiter
     now(): number; // ms since 1970
     fast?(chain: Chain): Chain; // the chain a swap lands through: Helius Sender's, by Otus's server; without it, the chain itself
+    tables?: Tables; // mainnet's lookup tables, kept: read again only past what they held
     settled?(): void; // a transaction Otus signed landed, failed onchain, or went out unseen yet: Otus's pages read again what it changed
 };
 
