@@ -570,6 +570,15 @@ test('mainnet’s lookup tables are kept: read once, then only past what they he
     assert.deepEqual(await signed('solana:devnet'), { kept: new Map(), tables: 2 });
 });
 
+test('an RPC that cannot answer just now, or cannot be reached, is said so, not as a failure of Otus', async () => {
+    const behind = await wallet({ chain: { accounts: () => Promise.reject(getSolanaErrorFromJsonRpcError({ code: -32016, message: 'Minimum context slot has not been reached' })) } });
+    assert.deepEqual(await behind.call('signTransaction', { account: behind.me, transactions: [behind.transfer()] }), { ok: false, error: 'the RPC could not answer just now: try again' });
+    const offline = await wallet({ chain: { accounts: () => Promise.reject(new TypeError('Failed to fetch')) } });
+    assert.deepEqual(await offline.call('signTransaction', { account: offline.me, transactions: [offline.transfer()] }), { ok: false, error: "Otus couldn't reach the RPC" });
+    const broken = await wallet({ chain: { accounts: () => Promise.reject(new TypeError("Cannot read properties of undefined (reading 'x')")) } });
+    assert.deepEqual(await broken.call('signTransaction', { account: broken.me, transactions: [broken.transfer()] }), { ok: false, error: 'Otus could not handle this request' }); // a fault of Otus's own stays one
+});
+
 test('a connected site signs in with its account only; another site cannot learn which accounts Otus holds', async () => {
     const w = await wallet();
     assert.deepEqual(await w.call('signIn', { address: key(5) }), { ok: false, error: 'that account is not connected to this site' });

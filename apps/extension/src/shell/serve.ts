@@ -1,7 +1,23 @@
 // What the background answers: sites' requests, and the transfers made in Otus's own popup, and what it makes there to
 // take access back. Each is checked, shown to the user and, once approved, signed with state as it is then. A reply
 // never throws.
-import { createAddressWithSeed, getBase58Decoder, getBase64Decoder, getPublicKeyFromAddress, getTransactionDecoder, isAddress, isSolanaError, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, verifySignature, type Address, type Signature, type SignatureBytes } from '@solana/kit';
+import {
+    createAddressWithSeed,
+    getBase58Decoder,
+    getBase64Decoder,
+    getPublicKeyFromAddress,
+    getTransactionDecoder,
+    isAddress,
+    isSolanaError,
+    SOLANA_ERROR__JSON_RPC__INTERNAL_ERROR,
+    SOLANA_ERROR__JSON_RPC__SERVER_ERROR_MIN_CONTEXT_SLOT_NOT_REACHED,
+    SOLANA_ERROR__JSON_RPC__SERVER_ERROR_NODE_UNHEALTHY,
+    SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
+    verifySignature,
+    type Address,
+    type Signature,
+    type SignatureBytes,
+} from '@solana/kit';
 
 import { COMPUTE_BUDGET_PROGRAM_ADDRESS } from '@solana-program/compute-budget';
 import { STAKE_PROGRAM_ADDRESS } from '@solana-program/stake';
@@ -487,6 +503,10 @@ function told(e: unknown): string | null {
     if (e instanceof Refused) return e.message;
     if (isSolanaError(e, SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR)) return `the RPC refused Otus's request (HTTP ${e.context.statusCode})`;
     if (timedOut(e)) return 'the RPC did not answer in time';
+    // Behind the network, or failing inside: a moment later it answers.
+    const busy = [SOLANA_ERROR__JSON_RPC__SERVER_ERROR_MIN_CONTEXT_SLOT_NOT_REACHED, SOLANA_ERROR__JSON_RPC__SERVER_ERROR_NODE_UNHEALTHY, SOLANA_ERROR__JSON_RPC__INTERNAL_ERROR] as const;
+    if (busy.some((code) => isSolanaError(e, code))) return 'the RPC could not answer just now: try again';
+    if (e instanceof TypeError && /fetch/i.test(e.message)) return "Otus couldn't reach the RPC";
     return null;
 }
 
