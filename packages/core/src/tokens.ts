@@ -27,27 +27,29 @@ const looked = new Map<string, TokenInfo | null>(); // null: Jupiter does not kn
 const asked = new Map<string, Promise<void>>(); // mints asked, until Jupiter answers
 
 /** What Jupiter says of these mints, through Otus's server or not; an empty answer for those it does not know, or
- *  when it does not answer. A mint asked already, and not answered yet, is waited for rather than asked again. */
+ *  when it does not answer. A mint asked already, and not answered yet, is waited for rather than asked again: its own
+ *  search, not the others asked with it. */
 export async function tokens(mints: string[], throughOtus: boolean): Promise<Map<string, TokenInfo | null>> {
     const wanted = [...new Set(mints)];
     const asking = wanted.filter((m) => !looked.has(m) && !asked.has(m));
-    if (asking.length > 0) {
-        const answer = ask(asking, throughOtus).finally(() => asking.forEach((m) => asked.delete(m)));
-        asking.forEach((m) => asked.set(m, answer));
+    let before: Promise<void> = Promise.resolve(); // one search after another
+    for (let i = 0; i < asking.length; i += PER_SEARCH) {
+        const batch = asking.slice(i, i + PER_SEARCH);
+        before = before.then(() => ask(batch, throughOtus));
+        const answer = before.finally(() => batch.forEach((m) => asked.delete(m)));
+        batch.forEach((m) => asked.set(m, answer));
     }
     await Promise.all(wanted.map((m) => asked.get(m)));
     return new Map(wanted.map((m) => [m, looked.get(m) ?? null]));
 }
 
-async function ask(mints: string[], throughOtus: boolean): Promise<void> {
+// One search; what it does not answer stays unknown, and is asked again next time.
+async function ask(batch: string[], throughOtus: boolean): Promise<void> {
     try {
-        for (let i = 0; i < mints.length; i += PER_SEARCH) {
-            const batch = mints.slice(i, i + PER_SEARCH);
-            const response = await fetch(`${throughOtus ? THROUGH_OTUS : JUPITER}?query=${batch.join(',')}`, { method: methodFor(throughOtus), credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(WAIT) });
-            if (!response.ok) throw new Error(`Jupiter answered ${response.status}`);
-            const found = new Map((await response.json() as unknown[]).flatMap((t) => (info(t) ? [[info(t)!.id, served(info(t)!, throughOtus)] as const] : [])));
-            for (const m of batch) looked.set(m, found.get(m) ?? null);
-        }
+        const response = await fetch(`${throughOtus ? THROUGH_OTUS : JUPITER}?query=${batch.join(',')}`, { method: methodFor(throughOtus), credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(WAIT) });
+        if (!response.ok) throw new Error(`Jupiter answered ${response.status}`);
+        const found = new Map((await response.json() as unknown[]).flatMap((t) => (info(t) ? [[info(t)!.id, served(info(t)!, throughOtus)] as const] : [])));
+        for (const m of batch) looked.set(m, found.get(m) ?? null);
     } catch {} // no names or prices beats no balances
 }
 

@@ -32,8 +32,12 @@ test('a mint asked while another lookup asks it waits for that answer, not askin
     t.mock.method(globalThis, 'fetch', (url: string) => (asked.push(new URL(url).searchParams.get('query') ?? ''), new Promise<Response>((done) => answers.push(done))));
     const early = tokens([key(70)], true);
     const later = tokens([key(70), key(71)], true);
-    answers[0](new Response(JSON.stringify([{ id: key(70), name: 'Early', symbol: 'ERL', isVerified: false }])));
+    await new Promise((done) => setImmediate(done));
+    // Its own mint answered, the later lookup still waits for the one the early lookup asks.
     answers[1](new Response('[]'));
+    await new Promise((done) => setImmediate(done));
+    assert.equal(await Promise.race([later.then(() => 'answered'), Promise.resolve('waiting')]), 'waiting');
+    answers[0](new Response(JSON.stringify([{ id: key(70), name: 'Early', symbol: 'ERL', isVerified: false }])));
     assert.equal((await early).get(key(70))?.symbol, 'ERL');
     assert.deepEqual([...(await later)].map(([m, i]) => [m, i?.symbol ?? null]), [[key(70), 'ERL'], [key(71), null]]);
     assert.deepEqual(asked, [key(70), key(71)] as string[]);
@@ -41,6 +45,21 @@ test('a mint asked while another lookup asks it waits for that answer, not askin
     assert.equal((await tokens([key(72)], true)).get(key(72)), null);
     await tokens([key(72)], true);
     assert.deepEqual(asked.slice(2), [key(72), key(72)]);
+});
+
+test('a mint waits only for its own search: one asked in the first of two is answered before the second is', async (t) => {
+    const many = Array.from({ length: 101 }, (_, i) => `${key(73).slice(0, -4)}${String(i).padStart(4, 'A')}`).map((m) => m.replace(/[0OIl]/g, 'A'));
+    const answers: ((r: Response) => void)[] = [];
+    t.mock.method(globalThis, 'fetch', () => new Promise<Response>((done) => answers.push(done)));
+    const all = tokens(many, true);
+    const first = tokens([many[0]], true);
+    await new Promise((done) => setImmediate(done));
+    answers[0](new Response('[]'));
+    await new Promise((done) => setImmediate(done));
+    assert.equal(answers.length, 2); // the second search, once the first is answered
+    assert.equal(await Promise.race([first.then(() => 'answered'), new Promise((done) => setImmediate(() => done('waiting')))]), 'answered');
+    answers[1](new Response('[]'));
+    assert.equal((await all).size, 101);
 });
 
 test('a token named as a well-known one at another address is never verified, whatever Jupiter says; the real one is', async (t) => {
