@@ -32,7 +32,7 @@ import { cap } from '@otus-wallet/sdk/format';
 import { decode } from '@otus-wallet/sdk/review/decode';
 import { siteFindings } from '@otus-wallet/sdk/review/assess';
 import { messageFindings } from '@otus-wallet/sdk/review/message';
-import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
+import { NOTHING_TO_HOLD, SIMULATION_FAILED, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Review } from '@otus-wallet/sdk/review/review';
 import { programsCalled } from '@otus-wallet/sdk/review/sites';
 import { delegatesGiven, waitingOn } from '@otus-wallet/sdk/access/access';
@@ -43,7 +43,7 @@ import { STAKE_SPACE } from '@otus-wallet/core/send/stake.ts';
 import { SENDER_TIPS, TIP } from '@otus-wallet/core/swap/build.ts';
 import { JUPITER } from '@otus-wallet/core/swap/route.ts';
 import { termsOf, type Asked } from '@otus-wallet/core/swap/terms.ts';
-import { explorerOf, networkOf, rpcFor } from '@otus-wallet/core/settings.ts';
+import { explorerOf, networkOf, OTUS_RPC, rpcFor } from '@otus-wallet/core/settings.ts';
 import { signInFields, signInText } from '../siws.ts';
 import type { TokenInfo } from '@otus-wallet/core/tokens.ts';
 import { accountView, siteView, type Approval, type Life, type Line, type Outcome, type SiteView } from '@otus-wallet/core/view.ts';
@@ -193,14 +193,18 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
             return approved(bytes, account, way, asking, () => {}, outcome.follow).then((d) => ({ ...d, chain, cluster }));
         };
         // Reviewed on the network the site names, or the wallet shows, while that is checked to be the transaction's;
-        // on the one it is, when it is another.
+        // on the one it is, when it is another. Only where it goes anyway: the network named, or the wallet's own
+        // endpoint (Otus's server, or yours); not a public one the transaction may not be for.
         const guess = request.chain ?? networkOf(state.settings);
         const chain = shell.chain(rpcFor(guess, state.settings));
         const checked = clusterOf(bytes, request.chain, state.settings, shell);
-        const deciding = reviewed(guess, chain, checked.then((found) => found.cluster === guess || Promise.reject(new Elsewhere(found)))).catch((e: unknown) => {
-            if (!(e instanceof Elsewhere)) throw e;
-            return reviewed(e.found.cluster, e.found.chain);
-        });
+        const ahead = request.chain !== null || [OTUS_RPC, state.settings.rpc].includes(rpcFor(guess, state.settings));
+        const deciding = ahead
+            ? reviewed(guess, chain, checked.then((found) => found.cluster === guess || Promise.reject(new Elsewhere(found)))).catch((e: unknown) => {
+                  if (!(e instanceof Elsewhere)) throw e;
+                  return reviewed(e.found.cluster, e.found.chain);
+              })
+            : checked.then((found) => reviewed(found.cluster, found.chain));
         // A no while it is reviewed ends the request at once: the review is left to end on its own.
         deciding.catch(() => {});
         decided = await (window ? Promise.race([deciding, window.no.then(() => Promise.reject(new Rejected()))]) : deciding);
@@ -359,8 +363,8 @@ export function swapOwn(bytes: Uint8Array, address: string, asked: Asked, shell:
             // Unguarded, a swap would rest on the route's own least alone: never signed so. One that fails as it is now
             // (more than you hold, a price gone) says so.
             const ready = (p: Prepared) => {
-                if (p.unguarded === 'the simulation failed') throw new Refused('the swap would fail as it is now (check what you hold, and quote it again), so nothing was sent');
-                if (p.unguarded !== null || p.holds.length === 0) throw new Refused(`${p.unguarded === null || p.unguarded === 'nothing of yours to hold' ? 'Otus found nothing of yours to guard in this swap' : p.unguarded}, so nothing was sent`);
+                if (p.unguarded === SIMULATION_FAILED) throw new Refused('the swap would fail as it is now (check what you hold, and quote it again), so nothing was sent');
+                if (p.unguarded !== null || p.holds.length === 0) throw new Refused(`${p.unguarded === null || p.unguarded === NOTHING_TO_HOLD ? 'Otus found nothing of yours to guard in this swap' : p.unguarded}, so nothing was sent`);
             };
             const { r, p, signature: signedOnDevice } = await approved(bytes, account, way, shell, checks, undefined, ready);
             if (!(signedOnDevice && onDevice(account))) await unexpired(r, chain);

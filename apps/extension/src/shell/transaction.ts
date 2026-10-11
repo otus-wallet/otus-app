@@ -36,7 +36,7 @@ import { notice, squadsTold, type Inside, type ProposalTold } from '@otus-wallet
 import { SQUADS_V4 } from '@otus-wallet/sdk/programs/squads';
 import { prepare, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Sent } from '@otus-wallet/core/send/send.ts';
-import { networkOf, rpcFor, type Settings } from '@otus-wallet/core/settings.ts';
+import { networkOf, OTUS_RPC, rpcFor, type Settings } from '@otus-wallet/core/settings.ts';
 import { accountView, describe, LEDGER_CLEAR, type Known, type Life, type Outcome, type Signer, type SiteView, type TransactionView } from '@otus-wallet/core/view.ts';
 import type { Answer } from './approvals.ts';
 import type { Shell } from './serve.ts';
@@ -112,8 +112,10 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     // Yours, and the addresses you keep: what lands with them is not someone else's.
     const { accounts, contacts, sent, settings } = way.kept ?? (await shell.load());
     const yours = { wallets: accounts.map((a) => a.address), contacts: new Map(contacts.map((c) => [c.address, c.label])), sent: Object.keys(sent) as Address[] };
-    // Mainnet's lookup tables as kept, read only past what they held: on another network, one may start over.
-    const reading = way.cluster === 'solana:mainnet' && shell.tables ? { ...way.chain, tables: shell.tables } : way.chain;
+    // Mainnet's lookup tables as kept, read only past what they held, as Otus's server reads them: another network may
+    // start over, and an endpoint of your own may say it is mainnet when it is not.
+    const tables = way.cluster === 'solana:mainnet' && rpcFor('solana:mainnet', settings) === OTUS_RPC ? shell.tables : undefined;
+    const reading = tables ? { ...way.chain, tables } : way.chain;
     const reviewing = Promise.all([review(bytes, { ...way.context, ...yours, wallet: account.address }, reading), way.blockhash]);
     reviewing.catch(() => {}); // heard below, once the cluster is confirmed
     await way.confirmed;

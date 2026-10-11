@@ -138,7 +138,8 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
             early: (first: Approval) => {
                 const window: (typeof opened)[number] = { first, at: performance.now(), closed: false };
                 opened.push(window);
-                return { approve: asking, no: o.early === 'no' ? Promise.resolve() : new Promise<void>(() => {}), close: (why) => void (window.closed = why ?? true) };
+                // Said no at once, as the real window, it answers no to what comes after.
+                return { approve: o.early === 'no' ? async () => false : asking, no: o.early === 'no' ? Promise.resolve() : new Promise<void>(() => {}), close: (why) => void (window.closed = why ?? true) };
             },
         }),
     };
@@ -577,6 +578,39 @@ test('an RPC that cannot answer just now, or cannot be reached, is said so, not 
     assert.deepEqual(await offline.call('signTransaction', { account: offline.me, transactions: [offline.transfer()] }), { ok: false, error: "Otus couldn't reach the RPC" });
     const broken = await wallet({ chain: { accounts: () => Promise.reject(new TypeError("Cannot read properties of undefined (reading 'x')")) } });
     assert.deepEqual(await broken.call('signTransaction', { account: broken.me, transactions: [broken.transfer()] }), { ok: false, error: 'Otus could not handle this request' }); // a fault of Otus's own stays one
+});
+
+test('kept lookup tables serve only mainnet as Otus’s server reads it; a public endpoint is never reviewed on ahead', async () => {
+    // Mainnet through an endpoint of your own: its tables are not taken from what Otus's server gave.
+    const MINE = 'https://mine.example/';
+    const own = await wallet({ validOn: [MINE] });
+    own.box.state = { ...own.box.state, settings: { ...DEFAULT_SETTINGS, network: 'custom', rpc: MINE, custom: 'solana:mainnet' } };
+    let used = 0;
+    own.shell.tables = { get: async () => (used++, undefined), set: () => void used++ };
+    result(await own.call('signTransaction', { account: own.me, transactions: [own.transfer()] }));
+    assert.equal(used, 0);
+    // The wallet on devnet's public endpoint, a transaction for mainnet that names no network: devnet is asked only
+    // whether its blockhash is its own, never to read or simulate it.
+    const devnet = await wallet({ validOn: [OTUS_RPC] });
+    devnet.box.state = { ...devnet.box.state, settings: { ...DEFAULT_SETTINGS, network: 'devnet' } };
+    const reads: string[] = [];
+    const chain = devnet.shell.chain;
+    devnet.shell.chain = (rpc) => {
+        const c = chain(rpc);
+        return { ...c, accounts: (a) => (reads.push(rpc), c.accounts(a)), simulate: (...args) => (reads.push(rpc), c.simulate(...args)) };
+    };
+    result(await devnet.call('signTransaction', { account: devnet.me, transactions: [devnet.transfer()] }));
+    assert.ok(reads.length > 0 && reads.every((rpc) => rpc === OTUS_RPC), reads.join());
+});
+
+test('a refusal of the review on the network guessed reaches the site once it is confirmed; a no then signs nothing', async () => {
+    const refused = await wallet({ chain: { accounts: () => Promise.reject(new Refused('an account appears twice')) } });
+    assert.deepEqual(await refused.call('signTransaction', { account: refused.me, chain: 'solana:mainnet', transactions: [refused.transfer()] }), { ok: false, error: 'an account appears twice' });
+    // Said no while it is reviewed on mainnet, for a transaction that is devnet's: nothing asked, nothing signed.
+    const no = await wallet({ early: 'no', validOn: ['https://api.devnet.solana.com'] });
+    assert.equal((await no.call('signTransaction', { account: no.me, transactions: [no.transfer()] })).ok, false);
+    await new Promise((done) => setTimeout(done, 50)); // the review left to end on its own
+    assert.deepEqual([no.approvals.length, no.box.state.sites[ORIGIN].signatures, no.box.state.signedHere[no.me]], [0, 0, undefined]);
 });
 
 test('a connected site signs in with its account only; another site cannot learn which accounts Otus holds', async () => {

@@ -195,4 +195,23 @@ test('a worker keeps what Jupiter said a while: woken again, a fresh answer is n
     await three.keepTokens();
     await three.tokens([key(80), key(81), key(83), key(84)], true);
     assert.deepEqual(asked.at(-1)?.split(',').sort(), [key(80), key(81), key(83)].sort()); // key(84): fresh, unknown to Jupiter
+    // Dated ahead, or kept from a search the other way (straight to Jupiter, so its icon is not through Otus's): asked.
+    session.tokens = [[key(85), null, Date.now() + 60_000, true], [key(86), null, Date.now(), false]];
+    const four = await worker(4);
+    await four.keepTokens();
+    await four.tokens([key(85), key(86)], true);
+    assert.deepEqual(asked.at(-1)?.split(',').sort(), [key(85), key(86)].sort());
+});
+
+test('what is kept of an answer is what is read of it: words cut as read, numbers only, no long icon address', async (t) => {
+    const huge = { id: key(90), name: 'N'.repeat(5000), symbol: 'S\u0000YM', icon: `https://example.com/${'x'.repeat(5000)}`, isVerified: true, usdPrice: { nested: 'x'.repeat(5000) }, extra: 'y'.repeat(5000) };
+    t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify([huge])));
+    const worker = (await import(`../src/tokens.ts?worker=${'trim'}`)) as typeof import('../src/tokens.ts');
+    await worker.keepTokens();
+    await worker.tokens([key(90)], true);
+    await new Promise((done) => setImmediate(done));
+    const { platform } = await import('../src/platform.ts');
+    const [, said] = ((await platform.storage.session.get('tokens')).tokens as [string, Record<string, unknown>][]).find(([m]) => m === key(90))!;
+    assert.deepEqual([(said.name as string).length, said.symbol, said.icon, said.usdPrice, 'extra' in said], [40, 'SYM', null, null, false]);
+    assert.ok(JSON.stringify(said).length < 600);
 });

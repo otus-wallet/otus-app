@@ -35,27 +35,36 @@ const MOST_KEPT = 300; // answers kept: the latest
 type Kept = [mint: string, said: unknown, at: number, throughOtus: boolean];
 let kept: Kept[] | null = null; // null: nothing kept
 let restored: Promise<void> = Promise.resolve();
+let clock = Date.now;
+const fresh = (at: number) => clock() - at >= 0 && clock() - at < FRESH;
 
 /** Keeps what Jupiter says of mints for a while, in session storage, and takes back what was kept fresh before: for a
- *  worker, which starts over each time it wakes. `now`: ms. */
+ *  worker, which starts over each time it wakes. Each answer is used only the way it was asked, through Otus's server
+ *  or not, as an icon's host learns who looks otherwise. `now`: ms. */
 export function keepTokens(now = Date.now): Promise<void> {
-    kept = [];
+    [kept, clock] = [[], now];
     restored = platform.storage.session.get(KEPT).then(
         (stored) => {
             const list = Array.isArray(stored[KEPT]) ? (stored[KEPT] as unknown[]) : [];
             for (const entry of list) {
                 if (!Array.isArray(entry) || entry.length !== 4) continue;
                 const [mint, said, at, throughOtus] = entry as Kept;
-                if (typeof mint !== 'string' || !isAddress(mint) || typeof at !== 'number' || !(now() - at < FRESH) || typeof throughOtus !== 'boolean') continue;
-                const t = said === null ? null : info(said);
-                if (said !== null && t?.id !== mint) continue; // not an answer for this mint
+                if (typeof mint !== 'string' || !isAddress(mint) || typeof at !== 'number' || !fresh(at) || typeof throughOtus !== 'boolean') continue;
+                if (said !== null && info(said)?.id !== mint) continue; // not an answer for this mint
                 kept!.push([mint, said, at, throughOtus]);
-                if (!looked.has(mint)) looked.set(mint, t && served(t, throughOtus));
             }
         },
         () => {}, // nothing kept: asked again
     );
     return restored;
+}
+
+// What was kept of these mints, asked this way and fresh still, known again: not asked.
+function fromKept(mints: string[], throughOtus: boolean) {
+    for (const [mint, said, at, through] of kept ?? []) {
+        if (through !== throughOtus || !fresh(at) || looked.has(mint) || !mints.includes(mint)) continue;
+        looked.set(mint, said === null ? null : served(info(said)!, throughOtus));
+    }
 }
 
 /** What Jupiter says of these mints, through Otus's server or not; an empty answer for those it does not know, or
@@ -64,6 +73,7 @@ export function keepTokens(now = Date.now): Promise<void> {
 export async function tokens(mints: string[], throughOtus: boolean): Promise<Map<string, TokenInfo | null>> {
     await restored;
     const wanted = [...new Set(mints)];
+    fromKept(wanted, throughOtus);
     const asking = wanted.filter((m) => !looked.has(m) && !asked.has(m));
     let before: Promise<void> = Promise.resolve(); // one search after another
     for (let i = 0; i < asking.length; i += PER_SEARCH) {
@@ -83,8 +93,33 @@ async function ask(batch: string[], throughOtus: boolean): Promise<void> {
         if (!response.ok) throw new Error(`Jupiter answered ${response.status}`);
         const said = new Map((await response.json() as unknown[]).flatMap((t) => (info(t) ? [[info(t)!.id, t] as const] : [])));
         for (const m of batch) looked.set(m, said.has(m) ? served(info(said.get(m))!, throughOtus) : null);
-        if (kept) keep(batch.map((m): Kept => [m, said.get(m) ?? null, Date.now(), throughOtus]));
+        if (kept) keep(batch.map((m): Kept => [m, said.has(m) ? trimmed(said.get(m)) : null, clock(), throughOtus]));
     } catch {} // no names or prices beats no balances
+}
+
+// What is kept of an answer: the fields `info` reads, its words as it reads them, its numbers only when numbers, and an
+// icon's address only when short; a maker's long strings never fill the storage the wallet's key shares.
+function trimmed(t: unknown): object {
+    const v = t as { id?: unknown; name?: unknown; symbol?: unknown; icon?: unknown; isVerified?: unknown; usdPrice?: unknown; decimals?: unknown; stats24h?: { priceChange?: unknown }; totalSupply?: unknown; circSupply?: unknown; mcap?: unknown; holderCount?: unknown; liquidity?: unknown; audit?: { topHoldersPercentage?: unknown }; firstPool?: { createdAt?: unknown } };
+    const n = (x: unknown) => (typeof x === 'number' ? x : null);
+    const created = v.firstPool?.createdAt;
+    return {
+        id: v.id,
+        name: clean(v.name),
+        symbol: clean(v.symbol),
+        icon: typeof v.icon === 'string' && v.icon.length <= 512 ? v.icon : null,
+        isVerified: v.isVerified === true,
+        usdPrice: n(v.usdPrice),
+        decimals: n(v.decimals),
+        stats24h: { priceChange: n(v.stats24h?.priceChange) },
+        totalSupply: n(v.totalSupply),
+        circSupply: n(v.circSupply),
+        mcap: n(v.mcap),
+        holderCount: n(v.holderCount),
+        liquidity: n(v.liquidity),
+        audit: { topHoldersPercentage: n(v.audit?.topHoldersPercentage) },
+        firstPool: { createdAt: typeof created === 'string' ? created.slice(0, 64) : null },
+    };
 }
 
 // Answers kept, the latest last, in place of any kept before for the same mints.

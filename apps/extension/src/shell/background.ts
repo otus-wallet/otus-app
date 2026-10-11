@@ -21,7 +21,6 @@ import { edited, load, update, type Edit, type State } from '@otus-wallet/core/s
 
 void keepTokens(); // what Jupiter said of tokens, kept while the worker sleeps
 const WARM_EVERY = 60_000; // ms
-let warmed = 0;
 const shell = {
     load,
     update,
@@ -35,14 +34,15 @@ const shell = {
     now: Date.now,
     fast: throughSender,
     tables: mainnetTables,
-    // At most once a minute: what the request reads is the blockhash, which tells nothing of the site.
-    warm: () => {
-        if (Date.now() - warmed < WARM_EVERY) return;
-        warmed = Date.now();
-        void load()
-            .then(({ settings }) => rpcChain(rpcAt(walletRpc(settings))).latest())
-            .catch(() => {});
-    },
+    // At most once a minute, the worker asleep or not, and not while Otus is locked: what the request reads is a
+    // blockhash, which tells nothing of the site.
+    warm: () =>
+        void (async () => {
+            const { warmed } = await chrome.storage.session.get('warmed');
+            if ((typeof warmed === 'number' && Date.now() - warmed < WARM_EVERY) || (await locked())) return;
+            await chrome.storage.session.set({ warmed: Date.now() });
+            await rpcChain(rpcAt(walletRpc((await load()).settings))).latest();
+        })().catch(() => {}),
     settled: () => void chrome.storage.session.set({ settled: Date.now() }),
 };
 const PAGES = new URL(chrome.runtime.getURL('')).origin;

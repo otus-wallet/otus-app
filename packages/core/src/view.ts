@@ -9,7 +9,7 @@ import { described, lookalikes, ranked, type Finding, type Level, type Tone, typ
 import type { Effect } from '@otus-wallet/sdk/review/effects';
 import type { Review } from '@otus-wallet/sdk/review/review';
 import { lookalike } from '@otus-wallet/sdk/review/sites';
-import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
+import { NOTHING_TO_HOLD, SIMULATION_FAILED, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { ProposalTold } from '@otus-wallet/sdk/review/squads';
 import type { Account, Site } from './state.ts';
 import type { TokenInfo } from './tokens.ts';
@@ -196,7 +196,7 @@ function summary(verdict: Verdict, findings: Finding[]): Pick<TransactionView, '
 export const LEDGER_CLEAR = 'its Ledger shows it in clear';
 
 // Why Otus left a transaction as it came that go without saying: nothing to hold, or a failure the verdict says already.
-const UNSAID = new Set(['nothing of yours to hold', 'the simulation failed']);
+const UNSAID = new Set([NOTHING_TO_HOLD, SIMULATION_FAILED]);
 
 // Whether guards hold the outcome, in words. Left as it came (no limits set either), why, unless it goes without
 // saying; one Otus set limits on and needs none (its own that only takes access back, a transfer a Ledger shows in
