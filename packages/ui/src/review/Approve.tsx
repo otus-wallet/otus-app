@@ -12,7 +12,7 @@ import { short } from '../dom.ts';
 import type { AccountView, Approval, Life, Line, TransactionView } from '@otus-wallet/core/view.ts';
 import { Answer, Block, Frame, Heading, Left, Notice, Steps, useArmed, useNow, WATCH_ONLY } from './Frame.tsx';
 import { OnLedger } from './Ledger.tsx';
-import { Ack, Balances, CopyTransaction, Programs, Verdict } from './Transaction.tsx';
+import { Ack, Balances, CopyTransaction, Findings, Programs, Verdict } from './Transaction.tsx';
 import { cn } from '../lib/cn.ts';
 import { filled, MARK } from './tone.ts';
 
@@ -98,6 +98,7 @@ function Single({ a, answers: { answer } }: { a: Exclude<Approval, TransactionVi
                         <p>{`${a.site.host} asks to see this account.`}</p>
                     </Block>
                     <Rights rights={CONNECT_RIGHTS} />
+                    {a.findings.length > 0 && <Findings lines={a.findings} />}
                     {watched && <Notice>{WATCH_ONLY_CONNECT}</Notice>}
                 </>
             ) : a.kind === 'message' ? (
@@ -112,17 +113,20 @@ function Single({ a, answers: { answer } }: { a: Exclude<Approval, TransactionVi
                     {risky && signer !== 'none' && signer !== 'ledger' && <Ack ack={ack} onAck={setAck} />}
                 </>
             ) : (
-                <Block>
-                    <Heading>Sign in</Heading>
-                    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
-                        {a.fields.map(([k, v]) => (
-                            <div key={k} className="contents">
-                                <dt className="text-ink-3">{k}</dt>
-                                <dd className="m-0 [overflow-wrap:anywhere] whitespace-pre-wrap">{v}</dd>
-                            </div>
-                        ))}
-                    </dl>
-                </Block>
+                <>
+                    <Block>
+                        <Heading>Sign in</Heading>
+                        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
+                            {a.fields.map(([k, v]) => (
+                                <div key={k} className="contents">
+                                    <dt className="text-ink-3">{k}</dt>
+                                    <dd className="m-0 [overflow-wrap:anywhere] whitespace-pre-wrap">{v}</dd>
+                                </div>
+                            ))}
+                        </dl>
+                    </Block>
+                    {a.findings.length > 0 && <Findings lines={a.findings} />}
+                </>
             )}
             {signer === 'none' && <Notice>{WATCH_ONLY}</Notice>}
             {signs && signer === 'ledger' && <Notice>A Ledger signs transactions only, not messages like this one.</Notice>}

@@ -80,6 +80,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
             given: [],
             signedHere: {},
             outside: {},
+            disconnected: {},
             settings: DEFAULT_SETTINGS,
         } as State,
     };
@@ -573,6 +574,55 @@ test('connecting silently answers only a site connected already; disconnecting f
     assert.equal(w.approvals.length, 0);
     assert.equal(result(await w.call('disconnect', {})), null);
     assert.deepEqual(w.box.state.sites, {});
+});
+
+test('connecting, a site is told by its host from the first visit, and known again once it was disconnected', async () => {
+    const w = await wallet();
+    const lines = (a: Approval | undefined) => (a?.kind === 'connect' || a?.kind === 'signIn' ? a.findings.map((f) => `${f.tone}:${f.title}`) : null);
+    result(await w.call('connect', {}, 'https://claim.vercel.app'));
+    assert.deepEqual(lines(w.approvals.at(-1)), ['warn:Hosted on vercel.app', 'warn:New site']);
+    result(await w.call('connect', {}, 'https://jup-claim.app'));
+    assert.deepEqual(lines(w.approvals.at(-1)), ['warn:This site looks like jup.ag', 'warn:New site']);
+    // jup.ag, first signed for two days ago: disconnected, its past is kept, and it connects again as known, with it.
+    const past = { since: NOW / 1000 - 2 * 86_400, programs: [key(50)] };
+    w.box.state = { ...w.box.state, sites: { [ORIGIN]: { account: w.me, signatures: 7, ...past } } };
+    assert.equal(result(await w.call('disconnect', {})), null);
+    assert.deepEqual([w.box.state.sites[ORIGIN], w.box.state.disconnected[ORIGIN]], [undefined, past]);
+    result(await w.call('connect', {}));
+    assert.deepEqual(lines(w.approvals.at(-1)), ['ok:Known site']);
+    assert.deepEqual([w.box.state.sites[ORIGIN], w.box.state.disconnected[ORIGIN]], [{ account: w.me, signatures: 0, ...past }, undefined]);
+    // Its first transaction since is not a first one.
+    result(await w.call('signTransaction', { account: w.me, transactions: [w.transfer()] }));
+    const shown = w.approvals.at(-1);
+    assert.ok(shown?.kind === 'transaction' && shown.findings.some((f) => f.title === 'Known site') && !shown.findings.some((f) => f.title === 'First transaction for this site'));
+    // Signed for a few hours ago, and disconnected: new still, since then.
+    w.box.state = { ...w.box.state, sites: {}, disconnected: { [ORIGIN]: { since: NOW / 1000 - 3 * 3_600 } } };
+    result(await w.call('connect', {}));
+    assert.deepEqual(w.approvals.at(-1)?.kind === 'connect' && w.approvals.at(-1)?.findings, [{ tone: 'notice', title: 'New site', note: 'You first signed a transaction for it 3 hours ago' }]);
+});
+
+test('signing in connects a site with what was kept of it, told as connecting is; a connected one, as before', async () => {
+    const w = await wallet();
+    const input = { statement: 'Sign in', uri: ORIGIN, version: '1', nonce: 'abc12345', issuedAt: '2026-10-03T12:00:00Z' };
+    result(await w.call('signIn', input));
+    assert.deepEqual(w.approvals.at(-1)?.kind === 'signIn' && w.approvals.at(-1)?.findings, []); // connected already
+    const since = NOW / 1000 - 2 * 86_400;
+    w.box.state = { ...w.box.state, sites: {}, disconnected: { [ORIGIN]: { since } } };
+    result(await w.call('signIn', input));
+    const shown = w.approvals.at(-1);
+    assert.deepEqual(shown?.kind === 'signIn' && shown.findings.map((f) => f.title), ['Known site']);
+    assert.deepEqual([w.box.state.sites[ORIGIN], w.box.state.disconnected], [{ account: w.me, signatures: 1, since }, {}]);
+});
+
+test('a site disconnected with nothing to keep keeps nothing; at most 200 are kept, the latest', async () => {
+    const w = await wallet();
+    assert.equal(result(await w.call('disconnect', {})), null); // connected, never signed for
+    assert.deepEqual(w.box.state.disconnected, {});
+    const many = Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`https://site${i}.app`, { since: i }]));
+    w.box.state = { ...w.box.state, sites: { [ORIGIN]: { account: w.me, signatures: 1, since: 999 } }, disconnected: many };
+    result(await w.call('disconnect', {}));
+    const kept = Object.keys(w.box.state.disconnected);
+    assert.deepEqual([kept.length, kept[0], kept.at(-1)], [200, 'https://site1.app', ORIGIN]);
 });
 
 test('a message is shown as text with what is invisible marked, or as hex; signing it counts for the site', async () => {

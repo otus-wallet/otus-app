@@ -14,6 +14,7 @@ import { intake, type Cluster, type Request } from '@otus-wallet/core/intake.ts'
 import { NO_KEY, Refused, type Reply } from '@otus-wallet/core/protocol.ts';
 import { cap } from '@otus-wallet/sdk/format';
 import { decode } from '@otus-wallet/sdk/review/decode';
+import { siteFindings } from '@otus-wallet/sdk/review/assess';
 import { messageFindings } from '@otus-wallet/sdk/review/message';
 import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Review } from '@otus-wallet/sdk/review/review';
@@ -29,9 +30,9 @@ import { termsOf, type Asked } from '@otus-wallet/core/swap/terms.ts';
 import { explorerOf, networkOf, rpcFor } from '@otus-wallet/core/settings.ts';
 import { signInFields, signInText } from '../siws.ts';
 import type { TokenInfo } from '@otus-wallet/core/tokens.ts';
-import { accountView, siteView, type Approval, type Life, type Outcome, type SiteView } from '@otus-wallet/core/view.ts';
+import { accountView, siteView, type Approval, type Life, type Line, type Outcome, type SiteView } from '@otus-wallet/core/view.ts';
 import type { Answer } from './approvals.ts';
-import { MAX_SIGNED_HERE, onDevice, sentTo, signs, type Account, type State } from '@otus-wallet/core/state.ts';
+import { connectSite, disconnectSite, MAX_SIGNED_HERE, onDevice, sentTo, signs, type Account, type State } from '@otus-wallet/core/state.ts';
 import { approved, channel, clusterOf, followed, landed, messageOf, Rejected, settled, signerOf, unexpired, withSignature } from './transaction.ts';
 
 /** What serve needs from the extension: its state, the user's answer (behind Otus's lock), the keystore, the network
@@ -88,17 +89,15 @@ async function handle(request: Request, state: State, shell: Shell): Promise<unk
             const active = need(accountOf(state, state.active), NO_ACCOUNT);
             const choices = state.accounts.filter(signs);
             if (!choices.length) throw new Refused(NO_SIGNER);
-            const answer = await shell.approve({ kind: 'connect', site: siteView(origin, undefined), account: accountView(active), choices: choices.map(accountView) });
+            const findings = siteLines(origin, state, shell);
+            const answer = await shell.approve({ kind: 'connect', site: siteView(origin, undefined), account: accountView(active), choices: choices.map(accountView), findings });
             if (answer !== true && !(typeof answer === 'object' && 'account' in answer)) throw new Rejected();
             const account = need(choices.find((c) => c.address === (answer === true ? active.address : answer.account)), NO_SIGNER);
-            await shell.update((s) => ({ sites: { ...s.sites, [origin]: { account: account.address, signatures: 0 } }, active: account.address })); // as they are now: the user may have changed them while deciding
+            await shell.update((s) => ({ ...connectSite(s, origin, account.address), active: account.address })); // as they are now: the user may have changed them while deciding
             return { accounts: [account.address], v1: !account.ledger };
         }
         case 'disconnect': {
-            await shell.update((s) => {
-                const { [origin]: _, ...rest } = s.sites;
-                return { sites: rest };
-            });
+            await shell.update((s) => disconnectSite(s, origin));
             return null;
         }
         case 'transaction': {
@@ -128,7 +127,8 @@ async function handle(request: Request, state: State, shell: Shell): Promise<unk
             const account = need(accountOf(state, site?.account ?? null) ?? accountOf(state, state.active), NO_ACCOUNT);
             if (site && request.input.address !== undefined && request.input.address !== account.address) throw new Refused('that account is not connected to this site');
             const input = { ...request.input, domain: new URL(origin).host, address: account.address };
-            await approve({ kind: 'signIn', site: siteView(origin, site), account: accountView(account), fields: signInFields(input), signer: signerOf(account) });
+            const findings = site ? [] : siteLines(origin, state, shell); // signing in connects it
+            await approve({ kind: 'signIn', site: siteView(origin, site), account: accountView(account), fields: signInFields(input), findings, signer: signerOf(account) });
             if (account.ledger) throw new Refused(LEDGER_MESSAGES);
             const message = new TextEncoder().encode(signInText(input));
             const signature = await signFor(account, message, shell, { origin, connects: true }, undefined, false);
@@ -138,6 +138,10 @@ async function handle(request: Request, state: State, shell: Shell): Promise<unk
 }
 
 const reviewing = new Set<string>(); // sites whose transaction is being reviewed or decided
+
+// What is known of a site asked to connect: from its host, and from what was kept of it when it was disconnected.
+const siteLines = (origin: string, state: State, shell: Shell): Line[] =>
+    siteFindings({ host: new URL(origin).host, signedBefore: state.disconnected[origin]?.since ?? null, now: Math.floor(shell.now() / 1000) }, true).map((f) => ({ title: f.text, note: f.note ?? '', tone: f.level }));
 
 // A site's transaction, checked: its cluster, the review and the user's answer, one at a time per site; then signed,
 // and sent if asked.
@@ -478,7 +482,7 @@ async function signFor(account: Account, data: Uint8Array, shell: Shell, asker: 
     const signature = onDevice(now) ? await deviceSigned(now, data, fromDevice) : await shell.sign(now, data);
     await shell.update((s) => ({
         accounts: s.accounts.map((a) => (a.address === account.address ? { ...a, signatures: (a.signatures ?? 0) + 1 } : a)),
-        ...(asker && signedFor(s.sites, asker, account.address, shell.now())),
+        ...(asker && signedFor(s, asker, account.address, shell.now())),
         // Not for an account removed in the meantime: its entry went with it.
         ...(transaction && s.accounts.some((a) => a.address === account.address) && { signedHere: { ...s.signedHere, [account.address]: [...(s.signedHere[account.address] ?? []), getBase58Decoder().decode(signature)].slice(-MAX_SIGNED_HERE) } }),
     }));
@@ -494,16 +498,17 @@ async function deviceSigned(account: Account, data: Uint8Array, signature: Signa
 
 const MAX_SITE_PROGRAMS = 32; // kept for a site, the latest last
 
-// A site once it got a signature: counted, connected by a sign-in, known from the day after its first transaction, and
-// the programs its transactions call kept.
-function signedFor(sites: State['sites'], { origin, connects = false, programs }: Asker, address: Address, now: number): Pick<State, 'sites'> | null {
+// A site once it got a signature: counted, connected by a sign-in (with what was kept of it, if it was disconnected),
+// known from the day after its first transaction, and the programs its transactions call kept.
+function signedFor(state: Pick<State, 'sites' | 'disconnected'>, { origin, connects = false, programs }: Asker, address: Address, now: number): Pick<State, 'sites' | 'disconnected'> | null {
+    if (!connects && state.sites[origin]?.account !== address) return null;
+    const { sites, disconnected } = state.sites[origin] ? state : connectSite(state, origin, address);
     const site = sites[origin];
-    const same = site?.account === address;
-    if (!connects && !same) return null;
+    const same = site.account === address;
     const since = (same ? site.since : undefined) ?? (programs ? Math.floor(now / 1000) : undefined);
     const kept = same ? site.programs : undefined;
     const called = programs ? [...(kept ?? []).filter((p) => !programs.includes(p)), ...programs].slice(-MAX_SITE_PROGRAMS) : kept; // the latest used last
-    return { sites: { ...sites, [origin]: { account: address, signatures: same ? site.signatures + 1 : 1, ...(since !== undefined && { since }), ...(called && { programs: called }) } } };
+    return { sites: { ...sites, [origin]: { account: address, signatures: same ? site.signatures + 1 : 1, ...(since !== undefined && { since }), ...(called && { programs: called }) } }, disconnected };
 }
 
 const MAX_USABLE = 32; // transactions waiting, and delegates given, kept: the latest

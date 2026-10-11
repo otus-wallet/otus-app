@@ -29,6 +29,9 @@ export const onDevice = (a: Account) => Boolean(a.ledger);
  *  did; none kept for a site signed for before Otus kept them. */
 export type Site = { account: Address; signatures: number; since?: number; programs?: Address[] };
 
+/** What is kept of a site once disconnected: when you first signed a transaction for it, and the programs they called. */
+export type Past = Pick<Site, 'since' | 'programs'>;
+
 /** A transaction signed for a site on a durable nonce, which can run until that nonce moves on: the account that signed
  *  it, the nonce account and nonce it waits on, the site, and when (seconds since 1970). */
 export type Signed = { wallet: Address; account: Address; nonce: string; host: string; at: number };
@@ -43,11 +46,13 @@ export type Contact = { address: Address; label: string };
  *  many transfers made in Otus landed at each address; `removed`: accounts on a phrase that you removed, which New
  *  account never brings back; `waiting` and `given`: what sites were signed for that others can still use, the latest
  *  last; `signedHere`: the transactions' signatures Otus made with each account, the latest last; `outside`: what the
- *  popup checked of each one's activity for those signed elsewhere, by network (outsideKey), the popup's alone. */
+ *  popup checked of each one's activity for those signed elsewhere, by network (outsideKey), the popup's alone;
+ *  `disconnected`: what is kept of the sites disconnected, back when each connects again, the latest last. */
 export type State = {
     accounts: Account[];
     active: Address | null;
     sites: Record<string, Site>;
+    disconnected: Record<string, Past>;
     contacts: Contact[];
     sent: Record<string, number>;
     removed: Address[];
@@ -58,10 +63,28 @@ export type State = {
     settings: Settings;
 };
 
-const DEFAULTS: State = { accounts: [], active: null, sites: {}, contacts: [], sent: {}, removed: [], waiting: [], given: [], signedHere: {}, outside: {}, settings: DEFAULT_SETTINGS };
+const DEFAULTS: State = { accounts: [], active: null, sites: {}, disconnected: {}, contacts: [], sent: {}, removed: [], waiting: [], given: [], signedHere: {}, outside: {}, settings: DEFAULT_SETTINGS };
 /** Signatures kept an account: far more than it makes between two looks at its activity. */
 export const MAX_SIGNED_HERE = 200;
 const MAX_CONTACTS = 200;
+const MAX_DISCONNECTED = 200; // sites kept once disconnected: the latest
+
+type Sites = Pick<State, 'sites' | 'disconnected'>;
+
+/** A site disconnected: its access gone, and its past kept, to tell it from a new one when it connects again. */
+export function disconnectSite(state: Sites, origin: string): Sites {
+    const { [origin]: site, ...sites } = state.sites;
+    if (!site || (site.since === undefined && !site.programs)) return { sites, disconnected: state.disconnected };
+    const { [origin]: _, ...others } = state.disconnected;
+    const past: Past = { ...(site.since !== undefined && { since: site.since }), ...(site.programs && { programs: site.programs }) };
+    return { sites, disconnected: Object.fromEntries([...Object.entries(others), [origin, past]].slice(-MAX_DISCONNECTED)) };
+}
+
+/** A site connected to an account, with its past when it was disconnected before. */
+export function connectSite(state: Sites, origin: string, account: Address): Sites {
+    const { [origin]: past, ...disconnected } = state.disconnected;
+    return { sites: { ...state.sites, [origin]: { account, signatures: 0, ...past } }, disconnected };
+}
 
 export async function load(): Promise<State> {
     const state = (await platform.storage.local.get(DEFAULTS)) as State;
@@ -148,8 +171,7 @@ export function edited(e: Edit, state: State, now = Date.now()): Partial<State> 
         }
         case 'disconnect': {
             if (typeof e.origin !== 'string' || !(e.origin in state.sites)) return null;
-            const { [e.origin]: _, ...rest } = state.sites;
-            return { sites: rest };
+            return disconnectSite(state, e.origin);
         }
         case 'watch': {
             // One of your accounts now: no longer one you keep. Not one that only looks like an address you know, nor

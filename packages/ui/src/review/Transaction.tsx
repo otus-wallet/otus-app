@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/toolti
 import { Icon, Logo } from '../components/icons.tsx';
 import { AddressNames, NameTag, ShortAddress } from '../components/address.tsx';
 import { cn } from '../lib/cn.ts';
-import type { AssetChange, InstructionView, ProgramView, Tone, TransactionView } from '@otus-wallet/core/view.ts';
+import type { AssetChange, InstructionView, Line, ProgramView, Tone, TransactionView } from '@otus-wallet/core/view.ts';
 import { Block, Heading, Notice, WATCH_ONLY } from './Frame.tsx';
 import { filled, MARK, text } from './tone.ts';
 import { Tagged, YouTag, YourWallet } from '../components/you.tsx';
@@ -391,6 +391,29 @@ export const Ack = ({ ack, onAck }: { ack: boolean; onAck: (ack: boolean) => voi
     </label>
 );
 
+/** Findings, a line each: a mark in its tone, its title and what it is about. */
+export const Findings = ({ lines }: { lines: Line[] }) => (
+    <ul>
+        {lines.map((f, i) => (
+            <li key={i} className="finding flex items-start gap-2.5 border-t border-dashed border-rule-2 py-[9px]">
+                <span className={cn('grid size-5 shrink-0 place-items-center rounded-[3px] border border-current', filled(f.tone))}>
+                    <Icon name={MARK[f.tone]} size={11} stroke={3} />
+                </span>
+                <span className="words flex min-w-0 flex-col gap-[3px]">
+                    <span className="font-bold">
+                        <Tagged text={f.title} />
+                    </span>
+                    {f.note && (
+                        <span className="text-xs text-ink-2">
+                            <Tagged text={f.note} />
+                        </span>
+                    )}
+                </span>
+            </li>
+        ))}
+    </ul>
+);
+
 export function Verdict({ t, ack, onAck }: { t: TransactionView; ack: boolean; onAck: (ack: boolean) => void }) {
     return (
         <>
@@ -403,25 +426,7 @@ export function Verdict({ t, ack, onAck }: { t: TransactionView; ack: boolean; o
                     </p>
                 </div>
             </div>
-            <ul>
-                {t.findings.map((f, i) => (
-                    <li key={i} className="finding flex items-start gap-2.5 border-t border-dashed border-rule-2 py-[9px]">
-                        <span className={cn('grid size-5 shrink-0 place-items-center rounded-[3px] border border-current', filled(f.tone))}>
-                            <Icon name={MARK[f.tone]} size={11} stroke={3} />
-                        </span>
-                        <span className="words flex min-w-0 flex-col gap-[3px]">
-                            <span className="font-bold">
-                                <Tagged text={f.title} />
-                            </span>
-                            {f.note && (
-                                <span className="text-xs text-ink-2">
-                                    <Tagged text={f.note} />
-                                </span>
-                            )}
-                        </span>
-                    </li>
-                ))}
-            </ul>
+            <Findings lines={t.findings} />
             {t.signer !== 'none' && t.verdict === 'danger' && <Ack ack={ack} onAck={onAck} />}
             {t.signer === 'none' && <Notice>{WATCH_ONLY}</Notice>}
         </>
