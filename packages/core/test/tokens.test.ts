@@ -26,6 +26,23 @@ test('each lookup answers only for the mints it asks about, though earlier ones 
     assert.deepEqual(asked, [FAKE_USDC, OTHER]);
 });
 
+test('a mint asked while another lookup asks it waits for that answer, not asking twice; one that failed is asked again', async (t) => {
+    const asked: string[] = [];
+    const answers: ((r: Response) => void)[] = [];
+    t.mock.method(globalThis, 'fetch', (url: string) => (asked.push(new URL(url).searchParams.get('query') ?? ''), new Promise<Response>((done) => answers.push(done))));
+    const early = tokens([key(70)], true);
+    const later = tokens([key(70), key(71)], true);
+    answers[0](new Response(JSON.stringify([{ id: key(70), name: 'Early', symbol: 'ERL', isVerified: false }])));
+    answers[1](new Response('[]'));
+    assert.equal((await early).get(key(70))?.symbol, 'ERL');
+    assert.deepEqual([...(await later)].map(([m, i]) => [m, i?.symbol ?? null]), [[key(70), 'ERL'], [key(71), null]]);
+    assert.deepEqual(asked, [key(70), key(71)] as string[]);
+    t.mock.method(globalThis, 'fetch', async (url: string) => (asked.push(new URL(url).searchParams.get('query') ?? ''), new Response('', { status: 500 })));
+    assert.equal((await tokens([key(72)], true)).get(key(72)), null);
+    await tokens([key(72)], true);
+    assert.deepEqual(asked.slice(2), [key(72), key(72)]);
+});
+
 test('a token named as a well-known one at another address is never verified, whatever Jupiter says; the real one is', async (t) => {
     const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
     const FORGED = 'Forged11111111111111111111111111111111111111';

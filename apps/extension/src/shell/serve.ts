@@ -291,6 +291,7 @@ export function swapOwn(bytes: Uint8Array, address: string, asked: Asked, shell:
             if (!account || !signs(account)) throw new Refused(NO_KEY);
             const cluster = networkOf(state.settings); // the network the wallet shows
             if (cluster !== 'solana:mainnet') throw new Refused('swaps are on mainnet only');
+            void shell.tokens([asked.input, asked.output]).catch(() => {}); // asked while it is reviewed: the window waits for their names
             const chain = shell.chain(rpcFor(cluster, state.settings));
             // Its guards hold what it gets to the slippage asked, as Jupiter's own least does, not a site's trade's tenth: a
             // quote set low by a bad route then costs no more than the slippage, measured against the honest simulation.

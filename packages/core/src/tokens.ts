@@ -24,21 +24,31 @@ const PER_SEARCH = 100; // mints in one search
 const WAIT = 8_000; // ms for Jupiter to answer, after which the tokens go without
 
 const looked = new Map<string, TokenInfo | null>(); // null: Jupiter does not know it
+const asked = new Map<string, Promise<void>>(); // mints asked, until Jupiter answers
 
 /** What Jupiter says of these mints, through Otus's server or not; an empty answer for those it does not know, or
- *  when it does not answer. */
+ *  when it does not answer. A mint asked already, and not answered yet, is waited for rather than asked again. */
 export async function tokens(mints: string[], throughOtus: boolean): Promise<Map<string, TokenInfo | null>> {
-    const asking = [...new Set(mints)].filter((m) => !looked.has(m));
+    const wanted = [...new Set(mints)];
+    const asking = wanted.filter((m) => !looked.has(m) && !asked.has(m));
+    if (asking.length > 0) {
+        const answer = ask(asking, throughOtus).finally(() => asking.forEach((m) => asked.delete(m)));
+        asking.forEach((m) => asked.set(m, answer));
+    }
+    await Promise.all(wanted.map((m) => asked.get(m)));
+    return new Map(wanted.map((m) => [m, looked.get(m) ?? null]));
+}
+
+async function ask(mints: string[], throughOtus: boolean): Promise<void> {
     try {
-        for (let i = 0; i < asking.length; i += PER_SEARCH) {
-            const batch = asking.slice(i, i + PER_SEARCH);
+        for (let i = 0; i < mints.length; i += PER_SEARCH) {
+            const batch = mints.slice(i, i + PER_SEARCH);
             const response = await fetch(`${throughOtus ? THROUGH_OTUS : JUPITER}?query=${batch.join(',')}`, { method: methodFor(throughOtus), credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(WAIT) });
             if (!response.ok) throw new Error(`Jupiter answered ${response.status}`);
             const found = new Map((await response.json() as unknown[]).flatMap((t) => (info(t) ? [[info(t)!.id, served(info(t)!, throughOtus)] as const] : [])));
             for (const m of batch) looked.set(m, found.get(m) ?? null);
         }
     } catch {} // no names or prices beats no balances
-    return new Map([...new Set(mints)].map((m) => [m, looked.get(m) ?? null]));
 }
 
 /** Tokens whose name or symbol matches a few words, as Jupiter finds them (the swap's picker), through Otus's server or
