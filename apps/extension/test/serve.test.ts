@@ -1205,7 +1205,29 @@ test('what the popup makes for a swap is reviewed as Otus’s own, signed and la
         ['no swap', swapFor(w.me, (r) => void (r.swap = syncNative(key(36))))],
         ['a tip elsewhere', swapFor(w.me, () => {}, key(7))],
     ];
-    for (const [what, made] of bent) assert.match(((await swapOwn(await made, w.me, ASKED, fast)) as { error: string }).error, /does more than swap/, what);
+    const refusals = new Map<string, string>();
+    for (const [what, made] of bent) {
+        const { error } = (await swapOwn(await made, w.me, ASKED, fast)) as { error: string };
+        assert.match(error, /does more than swap: /, what);
+        refusals.set(what, error);
+    }
+    // Each says which part of it is not a swap as asked.
+    const why: [string, RegExp][] = [
+        ['a tip elsewhere', /its last instruction isn't the tip to Sender/],
+        ['a platform fee', /the swap takes a fee/],
+        ['a positive slippage share', /the swap takes a fee/],
+        ['more in than asked', /the swap pays another amount than asked/],
+        ['a lower quote', /quote or slippage isn't the one shown/],
+        ['into another wallet', /pays into an account that isn't your token account/],
+        ['from another account', /pays from an account that isn't your token account/],
+        ['to another destination', /pays out to another account/],
+        ['for another token', /for other tokens than asked/],
+        ['an account for a third token', /opens an account for a third token/],
+        ['Jupiter twice', /swaps more than once/],
+        ['no swap', /token instruction \(17\)|there is no swap/],
+        ['closed to another', /token instruction \(9\)/],
+    ];
+    for (const [what, said] of why) assert.match(refusals.get(what) ?? '', said, what);
     // Neither side SOL: nothing may close the wrapped-SOL account.
     const tokens: Asked = { ...ASKED, input: USDC, output: key(38) };
     const closing = await swapFor(w.me, async (r, a) => {

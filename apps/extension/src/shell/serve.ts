@@ -358,7 +358,8 @@ export function swapOwn(bytes: Uint8Array, address: string, asked: Asked, shell:
             const way = { cluster, chain, site: SWAPPING, blockhash: chain.latest(), trade: BigInt(asked.slippageBps), context: { signedBefore: null, own: true } } as const;
             const checks = async (r: Review) => {
                 if (r.signers.some((s) => s !== account.address)) throw new Refused('another account would have to sign it');
-                if (!(await swapsOnly(r, account.address, asked))) throw new Refused('it does more than swap');
+                const why = await swapRefusal(r, account.address, asked);
+                if (why) throw new Refused(`it does more than swap: ${why}`);
             };
             // Unguarded, a swap would rest on the route's own least alone: never signed so. One that fails as it is now
             // (more than you hold, a price gone) says so.
@@ -385,8 +386,9 @@ export function swapOwn(bytes: Uint8Array, address: string, asked: Asked, shell:
 // - Jupiter's one swap (route_v2 or shared_accounts_route_v2), signed by it, with the amount, quote and slippage asked
 //   and no fee, from its own account of the mint paid into its own account of the mint asked for (see `termsOf`);
 // - its wrapped-SOL account closed back to it (CloseAccount, 9), when SOL is on one side.
-// The route plan is Jupiter's: the review simulates it, and the guards hold what comes of it.
-async function swapsOnly(r: Review, owner: Address, asked: Asked): Promise<boolean> {
+// The route plan is Jupiter's: the review simulates it, and the guards hold what comes of it. Why it is not one, in a few
+// words, or null when it is.
+async function swapRefusal(r: Review, owner: Address, asked: Asked): Promise<string | null> {
     type Ix = Review['message']['instructions'][number];
     const program = (ix: Ix) => r.accounts[ix.programAddressIndex].address;
     const at = (ix: Ix, i: number) => r.accounts[ix.accountIndices[i]]?.address;
@@ -395,8 +397,8 @@ async function swapsOnly(r: Review, owner: Address, asked: Asked): Promise<boole
     const instructions = r.message.instructions;
     const [limit] = instructions;
     const tip = instructions.at(-1);
-    if (r.message.version !== 0 || instructions.length < 3 || !limit || !tip || program(limit) !== COMPUTE_BUDGET_PROGRAM_ADDRESS || limit.data.length !== 5 || limit.data[0] !== 2) return false;
-    if (!transfer(tip, (a) => a !== undefined && SENDER_TIPS.includes(a), TIP)) return false;
+    if (r.message.version !== 0 || instructions.length < 3 || !limit || !tip || program(limit) !== COMPUTE_BUDGET_PROGRAM_ADDRESS || limit.data.length !== 5 || limit.data[0] !== 2) return 'not the compute limit first';
+    if (!transfer(tip, (a) => a !== undefined && SENDER_TIPS.includes(a), TIP)) return "its last instruction isn't the tip to Sender";
     const ownAccount = async (mint: Address | undefined, program: Address | undefined) => mint && program && isTokenProgram(program) && (await findAssociatedTokenPda({ owner, mint, tokenProgram: program }))[0];
     const [wrapped] = await findAssociatedTokenPda({ owner, mint: WSOL, tokenProgram: TOKEN_PROGRAM_ADDRESS });
     const paysSol = asked.input === WSOL;
@@ -407,23 +409,32 @@ async function swapsOnly(r: Review, owner: Address, asked: Asked): Promise<boole
         if (p === JUPITER) {
             swaps++;
             const t = termsOf(ix.data, (i) => at(ix, i), ix.accountIndices.length);
-            const terms = t !== null && t.signer === owner && t.inputMint === asked.input && t.outputMint === asked.output && t.amount === asked.amount && t.quoted === asked.out && t.slippageBps === asked.slippageBps;
-            if (!terms || t.platformFeeBps !== 0 || t.positiveSlippageBps !== 0 || (t.elsewhere !== null && t.elsewhere !== JUPITER)) return false;
-            if (t.source !== (await ownAccount(t.inputMint, t.inputProgram)) || t.destination !== (await ownAccount(t.outputMint, t.outputProgram))) return false;
+            if (t === null) return "Jupiter's instruction isn't a swap";
+            if (t.signer !== owner) return 'the swap is signed by another account';
+            if (t.inputMint !== asked.input || t.outputMint !== asked.output) return 'the swap is for other tokens than asked';
+            if (t.amount !== asked.amount) return 'the swap pays another amount than asked';
+            if (t.quoted !== asked.out || t.slippageBps !== asked.slippageBps) return "the swap's quote or slippage isn't the one shown";
+            if (t.platformFeeBps !== 0 || t.positiveSlippageBps !== 0) return 'the swap takes a fee';
+            if (t.elsewhere !== null && t.elsewhere !== JUPITER) return 'the swap pays out to another account';
+            if (t.source !== (await ownAccount(t.inputMint, t.inputProgram))) return "the swap pays from an account that isn't your token account";
+            if (t.destination !== (await ownAccount(t.outputMint, t.outputProgram))) return "the swap pays into an account that isn't your token account";
         } else if (p === ASSOCIATED_TOKEN_PROGRAM_ADDRESS) {
-            if (ix.data.length !== 1 || ix.data[0] !== 1 || ix.accountIndices.length !== 6 || at(ix, 0) !== owner || at(ix, 2) !== owner || at(ix, 4) !== SYSTEM_PROGRAM_ADDRESS) return false;
-            if (at(ix, 3) !== asked.input && at(ix, 3) !== asked.output) return false; // for the swap's own two tokens alone
-            if (at(ix, 1) !== (await ownAccount(at(ix, 3), at(ix, 5))) || opened.has(at(ix, 1))) return false;
+            if (ix.data.length !== 1 || ix.data[0] !== 1 || ix.accountIndices.length !== 6 || at(ix, 0) !== owner || at(ix, 2) !== owner || at(ix, 4) !== SYSTEM_PROGRAM_ADDRESS) return 'it opens an account otherwise than for you, paid by you';
+            if (at(ix, 3) !== asked.input && at(ix, 3) !== asked.output) return 'it opens an account for a third token'; // for the swap's own two tokens alone
+            if (at(ix, 1) !== (await ownAccount(at(ix, 3), at(ix, 5)))) return "it opens an account that isn't your token account";
+            if (opened.has(at(ix, 1))) return 'it opens the same account twice';
             opened.add(at(ix, 1));
         } else if (p === SYSTEM_PROGRAM_ADDRESS) {
-            if (!paysSol || ++wraps > 1 || !transfer(ix, (a) => a === wrapped, asked.amount)) return false;
+            if (!paysSol || ++wraps > 1 || !transfer(ix, (a) => a === wrapped, asked.amount)) return "it moves SOL other than the amount wrapped to pay";
         } else if (isTokenProgram(p)) {
             const syncs = paysSol && ix.data.length === 1 && ix.data[0] === 17 && ix.accountIndices.length === 1 && at(ix, 0) === wrapped;
             const closes = (paysSol || asked.output === WSOL) && ix.data.length === 1 && ix.data[0] === 9 && ix.accountIndices.length === 3 && at(ix, 0) === wrapped && at(ix, 1) === owner && at(ix, 2) === owner;
-            if (!syncs && !closes) return false;
-        } else return false;
+            if (!syncs && !closes) return `it runs a token instruction (${ix.data[0] ?? 'none'}) other than wrapping or unwrapping SOL`;
+        } else return `it calls another program, ${p}`;
     }
-    return swaps === 1 && opened.size <= 3;
+    if (swaps !== 1) return swaps === 0 ? 'there is no swap in it' : 'it swaps more than once';
+    if (opened.size > 3) return 'it opens more than three accounts';
+    return null;
 }
 
 // A legacy or v0 message (v1's limits and fee live in its config) with Compute Budget's SetComputeUnitLimit (2) first,
