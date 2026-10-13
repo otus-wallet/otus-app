@@ -8,7 +8,7 @@ import { NoHistory } from '@otus-wallet/sdk/activity/history';
 import type { Activity } from '@otus-wallet/sdk/activity/summary';
 import { USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
-import { explorerOf, networkOf, walletRpc } from '@otus-wallet/core/settings.ts';
+import { explorerOf, networkOf, OTUS_RPC, walletRpc } from '@otus-wallet/core/settings.ts';
 import { outsideKey, unchecked } from '@otus-wallet/core/outside.ts';
 import type { State } from '@otus-wallet/core/state.ts';
 import { cachedToken } from '@otus-wallet/core/tokens.ts';
@@ -20,33 +20,41 @@ import { YOU } from '@otus-wallet/core/view/names.ts';
 import { cn } from '../lib/cn.ts';
 import { accessWords, others } from '@otus-wallet/core/view/access.ts';
 import { rows, type Naming, type Part, type Row } from '@otus-wallet/sdk/activity/words';
-import { cuts } from '@otus-wallet/core/view/activity.ts';
+import { cuts, mintsIn } from '@otus-wallet/core/view/activity.ts';
+import { symbolOf } from '@otus-wallet/core/view/symbols.ts';
+import { latin } from '@otus-wallet/sdk/review/sites';
 import type { Screen } from './App.tsx';
 import { TabBar, Tip } from './common.tsx';
 import { WalletBar } from './Lobby.tsx';
-import { current, said, seenOutside, useAccess, useActivity, useHeldNow } from './store.ts';
+import { current, said, seenOutside, useAccess, useActivity, useHeldNow, useTokens } from './store.ts';
 
 export const KNOWN_SYMBOLS: Record<string, string> = { [USDC]: 'USDC', [USDT]: 'USDT', [WSOL]: 'wSOL' };
 
 export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) => void }) {
     const account = current(state);
     const rpc = walletRpc(state.settings);
-    const read = useActivity(rpc, account.address);
+    // Names from Jupiter and the tokens everyone knows are mainnet's: elsewhere the same addresses are other tokens.
+    const mainnet = networkOf(state.settings) === 'solana:mainnet';
+    const read = useActivity(rpc, account.address, mainnet);
     const held = useHeldNow(rpc, account.address);
+    const history = useMemo(() => once(read.data?.pages.flatMap((p) => p.rows) ?? []), [read.data]);
+    // The page's tokens, named in one search when it came: asked again here only for a name that came late.
+    const looked = useTokens(useMemo(() => mintsIn(history), [history]), rpc === OTUS_RPC, mainnet);
     const naming = useMemo((): Naming => {
         const verified = new Map((held?.assets ?? []).filter((a) => a.verified && a.symbol && !a.native).map((a) => [a.mint, a.symbol]));
         const names = new Map<string, string>([...state.contacts, ...state.accounts].map((k) => [k.address, k.label]));
-        // Names from Jupiter and the tokens everyone knows are mainnet's: elsewhere the same addresses are other tokens.
-        const mainnet = networkOf(state.settings) === 'solana:mainnet';
+        const said = (mint: string) => looked.data?.get(mint) ?? cachedToken(mint);
+        // The verified tokens' symbols in view: an unverified one named as one of them is a fake.
+        const known = new Set([...Object.values(KNOWN_SYMBOLS), ...verified.values()].map((s) => latin(s).toUpperCase()));
         return {
             wallet: account.address,
-            symbol: (mint) => (!mainnet ? mint : (KNOWN_SYMBOLS[mint] ?? verified.get(mint) ?? (cachedToken(mint)?.verified ? cachedToken(mint)!.symbol : mint))),
+            symbol: (mint) => (!mainnet ? mint : (KNOWN_SYMBOLS[mint] ?? verified.get(mint) ?? symbolOf(mint, said(mint), known))),
+            verified: (mint) => (!mainnet ? undefined : KNOWN_SYMBOLS[mint] !== undefined || verified.has(mint) || said(mint)?.verified),
             who: (a) => (a === account.address ? `${a}${YOU}` : (names.get(a) ?? PROGRAM_NAMES.get(a) ?? a)),
             program: (a) => PROGRAM_NAMES.get(a) ?? a,
             known: [...state.accounts.map((k) => k.address), ...state.contacts.map((k) => k.address), ...(Object.keys(state.sent) as Address[])],
         };
-    }, [account.address, held, state.accounts, state.contacts, state.sent, state.settings]);
-    const history = useMemo(() => once(read.data?.pages.flatMap((p) => p.rows) ?? []), [read.data]);
+    }, [account.address, held, looked.data, mainnet, state.accounts, state.contacts, state.sent]);
     const list = useMemo(() => rows(history, naming), [history, naming]);
     const cut = useMemo(() => cuts(history, naming.known), [history, naming]);
     const [open, setOpen] = useState<string | null>(null);

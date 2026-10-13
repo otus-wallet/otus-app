@@ -10,9 +10,8 @@ import type { Review } from '@otus-wallet/sdk/review/review';
 import type { Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import { latin } from '@otus-wallet/sdk/review/sites';
 import type { TokenInfo } from '../tokens.ts';
+import { IMITATED } from './symbols.ts';
 
-// Symbols scams like to give their own tokens: one of these on a token that is not verified gets a warning.
-const IMITATED = new Set(['SOL', 'WSOL', 'USDC', 'USDT', 'JUP', 'BONK', 'JTO', 'PYTH', 'RAY', 'ORCA', 'MSOL', 'JITOSOL', 'BSOL', 'JUPSOL', 'INF', 'WIF', 'TRUMP', 'ETH', 'WETH', 'BTC', 'WBTC', 'CBBTC', 'PYUSD', 'USDS', 'USDE', 'EURC', 'PENGU', 'POPCAT', 'RENDER', 'HNT']);
 
 // A token that is not verified, named as one people know: warned of, wherever it is in the transaction.
 export function imitations(tokens: Map<string, TokenInfo | null>, mainnet: boolean): Finding[] {

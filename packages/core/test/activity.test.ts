@@ -12,7 +12,7 @@ import { key } from './helpers.ts';
 // What the words say is the SDK's (rows(), tested there); here, how the page cuts the addresses in them.
 const WALLET = key(31);
 const FRIEND = key(32);
-const base = { signatures: {}, slot: 1n, time: 1_791_236_675, error: null, fee: 5000n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], instructions: [] as Told[], held: [], fresh: [] as Address[], staked: 0n, signed: true, programs: [] as Address[], unknown: [] as Address[], through: [], main: null, squads: [], memo: null, moves: [], inner: [] };
+const base = { signatures: {}, slot: 1n, time: 1_791_236_675, error: null, fee: 5000n, tip: 0n, payer: WALLET, rent: { yours: 0n, theirs: 0n, opened: 0n }, created: [] as Address[], instructions: [] as Told[], held: [], fresh: [] as Address[], staked: 0n, signed: true, programs: [] as Address[], unknown: [] as Address[], through: [], main: null, squads: [], memo: null, moves: [], inner: [] };
 
 test('a copy of an address, on the page or known: both cut as far as where they part', () => {
     // A copy: the real address's first and last four characters around another's middle, as poisoners grind them.

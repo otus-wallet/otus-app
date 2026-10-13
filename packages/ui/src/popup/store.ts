@@ -14,7 +14,9 @@ import { platform } from '@otus-wallet/core/platform.ts';
 import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
 import { load, save, signs, type Edit, type State } from '@otus-wallet/core/state.ts';
 import { lookOutside, outsideKey, unchecked, type Looked, type Outside } from '@otus-wallet/core/outside.ts';
-import { networkOf, walletRpc } from '@otus-wallet/core/settings.ts';
+import { networkOf, OTUS_RPC, walletRpc } from '@otus-wallet/core/settings.ts';
+import { tokens } from '@otus-wallet/core/tokens.ts';
+import { mintsIn } from '@otus-wallet/core/view/activity.ts';
 import { ask } from '../ask.ts';
 import { holdings, type Holdings } from '@otus-wallet/core/holdings.ts';
 import { epochOf, stakeRent, stakesOf } from '@otus-wallet/core/stake/stakes.ts';
@@ -72,12 +74,16 @@ const PAGE = 25; // transactions a page: what is checked for ones signed outside
  * page; never again on its own. Left, what it reads is dropped and it keeps its first page only, as old as it is, so
  * coming back reads one page at most. A transaction Otus cannot tell in short shows as unreadable, alone.
  */
-export function useActivity(rpc: string, address: Address) {
+/** `named`: whether its tokens get names (Jupiter's are mainnet's): each page's, in one search, before it shows. */
+export function useActivity(rpc: string, address: Address, named = false) {
     const read = useInfiniteQuery({
         queryKey: activityKey(rpc, address),
         queryFn: async ({ pageParam, signal }): Promise<ActivityPage> => {
             const page = await historyPage(rpc, address, pageParam ?? undefined, signal, PAGE);
-            return { rows: page.items.map((i) => ('unreadable' in i ? i : told(i, address))), next: page.next, at: Date.now() };
+            const rows = page.items.map((i) => ('unreadable' in i ? i : told(i, address)));
+            // A short wait at most: a slow answer names them when it comes (useTokens), the page shows the mints meanwhile.
+            if (named) await Promise.race([tokens(mintsIn(rows), rpc === OTUS_RPC), new Promise((done) => setTimeout(done, NAMES_WAIT))]);
+            return { rows, next: page.next, at: Date.now() };
         },
         initialPageParam: null as string | null,
         getNextPageParam: (last, _, from) => (last.next !== from ? last.next : null), // a page that points at itself ends it
@@ -94,6 +100,14 @@ export function useActivity(rpc: string, address: Address) {
             });
     }, [rpc, address]);
     return read;
+}
+
+// How long a page of Activity waits for its tokens' names.
+const NAMES_WAIT = 1_500;
+
+/** What Jupiter says of `mints`, in one search for those it wasn't asked of yet: none when all were. */
+export function useTokens(mints: string[], throughOtus: boolean, on: boolean) {
+    return useQuery({ queryKey: ['tokens', throughOtus, mints.join(',')], queryFn: () => tokens(mints, throughOtus), enabled: on && mints.length > 0, staleTime: Infinity });
 }
 
 // A landed transaction in short, or unreadable when its summary fails: one never takes the page with it.
