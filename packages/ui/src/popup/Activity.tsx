@@ -169,6 +169,7 @@ const DETAIL = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', dim: '
 // One transaction: its line, and opened, all it told. `outside`: the wallet signed it, and Otus did not.
 function Item({ row, open, flip, explorer, cut, outside }: { row: Row; open: boolean; flip: () => void; explorer: ReturnType<typeof explorerOf>; cut: Cut; outside: boolean }) {
     const when = row.time === null ? null : new Date(row.time * 1000);
+    const strange = row.unknown.length > 0;
     return (
         <li className="activity-row border-t border-dashed border-rule-2">
             <button type="button" aria-expanded={open} onClick={flip} className="flex min-h-[52px] w-full cursor-pointer items-center gap-3 py-2 text-left">
@@ -185,11 +186,12 @@ function Item({ row, open, flip, explorer, cut, outside }: { row: Row; open: boo
                         </span>
                     )}
                 </span>
-                {/* Signed outside Otus: a mark before the time, in line with the others down the list. */}
-                {(outside || when) && (
+                {/* Signed outside Otus, or calling a program Otus doesn't know: a mark before the time, in line with the others
+                    down the list. */}
+                {(outside || strange || when) && (
                     <span className="flex shrink-0 items-center gap-2 self-start pt-0.5 text-xs text-ink-3">
-                        {outside && (
-                            <span aria-label="Signed outside Otus" className="outside grid size-[15px] place-items-center rounded-[3px] border border-warn-bd bg-warn-bg text-warn">
+                        {(outside || strange) && (
+                            <span aria-label={outside ? 'Signed outside Otus' : "Calls a program Otus doesn't know"} className="outside grid size-[15px] place-items-center rounded-[3px] border border-warn-bd bg-warn-bg text-warn">
                                 <Icon name="bang" size={9} stroke={3} />
                             </span>
                         )}
