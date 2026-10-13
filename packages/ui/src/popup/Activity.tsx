@@ -21,7 +21,7 @@ import { cn } from '../lib/cn.ts';
 import { accessWords, others } from '@otus-wallet/core/view/access.ts';
 import { rows, type Naming, type Part, type Row } from '@otus-wallet/sdk/activity/words';
 import { cuts, mintsIn } from '@otus-wallet/core/view/activity.ts';
-import { symbolOf } from '@otus-wallet/core/view/symbols.ts';
+import { symbolOf } from '@otus-wallet/sdk/activity/symbols';
 import { latin } from '@otus-wallet/sdk/review/sites';
 import type { Screen } from './App.tsx';
 import { TabBar, Tip } from './common.tsx';
