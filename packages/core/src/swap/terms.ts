@@ -9,6 +9,10 @@ const ROUTE_V2 = [0xbb, 0x64, 0xfa, 0xcc, 0x31, 0xc4, 0xaf, 0x14];
 /** shared_accounts_route_v2: through Jupiter's program-owned accounts, `id` choosing them. */
 const SHARED_V2 = [0xd1, 0x98, 0x53, 0x93, 0x7c, 0xfe, 0xd8, 0xe9];
 
+/** Whether a swap instruction's data is route_v2's: it swaps through the taker's own accounts of each token between, which
+ *  it names writable. The shared route swaps through Jupiter's own. */
+export const throughOwn = (data: ReadonlyUint8Array) => ROUTE_V2.every((b, i) => data[i] === b);
+
 /** What a swap instruction says. `destination`: where what comes out lands; `elsewhere`: route_v2's optional other
  *  destination, which Otus leaves unset (Jupiter's own address stands for none); null for the shared route, which has
  *  none. */

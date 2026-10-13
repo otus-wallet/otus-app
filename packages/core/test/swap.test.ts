@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { address, type Address, type Blockhash } from '@solana/kit';
+import { address, getAddressDecoder, type Address, type Blockhash } from '@solana/kit';
 
 import type { Chain } from '@otus-wallet/sdk/chain';
 import { decode } from '@otus-wallet/sdk/review/decode';
@@ -18,6 +18,7 @@ const TAKER = address('HH2vCgeHY4PNpYfACYSAAr11P1chxbMsSYbY7VzAHVx2');
 const askOf = (r: Record<string, unknown>): Ask => ({ input: r.inputMint as Address, output: r.outputMint as Address, amount: BigInt(r.inAmount as string), taker: TAKER, slippageBps: 50, maxAccounts: 64 });
 const LIFETIME = { blockhash: '11111111111111111111111111111111' as Blockhash, lastValidBlockHeight: 0n };
 const copy = <T>(v: T): T => structuredClone(v);
+const made = (n: number) => getAddressDecoder().decode(new Uint8Array(32).fill(n));
 
 test('a route reads as Jupiter gave it: amounts, venues, and what to build', () => {
     const r = readRoute(ROUTES['sol-usdc'], askOf(ROUTES['sol-usdc']));
@@ -212,6 +213,44 @@ test("an account opened for a token between the two swapped goes only when the s
     };
     assert.throws(() => readRoute(through(false), ask), /opens an account otherwise/);
     assert.equal(readRoute(through(true), ask).setup.length, (ROUTES['sol-usdc'].setupInstructions as unknown[]).length + 1);
+});
+
+test('accounts opened for tokens passed through: the taker\'s, by CreateIdempotent, written by route_v2, each once, four at most', () => {
+    // USD Coin for SOL through route_v2, one account opened: room for more.
+    const base = ROUTES['usdc-sol'];
+    const ask = askOf(base);
+    const create = (r: Record<string, unknown>) => (r.setupInstructions as { accounts: { pubkey: string }[]; data: string }[])[0]!;
+    const opening = (n: number, change: (open: { accounts: { pubkey: string; isWritable: boolean }[]; data: string }, swap: { accounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[] }) => void = () => {}) => {
+        const r = copy(base);
+        const swap = r.swapInstruction as { accounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[] };
+        for (let i = 0; i < n; i++) {
+            const open = copy(create(base)) as { accounts: { pubkey: string; isWritable: boolean }[]; data: string };
+            open.accounts[1].pubkey = made(100 + i);
+            open.accounts[3].pubkey = made(120 + i);
+            swap.accounts.push({ pubkey: open.accounts[1].pubkey, isSigner: false, isWritable: true });
+            change(open, swap);
+            (r.setupInstructions as unknown[]).push(open);
+        }
+        return r;
+    };
+    assert.doesNotThrow(() => readRoute(opening(3), ask));
+    assert.throws(() => readRoute(opening(4), ask), /twice, or too many/);
+    // Another wallet's, a create that is not the idempotent one, or one the swap names only read-only: refused.
+    assert.throws(() => readRoute(opening(1, (open) => void (open.accounts[2].pubkey = 'Attacker111111111111111111111111111111111111')), ask), /opens an account otherwise/);
+    assert.throws(() => readRoute(opening(1, (open) => void (open.data = Buffer.from([0]).toString('base64'))), ask), /opens an account otherwise/);
+    assert.throws(() => readRoute(opening(1, (_, swap) => void (swap.accounts.at(-1)!.isWritable = false)), ask), /opens an account otherwise/);
+    // The same one twice.
+    const twice = copy(base);
+    (twice.setupInstructions as unknown[]).push(create(base));
+    assert.throws(() => readRoute(twice, ask), /twice, or too many/);
+    // The shared route swaps through Jupiter's own accounts: one of the taker's it names is no account it passes through.
+    const shared = copy(ROUTES['usdc-bonk']);
+    const open = copy(create(shared)) as { accounts: { pubkey: string }[] };
+    open.accounts[1].pubkey = made(140);
+    open.accounts[3].pubkey = made(141);
+    (shared.swapInstruction as { accounts: unknown[] }).accounts.push({ pubkey: open.accounts[1].pubkey, isSigner: false, isWritable: true });
+    (shared.setupInstructions as unknown[]).push(open);
+    assert.throws(() => readRoute(shared, askOf(ROUTES['usdc-bonk'])), /opens an account otherwise/);
 });
 
 test("a swap missing accounts its IDL names is refused, never read short", () => {

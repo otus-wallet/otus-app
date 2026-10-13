@@ -1136,6 +1136,23 @@ function routeV2(me: Address, at: { wrapped: Address; usdc: Address }, terms: Pa
     };
 }
 
+// shared_accounts_route_v2 for the same swap, laid out as Otus's terms reader takes it (its id after the discriminator;
+// the taker at 1, from 2 into 5, the mints at 6 and 7, their programs at 8 and 9): through Jupiter's own accounts.
+function sharedV2(me: Address, at: { wrapped: Address; usdc: Address }) {
+    const data = new Uint8Array(8 + 1 + 8 + 8 + 2 + 2 + 2 + 4);
+    data.set([0xd1, 0x98, 0x53, 0x93, 0x7c, 0xfe, 0xd8, 0xe9]);
+    const view = new DataView(data.buffer);
+    view.setBigUint64(9, ASKED.amount, true);
+    view.setBigUint64(17, ASKED.out, true);
+    view.setUint16(25, ASKED.slippageBps, true);
+    const r = (a: Address, role = AccountRole.READONLY) => ({ address: a, role });
+    return {
+        programAddress: JUPITER,
+        accounts: [r(TOKEN_PROGRAM_ADDRESS), r(me, AccountRole.WRITABLE_SIGNER), r(at.wrapped, AccountRole.WRITABLE), r(key(31), AccountRole.WRITABLE), r(key(32), AccountRole.WRITABLE), r(at.usdc, AccountRole.WRITABLE), r(WSOL), r(USDC), r(TOKEN_PROGRAM_ADDRESS), r(TOKEN_PROGRAM_ADDRESS), r(key(30)), r(JUPITER)],
+        data,
+    };
+}
+
 // A swap as Otus builds it from a Jupiter route, SOL for USDC: the wrapped-SOL account opened, SOL moved in and synced,
 // the USDC account opened, Jupiter's swap, the wrapped-SOL account closed back; `change` bends it.
 async function swapFor(me: Address, change: (r: Route, at: { wrapped: Address; usdc: Address }) => void | Promise<void> = () => {}, tip = SENDER_TIPS[0]) {
@@ -1207,6 +1224,37 @@ test('what the popup makes for a swap is reviewed as Otus’s own, signed and la
                 r.swap = { ...r.swap, accounts: [...r.swap.accounts!, { address: through, role: AccountRole.WRITABLE }] };
             }
         })],
+        ['a third token, named, at an address not your account of it', swapFor(w.me, async (r) => {
+            r.setup.push(getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: key(46), owner: w.me, mint: key(47) }));
+            r.swap = { ...r.swap, accounts: [...r.swap.accounts!, { address: key(46), role: AccountRole.WRITABLE }] };
+        })],
+        ['a third token, named, opened as your account of another', swapFor(w.me, async (r) => {
+            const [ofOther] = await findAssociatedTokenPda({ owner: w.me, mint: key(49), tokenProgram: TOKEN_PROGRAM_ADDRESS });
+            r.setup.push(getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: ofOther, owner: w.me, mint: key(48) }));
+            r.swap = { ...r.swap, accounts: [...r.swap.accounts!, { address: ofOther, role: AccountRole.WRITABLE }] };
+        })],
+        ['a third token, named, under a made-up token program', swapFor(w.me, async (r) => {
+            const [fake] = await findAssociatedTokenPda({ owner: w.me, mint: key(51), tokenProgram: key(50) });
+            r.setup.push(getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: fake, owner: w.me, mint: key(51), tokenProgram: key(50) }));
+            r.swap = { ...r.swap, accounts: [...r.swap.accounts!, { address: fake, role: AccountRole.WRITABLE }] };
+        })],
+        ['a third token opened twice', swapFor(w.me, async (r) => {
+            const [through] = await findAssociatedTokenPda({ owner: w.me, mint: key(52), tokenProgram: TOKEN_PROGRAM_ADDRESS });
+            const create = getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: through, owner: w.me, mint: key(52) });
+            r.setup.push(create, create);
+            r.swap = { ...r.swap, accounts: [...r.swap.accounts!, { address: through, role: AccountRole.WRITABLE }] };
+        })],
+        ['a third token named only by a second swap', swapFor(w.me, async (r, a) => {
+            const [through] = await findAssociatedTokenPda({ owner: w.me, mint: key(54), tokenProgram: TOKEN_PROGRAM_ADDRESS });
+            const second = routeV2(w.me, a);
+            r.setup.push(getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: through, owner: w.me, mint: key(54) }), { ...second, accounts: [...second.accounts, { address: through, role: AccountRole.WRITABLE }] });
+        })],
+        ['a third token named by the shared route', swapFor(w.me, async (r, a) => {
+            const [through] = await findAssociatedTokenPda({ owner: w.me, mint: key(55), tokenProgram: TOKEN_PROGRAM_ADDRESS });
+            r.setup.push(getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: through, owner: w.me, mint: key(55) }));
+            const shared = sharedV2(w.me, a);
+            r.swap = { ...shared, accounts: [...shared.accounts, { address: through, role: AccountRole.WRITABLE }] };
+        })],
         ["another's account of a token passed through", swapFor(w.me, async (r) => {
             const [theirs] = await findAssociatedTokenPda({ owner: stranger, mint: key(43), tokenProgram: TOKEN_PROGRAM_ADDRESS });
             r.setup.push(getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: theirs, owner: stranger, mint: key(43) }));
@@ -1237,6 +1285,12 @@ test('what the popup makes for a swap is reviewed as Otus’s own, signed and la
         ['an account for a token the swap does not pass through', /opens an account for a token the swap doesn't pass through/],
         ['five accounts opened', /opens more than four accounts/],
         ["another's account of a token passed through", /opens an account otherwise than for you/],
+        ['a third token, named, at an address not your account of it', /opens an account that isn't your token account/],
+        ['a third token, named, opened as your account of another', /opens an account that isn't your token account/],
+        ['a third token, named, under a made-up token program', /opens an account that isn't your token account/],
+        ['a third token opened twice', /opens the same account twice/],
+        ['a third token named only by a second swap', /swaps more than once/],
+        ['a third token named by the shared route', /opens an account for a token the swap doesn't pass through/],
         ['Jupiter twice', /swaps more than once/],
         ['no swap', /token instruction \(17\)|there is no swap/],
         ['closed to another', /token instruction \(9\)/],

@@ -9,7 +9,7 @@ import { AccountRole, getBase64Encoder, isAddress, type Address, type Instructio
 
 import { TOKEN_2022_PROGRAM_ADDRESS } from '@otus-wallet/sdk/programs/addresses';
 import { OTUS_RPC } from '../settings.ts';
-import { termsOf } from './terms.ts';
+import { termsOf, throughOwn } from './terms.ts';
 
 /** Jupiter's aggregator: the one program a route's swap may call. */
 export const JUPITER = 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4' as Address;
@@ -34,6 +34,7 @@ export type Route = {
 const WAIT = 8_000; // ms for a route to come
 const MOST_TABLES = 8;
 const MOST_SETUP = 6; // instructions: two accounts opened, SOL wrapped and synced, with room
+const MOST_OPENED = 4; // accounts: the token got, wrapped SOL, and two a route passes through
 const MOST_STEPS = 16; // of a route plan
 const MOST_ACCOUNTS = 255; // in one instruction's list, repeats included: its count is one byte
 
@@ -64,18 +65,24 @@ export function readRoute(body: unknown, ask: Ask): Route {
     if (setup.some((i) => !SETUP.includes(i.programAddress))) throw new Error('the route sets up with another program');
     const swap = ix(b.swapInstruction);
     if (swap.programAddress !== JUPITER) throw new Error('the route swaps with another program');
-    // An account opened is the taker's, paid by it, with the System Program and a token program: the Associated Token
-    // program takes the token program it is given, and the size it says. It is for one of the two tokens swapped, or for
-    // one a route of several steps passes through, which the swap then names (it swaps through the taker's own).
-    const swapUses = new Set(swap.accounts?.map((a) => a.address));
+    // An account opened is the taker's, paid by it, with the System Program and a token program (CreateIdempotent, 1): the
+    // Associated Token program takes the token program it is given, and the size it says. It is for one of the two
+    // tokens swapped, or for one a route of several steps passes through: route_v2 swaps through the taker's own
+    // account of it, which it names writable. Four at most, each once.
+    const swapWrites = new Set(throughOwn(swap.data!) ? swap.accounts?.filter((a) => a.role === AccountRole.WRITABLE).map((a) => a.address) : []);
     const opens = (i: Instruction) =>
+        i.data?.length === 1 &&
+        i.data[0] === 1 &&
         i.accounts?.length === 6 &&
         i.accounts[0].address === ask.taker &&
         i.accounts[2].address === ask.taker &&
         i.accounts[4].address === SYSTEM_PROGRAM_ADDRESS &&
         TOKENS.includes(i.accounts[5].address) &&
-        (i.accounts[3].address === ask.input || i.accounts[3].address === ask.output || swapUses.has(i.accounts[1].address));
-    if (setup.some((i) => i.programAddress === ASSOCIATED_TOKEN_PROGRAM_ADDRESS && !opens(i))) throw new Error('the route opens an account otherwise');
+        (i.accounts[3].address === ask.input || i.accounts[3].address === ask.output || swapWrites.has(i.accounts[1].address));
+    const opening = setup.filter((i) => i.programAddress === ASSOCIATED_TOKEN_PROGRAM_ADDRESS);
+    if (!opening.every(opens)) throw new Error('the route opens an account otherwise');
+    const opened = new Set(opening.map((i) => i.accounts![1].address));
+    if (opened.size !== opening.length || opened.size > MOST_OPENED) throw new Error('the route opens an account twice, or too many');
     const terms = termsOf(swap.data!, (i) => swap.accounts?.[i]?.address, swap.accounts?.length ?? 0);
     const told = terms && terms.signer === ask.taker && terms.inputMint === ask.input && terms.outputMint === ask.output && terms.amount === ask.amount && terms.quoted === out && terms.slippageBps === ask.slippageBps;
     if (!told || terms.platformFeeBps !== 0 || terms.positiveSlippageBps !== 0 || (terms.elsewhere !== null && terms.elsewhere !== JUPITER)) throw new Error('the swap does not carry the route’s terms');

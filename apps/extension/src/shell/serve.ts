@@ -42,7 +42,7 @@ import type { Sent } from '@otus-wallet/core/send/send.ts';
 import { STAKE_SPACE } from '@otus-wallet/core/send/stake.ts';
 import { SENDER_TIPS, TIP } from '@otus-wallet/core/swap/build.ts';
 import { JUPITER } from '@otus-wallet/core/swap/route.ts';
-import { termsOf, type Asked } from '@otus-wallet/core/swap/terms.ts';
+import { termsOf, throughOwn, type Asked } from '@otus-wallet/core/swap/terms.ts';
 import { explorerOf, networkOf, OTUS_RPC, rpcFor } from '@otus-wallet/core/settings.ts';
 import { signInFields, signInText } from '../siws.ts';
 import type { TokenInfo } from '@otus-wallet/core/tokens.ts';
@@ -405,8 +405,16 @@ async function swapRefusal(r: Review, owner: Address, asked: Asked): Promise<str
     const ownAccount = async (mint: Address | undefined, program: Address | undefined) => mint && program && isTokenProgram(program) && (await findAssociatedTokenPda({ owner, mint, tokenProgram: program }))[0];
     const [wrapped] = await findAssociatedTokenPda({ owner, mint: WSOL, tokenProgram: TOKEN_PROGRAM_ADDRESS });
     const paysSol = asked.input === WSOL;
-    // The accounts the swap itself names: a token it passes through is swapped in the taker's own account of it.
-    const swapUses = new Set(instructions.filter((ix) => program(ix) === JUPITER).flatMap((ix) => ix.accountIndices.map((i) => r.accounts[i]?.address)));
+    // The accounts route_v2 names: a token it passes through is swapped in the taker's own account of it. (The shared
+    // route swaps through Jupiter's own: it opens none of the taker's.) Whether it writes one can't be told here: a
+    // message's accounts are writable for all its instructions, and the create makes it so; the popup's reading of the
+    // route, which has each instruction's roles, asks it.
+    const swapNames = new Set(
+        instructions
+            .filter((ix) => program(ix) === JUPITER && throughOwn(ix.data))
+            .flatMap((ix) => ix.accountIndices.map((i) => r.accounts[i]?.address))
+            .filter((a): a is Address => a !== undefined),
+    );
     const opened = new Set<Address | undefined>();
     let [swaps, wraps] = [0, 0];
     for (const ix of instructions.slice(1, -1)) {
@@ -425,7 +433,8 @@ async function swapRefusal(r: Review, owner: Address, asked: Asked): Promise<str
             if (t.destination !== (await ownAccount(t.outputMint, t.outputProgram))) return "the swap pays into an account that isn't your token account";
         } else if (p === ASSOCIATED_TOKEN_PROGRAM_ADDRESS) {
             if (ix.data.length !== 1 || ix.data[0] !== 1 || ix.accountIndices.length !== 6 || at(ix, 0) !== owner || at(ix, 2) !== owner || at(ix, 4) !== SYSTEM_PROGRAM_ADDRESS) return 'it opens an account otherwise than for you, paid by you';
-            if (at(ix, 3) !== asked.input && at(ix, 3) !== asked.output && !swapUses.has(at(ix, 1))) return "it opens an account for a token the swap doesn't pass through";
+            if (at(ix, 1) === undefined || at(ix, 3) === undefined) return 'it opens an account it does not name';
+            if (at(ix, 3) !== asked.input && at(ix, 3) !== asked.output && !swapNames.has(at(ix, 1)!)) return "it opens an account for a token the swap doesn't pass through";
             if (at(ix, 1) !== (await ownAccount(at(ix, 3), at(ix, 5)))) return "it opens an account that isn't your token account";
             if (opened.has(at(ix, 1))) return 'it opens the same account twice';
             opened.add(at(ix, 1));
