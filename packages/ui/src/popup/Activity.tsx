@@ -22,6 +22,7 @@ import { accessWords, others } from '@otus-wallet/core/view/access.ts';
 import { rows, type Naming, type Part, type Row } from '@otus-wallet/sdk/activity/words';
 import { cuts, mintsIn } from '@otus-wallet/core/view/activity.ts';
 import { symbolOf } from '@otus-wallet/sdk/activity/symbols';
+import { rounded } from '@otus-wallet/sdk/format';
 import type { Screen } from './App.tsx';
 import { TabBar, Tip } from './common.tsx';
 import { WalletBar } from './Lobby.tsx';
@@ -49,6 +50,8 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
             wallet: account.address,
             symbol: (mint) => (!mainnet ? mint : (KNOWN_SYMBOLS[mint] ?? verified.get(mint) ?? symbolOf(mint, said(mint), known))),
             verified: (mint) => (!mainnet ? undefined : KNOWN_SYMBOLS[mint] !== undefined || verified.has(mint) || said(mint)?.verified),
+            // The line's amounts at a glance; opened, the row has them whole.
+            amount: rounded,
             who: (a) => (a === account.address ? `${a}${YOU}` : (names.get(a) ?? PROGRAM_NAMES.get(a) ?? a)),
             program: (a) => PROGRAM_NAMES.get(a) ?? a,
             known: [...state.accounts.map((k) => k.address), ...state.contacts.map((k) => k.address), ...(Object.keys(state.sent) as Address[])],
@@ -162,11 +165,11 @@ const WAY = { in: 'text-ok', out: 'text-danger' } as const;
 
 // A line's words, what came in green and what went out red: in a plain row; a warning's colour holds over all of one.
 // Words to take note of (a program Otus doesn't know) are amber in any. The line opens the row, so its addresses are
-// only cut short.
+// only cut short; a rounded amount is whole on a hover.
 const Parts = ({ parts, plain, cut }: { parts: Part[]; plain: boolean; cut: Cut }) => (
     <>
         {parts.map((p, i) => (
-            <span key={i} className={cn(plain && p.way && WAY[p.way], p.tone === 'warn' && 'text-warn')}>
+            <span key={i} title={p.exact} className={cn(plain && p.way && WAY[p.way], p.tone === 'warn' && 'text-warn')}>
                 <Tagged text={p.text} cut={cut} still />
             </span>
         ))}
