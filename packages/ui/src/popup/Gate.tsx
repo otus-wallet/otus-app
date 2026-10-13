@@ -10,7 +10,7 @@ export function Empty({ setUp }: { setUp: () => void }) {
             <div className="flex flex-1 flex-col items-center justify-center gap-3">
                 <Initial />
                 <h1 className="pixel text-lg">Otus</h1>
-                <p className="text-xs text-ink-2">Every transaction reviewed before you sign.</p>
+                <p className="text-xs text-ink-2">Know what you sign.</p>
             </div>
             <Button variant="default" className="w-full" onClick={setUp}>
                 Set up Otus
