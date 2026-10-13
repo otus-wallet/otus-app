@@ -218,7 +218,6 @@ function Item({ row, open, flip, explorer, cut, outside }: { row: Row; open: boo
                             </span>
                         </span>
                     )}
-                    {when && <span className="mt-1 text-ink-3">{when.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
                     {row.signature && (
                         <a href={explorer.tx(row.signature)} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex h-7 items-center gap-1.5 self-start rounded-[3px] border border-rule px-[9px] text-xs font-bold text-ink hover:border-ink-3">
                             {`View on ${explorer.name}`}
