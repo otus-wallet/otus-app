@@ -22,7 +22,6 @@ import { accessWords, others } from '@otus-wallet/core/view/access.ts';
 import { rows, type Naming, type Part, type Row } from '@otus-wallet/sdk/activity/words';
 import { cuts, mintsIn } from '@otus-wallet/core/view/activity.ts';
 import { symbolOf } from '@otus-wallet/sdk/activity/symbols';
-import { latin } from '@otus-wallet/sdk/review/sites';
 import type { Screen } from './App.tsx';
 import { TabBar, Tip } from './common.tsx';
 import { WalletBar } from './Lobby.tsx';
@@ -45,7 +44,7 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
         const names = new Map<string, string>([...state.contacts, ...state.accounts].map((k) => [k.address, k.label]));
         const said = (mint: string) => looked.data?.get(mint) ?? cachedToken(mint);
         // The verified tokens' symbols in view: an unverified one named as one of them is a fake.
-        const known = new Set([...Object.values(KNOWN_SYMBOLS), ...verified.values()].map((s) => latin(s).toUpperCase()));
+        const known = [...Object.values(KNOWN_SYMBOLS), ...verified.values()];
         return {
             wallet: account.address,
             symbol: (mint) => (!mainnet ? mint : (KNOWN_SYMBOLS[mint] ?? verified.get(mint) ?? symbolOf(mint, said(mint), known))),
