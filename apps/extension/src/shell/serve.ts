@@ -380,14 +380,17 @@ export function swapOwn(bytes: Uint8Array, address: string, asked: Asked, shell:
 // A v0 message with Compute Budget's SetComputeUnitLimit (2) first and a tip to one of Sender's accounts last (System's
 // Transfer, 2, of exactly TIP from the owner), and between them only what a Jupiter route sets up, swaps and cleans up
 // for this owner, as asked:
-// - at most three of its own token accounts opened, for the swap's two tokens only (Associated Token's CreateIdempotent,
-//   1, paid by it, with the System Program, a token program, and the very address the three derive);
+// - at most four of its own token accounts opened (Associated Token's CreateIdempotent, 1, paid by it, with the System
+//   Program, a token program, and the very address the three derive): for the swap's two tokens, or for a token a route
+//   of several steps passes through, when the swap itself names that account (route_v2 swaps through the taker's own);
 // - paying SOL, that amount moved into its wrapped-SOL account (Transfer) and synced (a token program's SyncNative, 17);
 // - Jupiter's one swap (route_v2 or shared_accounts_route_v2), signed by it, with the amount, quote and slippage asked
 //   and no fee, from its own account of the mint paid into its own account of the mint asked for (see `termsOf`);
 // - its wrapped-SOL account closed back to it (CloseAccount, 9), when SOL is on one side.
 // The route plan is Jupiter's: the review simulates it, and the guards hold what comes of it. Why it is not one, in a few
 // words, or null when it is.
+const MOST_OPENED = 4; // the token got, wrapped SOL, and two a route passes through
+
 async function swapRefusal(r: Review, owner: Address, asked: Asked): Promise<string | null> {
     type Ix = Review['message']['instructions'][number];
     const program = (ix: Ix) => r.accounts[ix.programAddressIndex].address;
@@ -402,6 +405,8 @@ async function swapRefusal(r: Review, owner: Address, asked: Asked): Promise<str
     const ownAccount = async (mint: Address | undefined, program: Address | undefined) => mint && program && isTokenProgram(program) && (await findAssociatedTokenPda({ owner, mint, tokenProgram: program }))[0];
     const [wrapped] = await findAssociatedTokenPda({ owner, mint: WSOL, tokenProgram: TOKEN_PROGRAM_ADDRESS });
     const paysSol = asked.input === WSOL;
+    // The accounts the swap itself names: a token it passes through is swapped in the taker's own account of it.
+    const swapUses = new Set(instructions.filter((ix) => program(ix) === JUPITER).flatMap((ix) => ix.accountIndices.map((i) => r.accounts[i]?.address)));
     const opened = new Set<Address | undefined>();
     let [swaps, wraps] = [0, 0];
     for (const ix of instructions.slice(1, -1)) {
@@ -420,7 +425,7 @@ async function swapRefusal(r: Review, owner: Address, asked: Asked): Promise<str
             if (t.destination !== (await ownAccount(t.outputMint, t.outputProgram))) return "the swap pays into an account that isn't your token account";
         } else if (p === ASSOCIATED_TOKEN_PROGRAM_ADDRESS) {
             if (ix.data.length !== 1 || ix.data[0] !== 1 || ix.accountIndices.length !== 6 || at(ix, 0) !== owner || at(ix, 2) !== owner || at(ix, 4) !== SYSTEM_PROGRAM_ADDRESS) return 'it opens an account otherwise than for you, paid by you';
-            if (at(ix, 3) !== asked.input && at(ix, 3) !== asked.output) return 'it opens an account for a third token'; // for the swap's own two tokens alone
+            if (at(ix, 3) !== asked.input && at(ix, 3) !== asked.output && !swapUses.has(at(ix, 1))) return "it opens an account for a token the swap doesn't pass through";
             if (at(ix, 1) !== (await ownAccount(at(ix, 3), at(ix, 5)))) return "it opens an account that isn't your token account";
             if (opened.has(at(ix, 1))) return 'it opens the same account twice';
             opened.add(at(ix, 1));
@@ -433,7 +438,7 @@ async function swapRefusal(r: Review, owner: Address, asked: Asked): Promise<str
         } else return `it calls another program, ${p}`;
     }
     if (swaps !== 1) return swaps === 0 ? 'there is no swap in it' : 'it swaps more than once';
-    if (opened.size > 3) return 'it opens more than three accounts';
+    if (opened.size > MOST_OPENED) return 'it opens more than four accounts';
     return null;
 }
 

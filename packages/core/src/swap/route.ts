@@ -62,12 +62,20 @@ export function readRoute(body: unknown, ask: Ask): Route {
     const ix = (v: unknown) => instruction(v, ask.taker);
     const setup = list(b.setupInstructions, MOST_SETUP).map(ix);
     if (setup.some((i) => !SETUP.includes(i.programAddress))) throw new Error('the route sets up with another program');
-    // An account opened is the taker's, paid by it, with the System Program and a token program: the Associated Token
-    // program takes the token program it is given, and the size it says.
-    const opens = (i: Instruction) => i.accounts?.length === 6 && i.accounts[0].address === ask.taker && i.accounts[2].address === ask.taker && i.accounts[4].address === SYSTEM_PROGRAM_ADDRESS && TOKENS.includes(i.accounts[5].address);
-    if (setup.some((i) => i.programAddress === ASSOCIATED_TOKEN_PROGRAM_ADDRESS && !opens(i))) throw new Error('the route opens an account otherwise');
     const swap = ix(b.swapInstruction);
     if (swap.programAddress !== JUPITER) throw new Error('the route swaps with another program');
+    // An account opened is the taker's, paid by it, with the System Program and a token program: the Associated Token
+    // program takes the token program it is given, and the size it says. It is for one of the two tokens swapped, or for
+    // one a route of several steps passes through, which the swap then names (it swaps through the taker's own).
+    const swapUses = new Set(swap.accounts?.map((a) => a.address));
+    const opens = (i: Instruction) =>
+        i.accounts?.length === 6 &&
+        i.accounts[0].address === ask.taker &&
+        i.accounts[2].address === ask.taker &&
+        i.accounts[4].address === SYSTEM_PROGRAM_ADDRESS &&
+        TOKENS.includes(i.accounts[5].address) &&
+        (i.accounts[3].address === ask.input || i.accounts[3].address === ask.output || swapUses.has(i.accounts[1].address));
+    if (setup.some((i) => i.programAddress === ASSOCIATED_TOKEN_PROGRAM_ADDRESS && !opens(i))) throw new Error('the route opens an account otherwise');
     const terms = termsOf(swap.data!, (i) => swap.accounts?.[i]?.address, swap.accounts?.length ?? 0);
     const told = terms && terms.signer === ask.taker && terms.inputMint === ask.input && terms.outputMint === ask.output && terms.amount === ask.amount && terms.quoted === out && terms.slippageBps === ask.slippageBps;
     if (!told || terms.platformFeeBps !== 0 || terms.positiveSlippageBps !== 0 || (terms.elsewhere !== null && terms.elsewhere !== JUPITER)) throw new Error('the swap does not carry the route’s terms');

@@ -197,6 +197,23 @@ test('an account opened with another program as its token program, or for anothe
     assert.throws(() => readRoute(many, ask), /not as asked/);
 });
 
+test("an account opened for a token between the two swapped goes only when the swap names it (a route of several steps)", () => {
+    const ask = askOf(ROUTES['sol-usdc']);
+    const THROUGH = 'DEkqHyPN7GMRJ5cArtQFAWefqbZb33Hyf6s5iCwjEonT';
+    const ACCOUNT = 'Through111111111111111111111111111111111111';
+    const through = (named: boolean) => {
+        const r = copy(ROUTES['sol-usdc']);
+        const create = copy((r.setupInstructions as { accounts: { pubkey: string }[] }[])[0]);
+        create.accounts[1].pubkey = ACCOUNT;
+        create.accounts[3].pubkey = THROUGH;
+        (r.setupInstructions as unknown[]).push(create);
+        if (named) (r.swapInstruction as { accounts: unknown[] }).accounts.push({ pubkey: ACCOUNT, isSigner: false, isWritable: true });
+        return r;
+    };
+    assert.throws(() => readRoute(through(false), ask), /opens an account otherwise/);
+    assert.equal(readRoute(through(true), ask).setup.length, (ROUTES['sol-usdc'].setupInstructions as unknown[]).length + 1);
+});
+
 test("a swap missing accounts its IDL names is refused, never read short", () => {
     const ask = askOf(ROUTES['sol-usdc']);
     const cut = copy(ROUTES['sol-usdc']);

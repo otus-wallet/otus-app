@@ -1199,7 +1199,19 @@ test('what the popup makes for a swap is reviewed as Otus’s own, signed and la
         ['from another account', swapFor(w.me, (r, a) => void (r.swap = routeV2(w.me, a, { source: a.usdc })))],
         ['for another token', swapFor(w.me, (r, a) => void (r.swap = routeV2(w.me, a, { output: key(35) })))],
         ['another of Jupiter’s instructions', swapFor(w.me, (r, a) => void (r.swap = { ...routeV2(w.me, a), data: Uint8Array.of(1, 2, 3, 4, 5, 6, 7, 8, ...new Uint8Array(26)) }))],
-        ['an account for a third token', swapFor(w.me, async (r) => void r.setup.push(getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: (await findAssociatedTokenPda({ owner: w.me, mint: key(37), tokenProgram: TOKEN_PROGRAM_ADDRESS }))[0], owner: w.me, mint: key(37) })))],
+        ['an account for a token the swap does not pass through', swapFor(w.me, async (r) => void r.setup.push(getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: (await findAssociatedTokenPda({ owner: w.me, mint: key(37), tokenProgram: TOKEN_PROGRAM_ADDRESS }))[0], owner: w.me, mint: key(37) })))],
+        ['five accounts opened', swapFor(w.me, async (r) => {
+            for (const n of [40, 41, 42]) {
+                const [through] = await findAssociatedTokenPda({ owner: w.me, mint: key(n), tokenProgram: TOKEN_PROGRAM_ADDRESS });
+                r.setup.push(getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: through, owner: w.me, mint: key(n) }));
+                r.swap = { ...r.swap, accounts: [...r.swap.accounts!, { address: through, role: AccountRole.WRITABLE }] };
+            }
+        })],
+        ["another's account of a token passed through", swapFor(w.me, async (r) => {
+            const [theirs] = await findAssociatedTokenPda({ owner: stranger, mint: key(43), tokenProgram: TOKEN_PROGRAM_ADDRESS });
+            r.setup.push(getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: theirs, owner: stranger, mint: key(43) }));
+            r.swap = { ...r.swap, accounts: [...r.swap.accounts!, { address: theirs, role: AccountRole.WRITABLE }] };
+        })],
         ['a swap with its accounts cut short', swapFor(w.me, (r, a) => void (r.swap = { ...routeV2(w.me, a), accounts: routeV2(w.me, a).accounts.slice(0, 7) }))],
         ['Jupiter twice', swapFor(w.me, (r) => void r.setup.push(r.swap))],
         ['no swap', swapFor(w.me, (r) => void (r.swap = syncNative(key(36))))],
@@ -1222,12 +1234,24 @@ test('what the popup makes for a swap is reviewed as Otus’s own, signed and la
         ['from another account', /pays from an account that isn't your token account/],
         ['to another destination', /pays out to another account/],
         ['for another token', /for other tokens than asked/],
-        ['an account for a third token', /opens an account for a third token/],
+        ['an account for a token the swap does not pass through', /opens an account for a token the swap doesn't pass through/],
+        ['five accounts opened', /opens more than four accounts/],
+        ["another's account of a token passed through", /opens an account otherwise than for you/],
         ['Jupiter twice', /swaps more than once/],
         ['no swap', /token instruction \(17\)|there is no swap/],
         ['closed to another', /token instruction \(9\)/],
     ];
     for (const [what, said] of why) assert.match(refusals.get(what) ?? '', said, what);
+    // A route of several steps, through the taker's own accounts of two tokens between (route_v2 swaps through them):
+    // opened, and named by the swap, they go.
+    const hops = await swapFor(w.me, async (r) => {
+        for (const n of [44, 45]) {
+            const [through] = await findAssociatedTokenPda({ owner: w.me, mint: key(n), tokenProgram: TOKEN_PROGRAM_ADDRESS });
+            r.setup.push(getCreateAssociatedTokenIdempotentInstruction({ payer: me, ata: through, owner: w.me, mint: key(n) }));
+            r.swap = { ...r.swap, accounts: [...r.swap.accounts!, { address: through, role: AccountRole.WRITABLE }] };
+        }
+    });
+    assert.equal(result<{ outcome: string }>(await swapOwn(hops, w.me, ASKED, fast)).outcome, 'confirmed');
     // Neither side SOL: nothing may close the wrapped-SOL account.
     const tokens: Asked = { ...ASKED, input: USDC, output: key(38) };
     const closing = await swapFor(w.me, async (r, a) => {
@@ -1263,7 +1287,7 @@ test('what the popup makes for a swap is reviewed as Otus’s own, signed and la
     assert.match(((await swapOwn(await swapFor(key(5)), w.me, ASKED, fast)) as { error: string }).error, /does not sign this transaction/);
     await w.shell.update((s) => ({ settings: { ...s.settings, network: 'devnet' } }));
     assert.match(((await swapOwn(made, w.me, ASKED, fast)) as { error: string }).error, /mainnet only/);
-    assert.equal(landedFast.length, 2);
+    assert.equal(landedFast.length, 3);
 });
 
 test('a swap Otus could not guard is refused before it can be approved', async () => {
