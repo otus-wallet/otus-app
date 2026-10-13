@@ -154,11 +154,12 @@ const TONE = { plain: '', warn: 'text-warn', danger: 'text-danger' } as const;
 const WAY = { in: 'text-ok', out: 'text-danger' } as const;
 
 // A line's words, what came in green and what went out red: in a plain row; a warning's colour holds over all of one.
-// The line opens the row, so its addresses are only cut short.
+// Words to take note of (a program Otus doesn't know) are amber in any. The line opens the row, so its addresses are
+// only cut short.
 const Parts = ({ parts, plain, cut }: { parts: Part[]; plain: boolean; cut: Cut }) => (
     <>
         {parts.map((p, i) => (
-            <span key={i} className={cn(plain && p.way && WAY[p.way])}>
+            <span key={i} className={cn(plain && p.way && WAY[p.way], p.tone === 'warn' && 'text-warn')}>
                 <Tagged text={p.text} cut={cut} still />
             </span>
         ))}
