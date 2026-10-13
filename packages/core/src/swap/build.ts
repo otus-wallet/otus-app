@@ -5,7 +5,6 @@
 import { MAX_COMPUTE_UNIT_LIMIT, getSetComputeUnitLimitInstruction } from '@solana-program/compute-budget';
 import { getTransferSolInstruction } from '@solana-program/system';
 import {
-    address,
     appendTransactionMessageInstructions,
     compileTransaction,
     compressTransactionMessageUsingAddressLookupTables,
@@ -15,26 +14,14 @@ import {
     pipe,
     setTransactionMessageFeePayer,
     setTransactionMessageLifetimeUsingBlockhash,
-    type Address,
 } from '@solana/kit';
 
-import { WSOL } from '@otus-wallet/sdk/programs/addresses';
+import { SENDER_TIPS, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import type { Lifetime } from '../send/transfer.ts';
 import { routeFor, type Ask, type Route } from './route.ts';
 
-/** Helius Sender's tip accounts (helius.dev/docs/sending-transactions/sender): one of them is paid per transaction. */
-export const SENDER_TIPS: readonly Address[] = [
-    '4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE',
-    'D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ',
-    '9bnz4RShgq1hAnLnZbP8kbgBg1kEmcJBYQq3gQbmnSta',
-    '5VY91ws6B2hMmBFRsXkoAAdsPHBJwRfBht4DXox3xkwn',
-    '2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD',
-    '2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ',
-    'wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF',
-    '3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT',
-    '4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey',
-    '4TQLFNWK8AovT1gFvda5jfw2oJeRMKEmw7aH6MGBJ3or',
-].map((a) => address(a));
+// Helius Sender's tip accounts, one of them paid per transaction: the SDK's list, which Activity tells a tip by.
+export { SENDER_TIPS };
 
 /** The tip, in lamports: above Sender's least on the stake-weighted path Otus's server sends through (5,000). */
 export const TIP = 10_000n;
