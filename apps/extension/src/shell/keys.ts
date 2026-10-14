@@ -3,7 +3,7 @@
 import { createKeyPairFromPrivateKeyBytes, getAddressEncoder, getAddressFromPublicKey, getBase58Decoder, signBytes, type Address, type SignatureBytes } from '@solana/kit';
 
 import { newPhrase, phraseOf, privateKeyFromText, privateKeyOf, privateKeysOf } from '../keys/derive.ts';
-import { base64, bytes, createVault, openVault, readSecrets, writeSecrets, WrongPassword, type Bytes, type Secret, type Vault } from '../keys/vault.ts';
+import { base64, bytes, createVault, openVault, readSecrets, UnknownVault, writeSecrets, WrongPassword, type Bytes, type Secret, type Vault } from '../keys/vault.ts';
 import { NO_KEY, Refused } from '@otus-wallet/core/protocol.ts';
 import type { KeysCall, KeysReply, KeyStatus } from '@otus-wallet/core/keystore.ts';
 import { load, named, signs, update, type Account } from '@otus-wallet/core/state.ts';
@@ -26,13 +26,14 @@ function serial<T>(work: () => Promise<T>): Promise<T> {
     return run;
 }
 
-/** A call from Otus's pages → the reply. Never throws. */
+/** A call from Otus's pages → the reply. Never throws. What failed is logged by its kind only: a message may quote what
+ *  was asked, a phrase or a key among it. */
 export async function keysCall(call: KeysCall): Promise<KeysReply> {
     try {
         return { ok: true, result: await serial(() => run(call)) };
     } catch (e) {
         if (e instanceof Refused) return { ok: false, error: e.message };
-        console.error('Otus: keys', e);
+        console.error('Otus: keys', e instanceof Error ? e.name : typeof e);
         return { ok: false, error: 'Otus could not do that' };
     }
 }
@@ -44,8 +45,7 @@ async function run(call: KeysCall): Promise<unknown> {
         case 'unlock': {
             const key = await opened(text(call.password));
             await keep(key);
-            await verified(key).catch((e) => console.error('Otus: checking accounts', e));
-            return void (await pruned().catch((e) => console.error('Otus: pruning the vault', e)));
+            return void (await verified(key).catch((e) => console.error('Otus: checking accounts', e)));
         }
         case 'lock':
             return locking();
@@ -53,7 +53,7 @@ async function run(call: KeysCall): Promise<unknown> {
             if (await shielded()) throw new Refused('Unlock Otus first');
             return pending(call.words === 24 ? 24 : 12);
         case 'add':
-            return add(call.from, label(call.label), call.newPassword === undefined ? undefined : text(call.newPassword));
+            return add(source(call.from), label(call.label), call.newPassword === undefined ? undefined : text(call.newPassword));
         case 'derive':
             return derive(label(call.label));
         case 'reveal':
@@ -93,6 +93,7 @@ async function opened(password: string): Promise<Bytes> {
     const vault = await stored();
     if (!vault) throw new Refused('There is no wallet to unlock');
     return openVault(vault, password).catch((e) => {
+        if (e instanceof UnknownVault) throw new Refused("Otus can't open its vault: it was changed outside Otus");
         throw e instanceof WrongPassword ? new Refused('Wrong password') : e;
     });
 }
@@ -100,13 +101,21 @@ async function opened(password: string): Promise<Bytes> {
 // Unlocked until the background locks it, or the browser closes.
 const keep = (key: Bytes) => chrome.storage.session.set({ unlocked: base64(key) });
 
-// The phrase being created waits in session storage until it is added, or until another length is asked for.
+// The phrases being created wait in session storage, one of each length, until one is added: switched from 12 words to
+// 24 and back, it is the 12 shown before, which may be written down already.
 async function pending(words: 12 | 24): Promise<string> {
-    const { pending } = await chrome.storage.session.get('pending');
-    if (typeof pending === 'string' && pending.split(' ').length === words) return pending;
+    const kept = await waiting();
+    if (kept[words]?.split(' ').length === words) return kept[words];
     const phrase = newPhrase(words);
-    await chrome.storage.session.set({ pending: phrase });
+    await chrome.storage.session.set({ pending: { ...kept, [words]: phrase } });
     return phrase;
+}
+
+// The phrases being created, by length.
+async function waiting(): Promise<Partial<Record<12 | 24, string>>> {
+    const { pending } = await chrome.storage.session.get('pending');
+    if (typeof pending !== 'object' || pending === null) return {};
+    return Object.fromEntries(([12, 24] as const).flatMap((n) => (typeof (pending as Record<number, unknown>)[n] === 'string' ? [[n, (pending as Record<number, string>)[n]]] : [])));
 }
 
 // A key pair that cannot be exported, for one use.
@@ -157,11 +166,21 @@ async function add(from: { phrase: string } | { privateKey: string }, name: stri
         if ('phrase' in fresh) await unremoved(fresh.phrase);
         throw new Refused('phrase' in fresh ? 'That phrase is in Otus already: New account brings back the accounts you removed from it' : 'That account is in Otus already');
     }
-    if (!same) await chrome.storage.local.set({ vault: await writeSecrets(vault, key, [...secrets, fresh]) });
+    // The vault with its secret and the account on it, written at once: an add cut short leaves neither.
+    const sealed = same ? {} : { vault: await writeSecrets(vault, key, [...secrets, fresh]) };
+    const account = await list({ address, label: name, key: { secret: (same ?? fresh).id, ...(index !== undefined && { index }) } }, sealed);
     await keep(key);
-    if ('phrase' in fresh && fresh.phrase === (await chrome.storage.session.get('pending')).pending) await chrome.storage.session.remove('pending');
+    if ('phrase' in fresh && Object.values(await waiting()).includes(fresh.phrase)) await chrome.storage.session.remove('pending');
     if ('phrase' in fresh) await unremoved(fresh.phrase);
-    return list({ address, label: name, key: { secret: (same ?? fresh).id, ...(index !== undefined && { index }) } });
+    return account;
+}
+
+// What an add comes from: a phrase, or a private key, as text.
+function source(v: unknown): { phrase: string } | { privateKey: string } {
+    if (typeof v !== 'object' || v === null) throw new Refused('bad input');
+    if ('phrase' in v) return { phrase: text(v.phrase) };
+    if ('privateKey' in v) return { privateKey: text(v.privateKey) };
+    throw new Refused('bad input');
 }
 
 // An account's private key as wallets export it (base58 of the key and its public key), or the phrase it comes from.
@@ -215,8 +234,9 @@ async function unremoved(phrase: string) {
     await update((s) => ({ removed: s.removed.filter((a) => !addresses.has(a)) }));
 }
 
-/** Drops from the vault the phrases and keys no account of yours uses any more: a wallet removed is gone from Otus. Also
- *  at unlock, for a removal a lock or a stop came between. */
+/** Drops from the vault the phrases and keys no account of yours uses any more, once a wallet is removed: it is gone
+ *  from Otus. Only then: an account list that lost entries some other way (cut short, changed outside Otus) must not
+ *  take secrets with it. */
 export const prune = () => serial(pruned);
 async function pruned() {
     const [key, vault] = [await held(), await stored()];
@@ -229,15 +249,15 @@ async function pruned() {
 
 // Each account of yours as its key in the vault gives it: an address written into storage by anything but Otus (as
 // malware may, while Chrome is closed) is put back, so Receive never shows someone else's under your wallet's name.
-// One whose key the vault does not hold, or gives no address, keeps its address as one Otus only watches; one that
-// comes back to an address another account has already goes.
+// One whose key the vault does not hold keeps its address as one Otus only watches; one that comes back to an address
+// another account has already goes. A key that gives no address at all stops the check: nothing is changed then.
 async function verified(key: Bytes) {
     const secrets = new Map((await readSecrets((await stored())!, key)).map((s) => [s.id, s]));
     const fixed = new Map<string, Address | null>();
     for (const a of (await load()).accounts) {
         if (!a.key) continue;
         const secret = secrets.get(a.key.secret);
-        const real = secret ? await addressOf(secret, a.key.index).catch(() => null) : null;
+        const real = secret ? await addressOf(secret, a.key.index) : null;
         if (real !== a.address) fixed.set(a.address, real);
     }
     if (fixed.size === 0) return;
@@ -257,8 +277,9 @@ async function verified(key: Bytes) {
     });
 }
 
-// Added to your accounts and put in use. An address you only watched becomes one you can sign for, keeping its name.
-async function list(account: Account): Promise<Account> {
+// Added to your accounts and put in use, with `also` written in the same write. An address you only watched becomes
+// one you can sign for, keeping its name.
+async function list(account: Account, also: Record<string, unknown> = {}): Promise<Account> {
     let listed = account;
     await update(({ accounts, contacts }) => {
         const known = accounts.find((a) => a.address === account.address);
@@ -267,7 +288,7 @@ async function list(account: Account): Promise<Account> {
         listed = { ...account, ...(known && { label: known.label }), ...(since !== undefined && { since }) };
         const kept = contacts.filter((c) => c.address !== account.address); // yours now: no longer an address you keep
         return { accounts: known ? accounts.map((a) => (a === known ? listed : a)) : [...accounts, listed], active: account.address, contacts: kept };
-    });
+    }, also);
     return listed;
 }
 

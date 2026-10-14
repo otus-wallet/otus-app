@@ -100,3 +100,84 @@ test('a phrase imported again brings back the accounts you removed from it', asy
     const back = await call({ keys: 'derive', label: 'Back' });
     assert.equal((await load()).accounts.find((a) => a.address === back.address)?.key?.index, 1);
 });
+
+test('an unlock never drops secrets: an account list that lost entries outside Otus takes nothing from the vault', async () => {
+    const before = await secrets();
+    const { accounts } = await load();
+    await call({ keys: 'lock' });
+    await chrome.storage.local.set({ accounts: [] }); // cut short, or changed outside Otus
+    await call({ keys: 'unlock', password: PASSWORD });
+    assert.deepEqual(await secrets(), before);
+    await chrome.storage.local.set({ accounts });
+});
+
+test('a key that gives no address stops the check at unlock: nothing is changed', async () => {
+    const { vault } = (await chrome.storage.local.get('vault')) as { vault: Parameters<typeof readSecrets>[0] };
+    const { unlocked } = (await chrome.storage.session.get('unlocked')) as { unlocked: string };
+    const { writeSecrets } = await import('../src/keys/vault.ts');
+    const kept = await readSecrets(vault, bytes(unlocked));
+    const broken = { id: 'broken', key: 'AAAA' }; // three bytes: no key pair comes of them
+    await chrome.storage.local.set({ vault: await writeSecrets(vault, bytes(unlocked), [...kept, broken]) });
+    const { accounts } = await load();
+    const odd = { address: 'DRpbCBMxVnDK7maPM5tGv6MvB3v1sRMC86PZ8okm21hy', label: 'Odd', key: { secret: 'broken' } };
+    await chrome.storage.local.set({ accounts: [...accounts, odd] });
+    await call({ keys: 'lock' });
+    await call({ keys: 'unlock', password: PASSWORD });
+    assert.deepEqual((await load()).accounts.find((a) => a.address === odd.address), odd); // not made watch-only
+    await chrome.storage.local.set({ accounts, vault });
+});
+
+test('an added wallet lands in one write, its secret with its account', async () => {
+    const writes: string[][] = [];
+    const set = chrome.storage.local.set;
+    chrome.storage.local.set = (async (items: Record<string, unknown>) => (writes.push(Object.keys(items).sort()), set(items))) as typeof set;
+    try {
+        await call({ keys: 'add', from: { phrase: 'zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong' }, label: 'Zoo' });
+    } finally {
+        chrome.storage.local.set = set;
+    }
+    const withVault = writes.filter((w) => w.includes('vault'));
+    assert.equal(withVault.length, 1, JSON.stringify(writes));
+    assert.ok(withVault[0].includes('accounts'), JSON.stringify(writes));
+    assert.ok((await secrets()).includes('zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong'));
+});
+
+test('a vault whose costs or shape are not Otus’s is refused at once, before any work on the password', async () => {
+    const { vault } = (await chrome.storage.local.get('vault')) as { vault: { kdf: Record<string, unknown>; version: number } };
+    const tried = async (changed: object) => {
+        await chrome.storage.local.set({ vault: { ...vault, ...changed } });
+        const start = performance.now();
+        const reply = await keysCall({ keys: 'unlock', password: PASSWORD });
+        return [reply.ok ? 'opened' : reply.error, performance.now() - start < 200];
+    };
+    await call({ keys: 'lock' });
+    const refused = ["Otus can't open its vault: it was changed outside Otus", true];
+    assert.deepEqual(await tried({ kdf: { ...vault.kdf, t: 30 } }), refused);
+    assert.deepEqual(await tried({ kdf: { ...vault.kdf, m: 1024 * 1024 } }), refused);
+    assert.deepEqual(await tried({ kdf: { ...vault.kdf, p: 4 } }), refused);
+    assert.deepEqual(await tried({ kdf: { ...vault.kdf, salt: 'AAAA' } }), refused);
+    assert.deepEqual(await tried({ version: 2 }), refused);
+    assert.deepEqual((await tried({}))[0], 'opened');
+});
+
+test('the phrase being made stays the same for each length, switched back and forth', async () => {
+    await chrome.storage.session.remove('pending');
+    const twelve = await call({ keys: 'phrase', words: 12 });
+    const twentyFour = await call({ keys: 'phrase', words: 24 });
+    assert.equal(String(twentyFour).split(' ').length, 24);
+    assert.equal(await call({ keys: 'phrase', words: 12 }), twelve);
+    assert.equal(await call({ keys: 'phrase', words: 24 }), twentyFour);
+});
+
+test('an add from anything but a phrase or a key, as an object, is refused without echoing it', async () => {
+    const logged: unknown[] = [];
+    const error = console.error;
+    console.error = (...args: unknown[]) => void logged.push(...args);
+    try {
+        assert.deepEqual(await keysCall({ keys: 'add', from: B as never, label: 'x' }), { ok: false, error: 'bad input' });
+        assert.deepEqual(await keysCall({ keys: 'add', from: null as never, label: 'x' }), { ok: false, error: 'bad input' });
+    } finally {
+        console.error = error;
+    }
+    assert.ok(!JSON.stringify(logged).includes('legal'));
+});

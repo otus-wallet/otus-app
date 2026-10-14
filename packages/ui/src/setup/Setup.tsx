@@ -93,10 +93,10 @@ function Start({ adding, go }: { adding: boolean; go: (to: Page) => void }) {
     );
 }
 
-// A new phrase, 12 or 24 words. The background keeps the same one until it is added, so what is written down is what
-// gets saved even if this tab is closed in between; and this page saves the very words it showed, whatever another tab
-// asked for meanwhile: a reply for a length no longer chosen, or after leaving the page, is dropped. Once written down:
-// the password, then done.
+// A new phrase, 12 or 24 words. The background keeps one of each length until one is added, so what is written down is
+// what gets saved even if this tab is closed in between, or the length switched and back; and this page saves the very
+// words it showed, whatever another tab asked for meanwhile: a reply for a length no longer chosen, or after leaving the
+// page, is dropped. Once written down: the password, then done.
 function Create({ length, setLength, shown, setShown, go }: { length: 12 | 24; setLength: (n: 12 | 24) => void; shown: string; setShown: (s: string) => void; go: (to: Page) => void }) {
     const [error, setError] = useState('');
     const [done, setDone] = useState(false);

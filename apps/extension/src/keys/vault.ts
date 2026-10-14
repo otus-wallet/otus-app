@@ -22,6 +22,8 @@ export type Vault = {
 export const COSTS = { t: 3, m: 64 * 1024, p: 1 };
 
 export class WrongPassword extends Error {}
+/** A vault Otus can't read: not as it writes one. */
+export class UnknownVault extends Error {}
 
 /** Bytes WebCrypto takes. */
 export type Bytes = Uint8Array<ArrayBuffer>;
@@ -34,8 +36,9 @@ export async function createVault(password: string, secrets: Secret[], costs = C
     return { vault, key };
 }
 
-/** The vault's key, given its password. Throws WrongPassword. */
+/** The vault's key, given its password. Throws WrongPassword, or UnknownVault for one not as Otus writes it. */
 export async function openVault(vault: Vault, password: string): Promise<Bytes> {
+    if (!asWritten(vault)) throw new UnknownVault('not a vault Otus made');
     const sealer = await passwordKey(password, vault.kdf);
     try {
         return await open(sealer, vault.key, 'key');
@@ -50,8 +53,24 @@ export const readSecrets = async (vault: Vault, key: Bytes): Promise<Secret[]> =
 
 export const writeSecrets = async (vault: Vault, key: Bytes, secrets: Secret[]): Promise<Vault> => ({ ...vault, secrets: await seal(key, json(secrets), 'secrets') });
 
+// A vault as Otus writes it: its version, a 16-byte salt and costs no higher than Otus's own, and a 12-byte nonce for each
+// part. Costs past them, written by anything but Otus, would hold the keystore for as long as they say.
+function asWritten(v: Vault): boolean {
+    const within = (n: unknown, low: number, high: number) => Number.isInteger(n) && (n as number) >= low && (n as number) <= high;
+    const length = (b64: unknown) => {
+        try {
+            return typeof b64 === 'string' ? bytes(b64).length : -1;
+        } catch {
+            return -1;
+        }
+    };
+    const sealed = (s: Sealed | undefined) => length(s?.iv) === 12 && typeof s?.data === 'string';
+    const k = v?.kdf;
+    return v?.version === 1 && length(k?.salt) === 16 && within(k.t, 1, COSTS.t) && within(k.p, 1, COSTS.p) && within(k.m, 8 * k.p, COSTS.m) && sealed(v.key) && sealed(v.secrets);
+}
+
 // The same password typed on another keyboard, or composed another way, gives the same key.
-const passwordKey = (password: string, kdf: Kdf) => argon2idAsync(password.normalize('NFKC'), bytes(kdf.salt), { t: kdf.t, m: kdf.m, p: kdf.p, dkLen: 32 });
+const passwordKey = (password: string, kdf: Kdf) => argon2idAsync(password.normalize('NFKC'), bytes(kdf.salt), { t: kdf.t, m: kdf.m, p: kdf.p, dkLen: 32, maxmem: COSTS.m * 1024 });
 
 // Each sealed part names what it holds, so one cannot stand in for the other.
 async function seal(key: Bytes, data: Bytes, what: string): Promise<Sealed> {

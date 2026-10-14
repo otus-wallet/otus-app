@@ -97,12 +97,13 @@ export async function load(): Promise<State> {
 export const save = (part: Partial<State>) => platform.storage.local.set(part);
 
 // Changes to accounts and sites, one after another, each made from the state as it is then, so that two never undo
-// each other. Only the background writes them: Otus's pages ask it to, with an Edit.
+// each other. Only the background writes them: Otus's pages ask it to, with an Edit. `also`: other items written in
+// the same write as the change, as the vault holding a new account's key: one never lands without the other.
 let queue: Promise<unknown> = Promise.resolve();
-export function update(change: (state: State) => Partial<State> | null): Promise<void> {
+export function update(change: (state: State) => Partial<State> | null, also: Record<string, unknown> = {}): Promise<void> {
     const run = queue.then(async () => {
         const part = change(await load());
-        if (part) await save(part);
+        if (part) await platform.storage.local.set({ ...also, ...part });
     });
     queue = run.catch(() => {});
     return run;
