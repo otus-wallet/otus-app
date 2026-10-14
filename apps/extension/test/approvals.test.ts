@@ -5,6 +5,7 @@ import type { Approval, Life } from '@otus-wallet/core/view.ts';
 
 // Chrome's windows and ports, played here: the windows opened and removed, and the ports that connect back.
 const created: { id: number; url: string }[] = [];
+const asked: string[] = []; // the address of each window asked for, before Chrome opens it
 const removed: number[] = [];
 let connected: (port: unknown) => void = () => {};
 let closed: (window: number) => void = () => {};
@@ -19,6 +20,7 @@ const chrome = {
     windows: {
         getLastFocused: async () => ({ left: 0, top: 0, width: 1200 }),
         create: async ({ url }: { url: string }) => {
+            asked.push(url);
             await opening;
             if (refusing) throw new Error('Chrome would not open it');
             created.push({ id: 100 + created.length, url });
@@ -35,21 +37,23 @@ const { approve, early } = await import('../src/shell/approvals.ts');
 const tick = () => new Promise((r) => setTimeout(r, 5));
 const form = (kind: string, origin = 'https://jup.ag') => ({ kind, site: { origin, host: new URL(origin).host, note: '', tone: 'plain' }, account: { label: 'Me', address: 'x' } }) as unknown as Approval;
 
-// The window's page connecting back, from Otus's own page: what it hears, and how it answers.
-function page(window = created.at(-1)!) {
+// The window's page connecting back, from Otus's own page in that window (or `from` another): what it hears, whether it
+// was cut off, and how it answers.
+function page(window = created.at(-1)!, from = window.id) {
     const heard: unknown[] = [];
     let said: (m: object) => void = () => {};
     let gone: () => void = () => {};
+    let cut = false;
     const id = window.url.split('#')[1];
     connected({
         name: `approve:${id}`,
-        sender: { id: 'otus', url: window.url },
+        sender: { id: 'otus', url: window.url, tab: { windowId: from } },
         postMessage: (m: unknown) => heard.push(m),
         onMessage: { addListener: (f: typeof said) => (said = f) },
         onDisconnect: { addListener: (f: typeof gone) => (gone = f) },
-        disconnect: () => {},
+        disconnect: () => void (cut = true),
     });
-    return { heard, say: (m: object) => said(m), leave: () => gone() };
+    return { heard, say: (m: object) => said(m), leave: () => gone(), cut: () => cut };
 }
 // Whether a promise has settled yet, and how.
 const state = async (p: Promise<unknown>) => Promise.race([p.then((v) => ({ answered: v })), tick().then(() => 'waiting')]);
@@ -240,4 +244,41 @@ test('the no a request hears at once is only one said before the window is given
     assert.deepEqual(await state(answer), { answered: false });
     w.say({ approve: false });
     assert.equal(await state(after.no), 'waiting'); // the review's own failure: the request hears that, not a no
+});
+
+test('the window answers only from the window Otus opened for it, and only once', async () => {
+    const answer = approve(form('connect', 'https://one.example'));
+    await tick();
+    const window = created.at(-1)!;
+    // Its address read by another extension and opened in a window of its own: cut off, told nothing.
+    const copy = page(window, 999);
+    await tick();
+    assert.deepEqual([copy.cut(), copy.heard], [true, []]);
+    copy.say({ approve: true });
+    assert.equal(await state(answer), 'waiting');
+    // Its own page is heard; a second one, even from that window, is cut off.
+    const own = page(window);
+    const again = page(window);
+    await tick();
+    assert.deepEqual([own.cut(), own.heard.length, again.cut()], [false, 1, true]);
+    own.say({ approve: true });
+    assert.deepEqual(await state(answer), { answered: true });
+});
+
+test('a page that connects before its window is known waits for it, then is taken or cut off', async () => {
+    let open: () => void = () => {};
+    opening = new Promise((r) => (open = r));
+    const answer = approve(form('connect', 'https://two.example'));
+    await tick();
+    const window = { id: 100 + created.length, url: asked.at(-1)! }; // the window Chrome is about to give it
+    const own = page(window);
+    const other = page(window, 998);
+    await tick();
+    assert.deepEqual([own.heard, own.cut(), other.cut()], [[], false, false]); // both wait
+    open();
+    await tick();
+    opening = Promise.resolve();
+    assert.deepEqual([own.heard.length, own.cut(), other.cut()], [1, false, true]);
+    own.say({ approve: true });
+    assert.deepEqual(await state(answer), { answered: true });
 });

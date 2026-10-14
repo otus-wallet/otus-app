@@ -10,7 +10,8 @@ const [WIDTH, HEIGHT] = [400, 680];
 export type Answer = boolean | SignatureBytes | { account: Address };
 
 // `ready`: the approval is in its final form, the only one a yes counts for; `told`: the window, to hear it; `follow`: its
-// blockhash's life, for the window; `after`: approved, how it goes, for the window that stays; `port`: the window's own.
+// blockhash's life, for the window; `after`: approved, how it goes, for the window that stays; `port`: the window's own;
+// `opened`: the window Otus opened for it, once it has (undefined when it did not open).
 type Pending = {
     approval: Approval;
     ready: boolean;
@@ -19,6 +20,8 @@ type Pending = {
     after?: (tell: (outcome: Outcome) => void) => void;
     decide: (answer: Answer) => void;
     port?: chrome.runtime.Port;
+    opened: Promise<number | undefined>;
+    window?: number;
 };
 const pending = new Map<string, Pending>();
 const windows = new Map<number, string>(); // approval windows, to the request they ask about
@@ -61,13 +64,16 @@ export function early(first: Approval): Early {
         answered = true;
         settle(answer);
     };
-    const asked: Pending = { approval: first, ready: false, decide };
+    const opened = openWindow(id).then(
+        (window) => (asked.window = window),
+        (error: unknown) => {
+            failure = error;
+            decide(false);
+            return undefined;
+        },
+    );
+    const asked: Pending = { approval: first, ready: false, decide, opened };
     pending.set(id, asked);
-    const opened = openWindow(id).catch((error: unknown) => {
-        failure = error;
-        decide(false);
-        return undefined;
-    });
     // Answered, or ended: the window closes, or stays to hear how an approved transaction goes.
     void decided.then(async (answer) => {
         pending.delete(id);
@@ -123,13 +129,25 @@ async function openWindow(id: string): Promise<number> {
 // What tells the window its blockhash's life.
 const listening = (port: chrome.runtime.Port) => (life: Life) => tellPort(port, { life });
 
-// The approval window connects back by the id in its address, and only from Otus's own page. A yes counts only while
+// The approval window connects back by the id in its address, and only from Otus's own page, in the window Otus opened
+// for it, once: another extension can read the address of any tab and open the page itself. A yes counts only while
 // Otus is unlocked: the window shows its lock then, but a click may come in the moment before it does.
 chrome.runtime.onConnect.addListener((port) => {
     if (!port.name.startsWith('approve:')) return;
-    const asked = pending.get(port.name.slice('approve:'.length));
+    const id = port.name.slice('approve:'.length);
+    const asked = pending.get(id);
     const fromPage = port.sender?.id === chrome.runtime.id && port.sender.url?.split('#')[0] === chrome.runtime.getURL(PAGE);
     if (!asked || !fromPage) return port.disconnect();
+    const take = (window: number | undefined) => {
+        if (pending.get(id) !== asked || window === undefined || port.sender?.tab?.windowId !== window || asked.port) return port.disconnect();
+        listen(asked, port);
+    };
+    if (asked.window !== undefined) take(asked.window);
+    else void asked.opened.then(take);
+});
+
+// The window's port, taken: what it asks about, told now and as it changes, and its answers.
+function listen(asked: Pending, port: chrome.runtime.Port) {
     asked.port = port;
     port.postMessage(asked.approval);
     asked.told = (approval) => tellPort(port, approval);
@@ -142,7 +160,7 @@ chrome.runtime.onConnect.addListener((port) => {
         void shielded().then((shut) => asked.decide(!shut && answer), () => asked.decide(false));
     });
     port.onDisconnect.addListener(() => asked.decide(false));
-});
+}
 
 // A message for a window that may have gone meanwhile.
 function tellPort(port: chrome.runtime.Port, message: object) {
