@@ -1,5 +1,7 @@
 import { getBase64Encoder, getCompiledTransactionMessageDecoder, isAddress, type Address } from '@solana/kit';
 
+import { startsAsMessage } from '@otus-wallet/sdk/review/decode';
+
 import { Refused, SIGN_IN_FIELDS, type SignInInput } from './protocol.ts';
 
 export const CHAINS = ['solana:mainnet', 'solana:devnet', 'solana:testnet', 'solana:localnet'] as const;
@@ -69,16 +71,17 @@ const SIGN_IN = ' wants you to sign in with your Solana account';
 // Solana's off-chain messages start so; Otus signs none (it offers no off-chain signing), and one could carry a sign-in.
 const OFFCHAIN = [0xff, ...new TextEncoder().encode('solana offchain')];
 
-// Bytes that parse as a transaction message would give the site a transaction signature; an off-chain message could
-// carry anything. Text that reads as Sign In With Solana, anywhere in it, must be this site's own, whole: its domain
-// first, once, and every URI this site's.
+// Bytes that parse as a transaction message would give the site a transaction signature, and so would bytes that
+// start with one the runtime would take, whatever follows; an off-chain message could carry anything. Text that reads
+// as Sign In With Solana, anywhere in it, must be this site's own, whole: its domain first, once, and every URI this
+// site's.
 function message(v: unknown, origin: string): Uint8Array {
     const m = bytes(v, 'message', LIMITS.messageBytes);
     let parsed = false;
     try {
         parsed = getCompiledTransactionMessageDecoder().read(m, 0)[1] === m.length;
     } catch {}
-    if (parsed) throw new Refused('message is a transaction');
+    if (parsed || startsAsMessage(m)) throw new Refused('message is a transaction');
     if (OFFCHAIN.every((b, i) => m[i] === b)) throw new Refused('message is an off-chain message');
     const text = new TextDecoder().decode(m).replace(/\r\n?|[\u0085\u2028\u2029\v\f]/g, '\n'); // any line break, as a reader may take it
     const at = text.indexOf(SIGN_IN);

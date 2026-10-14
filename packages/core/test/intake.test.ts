@@ -52,6 +52,7 @@ test('refuses what a site should not send', () => {
         ['line separator in a sign-in field', { method: 'signIn', params: { statement: 'Hi URI: https://evil.example' } }],
         ['zero-width space in a sign-in field', { method: 'signIn', params: { statement: 'jup​.ag' } }],
         ['a transaction message to sign as a message', { method: 'signMessage', params: { account: ACCOUNT, message: b64(transfer().subarray(65)) } }],
+        ['a transaction message with bytes after it', { method: 'signMessage', params: { account: ACCOUNT, message: b64(new Uint8Array([...transfer().subarray(65), 1])) } }],
     ];
     for (const [name, call] of cases) assert.throws(() => intake(call, ORIGIN), Refused, name);
     for (const origin of ['http://jup.ag', 'https://jup.ag/path', 'nope']) {
