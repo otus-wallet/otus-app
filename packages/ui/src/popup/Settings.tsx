@@ -148,7 +148,7 @@ function ChangePassword() {
     return (
         <>
             <p className="text-xs text-ink-2">{`${MIN_PASSWORD} to ${MAX_PASSWORD} characters.`}</p>
-            <PasswordInput placeholder="Password" autoComplete="current-password" aria-label="Password" value={current} onChange={(e) => (setCurrent(e.target.value), setDone(false))} />
+            <PasswordInput placeholder="Current password" autoComplete="current-password" aria-label="Current password" value={current} onChange={(e) => (setCurrent(e.target.value), setDone(false))} />
             <PasswordInput placeholder="New password" autoComplete="new-password" aria-label="New password" value={first} onChange={(e) => (setFirst(e.target.value), setDone(false))} />
             <Strength password={first} />
             <PasswordInput placeholder="The same again" autoComplete="new-password" aria-label="The same again" value={again} onChange={(e) => (setAgain(e.target.value), setDone(false))} onKeyDown={(e) => e.key === 'Enter' && void change()} />
