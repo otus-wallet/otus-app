@@ -1,7 +1,7 @@
 // What every approval window has: who asks and for which account, the steps of a transaction, a body that scrolls,
-// the answers. And the waiting buttons: those that approve or move on take clicks only a moment after the window shows,
-// comes to the front, moves, changes size or changes step, and once the pointer really moves after that (or Tab is
-// pressed), so a burst of clicks a site asked for elsewhere, at a pointer standing still, cannot land on them.
+// the answers. And the waiting buttons: those that approve or move on take a click only once the pointer has really
+// moved, a reaction time after the window shows, comes to the front, moves, changes size or changes step, with no click
+// or key just before: so a burst of clicks a site asked for elsewhere, or typing it timed, never lands on them.
 import { useEffect, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -14,14 +14,16 @@ import { cn } from '../lib/cn.ts';
 import type { AccountView, SiteView, Tone } from '@otus-wallet/core/view.ts';
 import { filled, MARK, text } from './tone.ts';
 
-const ARMING = 150; // ms
+const ARMING = 500; // ms after the window shows, comes to the front, moves or changes: about a reaction time
+const QUIET = 500; // ms with no click and no key before it arms: a burst of clicks, or typing, never does
+const TRAVEL = 24; // px the pointer moves after that: a hand on the mouse, not a jitter under a click
 
 /**
  * False for a moment after the window shows, comes to the front, moves or changes size, and after each change of
- * `step`; then until the pointer moves, or Tab is pressed (a tap counts too, but not on the button it would arm). Worked
- * out while drawing, so the render
- * that shows a new step or follows the focus is already unarmed: a click queued right behind them finds the buttons
- * disabled.
+ * `step`; then until the pointer moves a little way, with no click or key for a moment before (a tap counts too, but
+ * not on the button it would arm). Keys never arm it, and one pressed takes it back: a yes is the pointer's alone.
+ * Worked out while drawing, so the render that shows a new step or follows the focus is already unarmed: a click
+ * queued right behind them finds the buttons disabled.
  */
 export function useArmed(step: unknown): boolean {
     const [focused, setFocused] = useState(0);
@@ -51,18 +53,43 @@ export function useArmed(step: unknown): boolean {
         };
     }, []);
     useEffect(() => {
-        let waited = false;
-        const stir = (e: PointerEvent | KeyboardEvent) => {
-            if (!waited) return;
-            const tap = e.type === 'pointerdown' && (e as PointerEvent).pointerType !== 'mouse' && !(e.target instanceof Element && e.target.closest('[data-arms]'));
-            const moved = e instanceof KeyboardEvent ? e.key === 'Tab' : tap || e.movementX !== 0 || e.movementY !== 0;
-            if (moved) setArmedFor((a) => (a?.changes === changes && a.focused === focused ? a : { changes, focused }));
+        const since = performance.now();
+        let [pressed, travel, armed] = [-Infinity, 0, false];
+        let last: [number, number] | null = null;
+        const ready = (now: number) => now - since >= ARMING && now - pressed >= QUIET;
+        const arm = () => {
+            armed = true;
+            setArmedFor((a) => (a?.changes === changes && a.focused === focused ? a : { changes, focused }));
         };
-        const t = setTimeout(() => (waited = true), ARMING);
-        for (const kind of ['pointermove', 'pointerdown', 'keydown'] as const) addEventListener(kind, stir);
+        // A click or a key while it waits starts the wait over; armed, a click is the answer, and a key takes it back.
+        const press = (e: PointerEvent) => {
+            if (armed) return;
+            const now = performance.now();
+            const tap = e.pointerType !== 'mouse' && !(e.target instanceof Element && e.target.closest('[data-arms]'));
+            if (tap && ready(now)) return arm();
+            [pressed, travel] = [now, 0];
+        };
+        const key = () => {
+            [pressed, travel] = [performance.now(), 0];
+            if (!armed) return;
+            armed = false;
+            flushSync(() => setArmedFor(null)); // before the key's own default, as Enter clicking a button
+        };
+        const move = (e: PointerEvent) => {
+            const now = performance.now();
+            const from = last;
+            last = [e.clientX, e.clientY];
+            if (armed || e.pointerType !== 'mouse' || !from || now - since < ARMING) return;
+            travel += Math.hypot(e.clientX - from[0], e.clientY - from[1]);
+            if (travel >= TRAVEL && ready(now)) arm();
+        };
+        addEventListener('pointerdown', press, true);
+        addEventListener('keydown', key, true);
+        addEventListener('pointermove', move, true);
         return () => {
-            clearTimeout(t);
-            for (const kind of ['pointermove', 'pointerdown', 'keydown'] as const) removeEventListener(kind, stir);
+            removeEventListener('pointerdown', press, true);
+            removeEventListener('keydown', key, true);
+            removeEventListener('pointermove', move, true);
         };
     }, [changes, focused]);
     return armedFor !== null && armedFor.changes === changes && armedFor.focused === focused;

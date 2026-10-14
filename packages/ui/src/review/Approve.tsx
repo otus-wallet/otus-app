@@ -207,9 +207,9 @@ function AccountPicker({ choices, shown, choose }: { choices: AccountView[]; sho
 }
 
 // A transaction, in three steps: balances, programs, verdict; a step seen already opens again from the steps. Next
-// moves on at once (it approves nothing); Sign waits for the window to arm. Signing what is not safe asks to say so
-// first. The time left to sign shows above; once it is out, the transaction can only be
-// rejected, or, one made in Otus, built again.
+// waits for the window to arm once; Sign, again on its own step. Signing what is not safe asks to say so first. The
+// time left to sign shows above; once it is out, the transaction can only be rejected, or, one made in Otus, built
+// again.
 function Transaction({ t, answers, expiry, died }: { t: TransactionView; answers: Answers; expiry?: Expiry; died: boolean }) {
     const [step, setStep] = useState(0);
     const [reached, setReached] = useState(0);
@@ -220,6 +220,7 @@ function Transaction({ t, answers, expiry, died }: { t: TransactionView; answers
     const [ack, setAck] = useState(false);
     // Prepared while shown: the window arms again once the final form comes, which is what Sign answers.
     const armed = useArmed(t.preparing ? -1 - step : step);
+    const opened = useArmed('next'); // Next, from when the window shows: moving on approves nothing, but leads to Sign
     const risky = t.verdict === 'danger';
     const [onDevice, setOnDevice] = useState(false); // approved: a Ledger account signs on its device now
     // Read again at the click: the time may run out between two draws of the button.
@@ -243,7 +244,7 @@ function Transaction({ t, answers, expiry, died }: { t: TransactionView; answers
             return (
                 <>
                     {step === 0 ? <Answer onClick={() => answers.answer(false)}>Reject</Answer> : <Answer onClick={() => go(0)}>Back</Answer>}
-                    <Answer variant="default" onClick={() => go(step + 1)}>
+                    <Answer variant="default" arms armed={opened} onClick={() => go(step + 1)}>
                         Next
                     </Answer>
                 </>
