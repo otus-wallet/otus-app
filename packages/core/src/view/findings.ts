@@ -58,6 +58,10 @@ export function noteOf(f: Finding, r: Review, p: Prepared | null, n: Names): str
         return `${amounts.join(' and ')}${p.known ? '' : ` → ${p.holder}`}${through}`;
     }
     if (f.code === 'large-outflow' && f.subject) return n.token(f.subject).symbol; // the token, by its symbol when verified
+    if (f.code === 'guards-leeway' && p) {
+        const tokens = p.leeway.units > 0n ? ' and some of your tokens' : '';
+        return `${p.leeway.lamports > 0n ? `Up to ${sol(p.leeway.lamports)} SOL` : 'Some of your SOL'}${tokens} more than shown, as others here move it between your accounts: the site may never send them`;
+    }
     if (f.code === 'check-balances') {
         const [out, back] = [r.assessment.flows.filter((flow) => flow.change < 0n), r.assessment.flows.filter((flow) => flow.change > 0n)];
         return `${out.map(flowText).join(' and ')} out · ${back.map(flowText).join(' and ')} in`;

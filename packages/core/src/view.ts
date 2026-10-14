@@ -154,7 +154,8 @@ export function describe(r: Review, p: Prepared | null, { site, account, signer,
     const mainnet = cluster === 'solana:mainnet';
     const told = known.told ?? new Map();
     const named = selfNamed(r, told);
-    const held = p !== null && p.unguarded === null && !later; // guards hold what it does, and it lands now
+    // Guards hold what it does, and it lands now; signed with others, as tightly as alone.
+    const held = p !== null && p.unguarded === null && p.loose.length === 0 && p.leeway.lamports === 0n && p.leeway.units === 0n && !later;
     const n = names(r, known, wallet, mainnet);
     const proposals = proposalViews(known.squads ?? [], n);
     const { verdict, findings } = ranked([...described(r.assessment.findings, named, r.assessment.programs, held), ...(p?.findings ?? []), ...imitations(known.tokens, mainnet), ...misread(known), ...proposedTo(proposals, r, wallet, kept)]);
@@ -345,6 +346,9 @@ const UNSAID = new Set([NOTHING_TO_HOLD, SIMULATION_FAILED]);
 // saying; one Otus set limits on and needs none (its own that only takes access back, a transfer a Ledger shows in
 // clear) says nothing of them.
 function guards(p: Prepared): TransactionView['guards'] {
+    const count = p.holds.length === 1 ? 'One guard' : `${p.holds.length} guards`;
+    if (p.unguarded === null && p.loose.length > 0) return { held: false, text: `${count}, some holding less: another transaction here changes those accounts` };
+    if (p.unguarded === null && (p.leeway.lamports > 0n || p.leeway.units > 0n)) return { held: false, text: `${count}, with room for what the others here move between your accounts` };
     if (p.unguarded === null) return { held: true, text: p.holds.length === 1 ? 'One guard locks your account to what you see' : `${p.holds.length} guards lock your accounts to what you see` };
     if (p.units !== null || UNSAID.has(p.unguarded)) return { held: false, text: '' };
     return { held: false, text: `None: ${p.unguarded}`, why: p.unguarded };

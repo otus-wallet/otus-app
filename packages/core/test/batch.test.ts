@@ -7,7 +7,9 @@ import { createNoopSigner, type MaybeEncodedAccount } from '@solana/kit';
 import { review, type Review } from '@otus-wallet/sdk/review/review';
 import { prepare, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import { describeBatch, siteView, type Shown } from '../src/view.ts';
-import { account, DRAIN, DRAIN_AFTER, DRAIN_BEFORE, fakeChain, key, PAYER, SYSTEM, transaction } from './helpers.ts';
+import { AccountRole } from '@solana/kit';
+import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
+import { account, DRAIN, DRAIN_AFTER, DRAIN_BEFORE, fakeChain, key, PAYER, SYSTEM, tokenAccountData, transaction } from './helpers.ts';
 
 // Several transactions signed at once, as the window shows them: all together, and each alone.
 const SOL = 1_000_000_000n;
@@ -101,4 +103,18 @@ test('a clear line only some of them have says whose it is', async () => {
         const inFirst = onlyFirst.some((t) => f.title.endsWith(t));
         if (inFirst && !inDrain) assert.ok(f.title.startsWith('1 · '), f.title);
     }
+});
+
+test('room the others leave, moving funds between your accounts, is said with how much', async () => {
+    // B: 1 SOL from your wallet into your own token account's lamports, nothing of yours leaving.
+    const OWN = key(30);
+    const own = (lamports: bigint) => account(OWN, TOKEN_PROGRAM_ADDRESS, lamports, tokenAccountData({ mint: key(31), owner: PAYER, amount: 0n }));
+    const touch = transaction([{ programAddress: key(32), accounts: [{ address: PAYER, role: AccountRole.WRITABLE_SIGNER }, { address: OWN, role: AccountRole.WRITABLE }] }]);
+    const b = await reviewed(touch, [account(PAYER, SYSTEM, 2n * SOL), own(2_039_280n)], [account(PAYER, SYSTEM, SOL - 5_000n), own(SOL + 2_039_280n)]);
+    const a = await reviewed(send(2, SOL / 10n), [account(PAYER, SYSTEM, 2n * SOL)], sent(2, SOL / 10n), [b.r]);
+    const v = describeBatch([{ ...a, known }, { ...b, known }], shown);
+    const said = v.findings.find((f) => f.title.endsWith('Its guards leave room for the others'));
+    assert.ok(said?.title.startsWith('1 · '), JSON.stringify(v.findings));
+    assert.match(said!.note, /^Up to 1 SOL more than shown/);
+    assert.equal(v.items[0].guards.held, false);
 });
