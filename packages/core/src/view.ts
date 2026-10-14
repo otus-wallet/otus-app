@@ -14,7 +14,7 @@ import type { ProposalTold } from '@otus-wallet/sdk/review/squads';
 import type { Account, Site } from './state.ts';
 import type { TokenInfo } from './tokens.ts';
 import { balances } from './view/balances.ts';
-import { imitations, noteOf } from './view/findings.ts';
+import { imitations, misread, noteOf } from './view/findings.ts';
 import { keptIn, names, type Kept } from './view/names.ts';
 import { programs, selfNamed } from './view/programs.ts';
 import { partiesOf, proposalViews, type ProposalView } from './view/squads.ts';
@@ -142,7 +142,7 @@ export function describe(r: Review, p: Prepared | null, { site, account, signer,
     const held = p !== null && p.unguarded === null && !later; // guards hold what it does, and it lands now
     const n = names(r, known, wallet, mainnet);
     const proposals = proposalViews(known.squads ?? [], n);
-    const { verdict, findings } = ranked([...described(r.assessment.findings, named, r.assessment.programs, held), ...(p?.findings ?? []), ...imitations(known.tokens, mainnet), ...proposedTo(proposals, r, wallet, kept)]);
+    const { verdict, findings } = ranked([...described(r.assessment.findings, named, r.assessment.programs, held), ...(p?.findings ?? []), ...imitations(known.tokens, mainnet), ...misread(known), ...proposedTo(proposals, r, wallet, kept)]);
     const note = (f: Finding) => noteOf(f, r, p, n);
     const view: Omit<TransactionView, 'kept'> = {
         kind: 'transaction',

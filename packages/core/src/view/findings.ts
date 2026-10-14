@@ -24,6 +24,16 @@ export function imitations(tokens: Map<string, TokenInfo | null>, mainnet: boole
     });
 }
 
+/** Tokens whose mint, as the RPC read it, has other decimals than the token list gives it: one of them is wrong, and
+ *  amounts shown by the mint's may be off a thousandfold or more. A mint's decimals never change. */
+export function misread(known: { tokens: Map<string, TokenInfo | null>; decimals: Map<string, number> }): Finding[] {
+    return [...known.decimals].flatMap(([mint, places]): Finding[] => {
+        const listed = known.tokens.get(mint)?.decimals;
+        if (typeof listed !== 'number' || listed === places) return [];
+        return [{ level: 'danger', code: 'decimals-differ', text: "A token's amounts may be wrong", subject: mint as Address, note: `The RPC gives it ${places} decimals, the token list ${listed}` }];
+    });
+}
+
 // A finding's second line: what it is about, in words. A few say it from the review itself.
 export function noteOf(f: Finding, r: Review, p: Prepared | null, n: Names): string {
     const flowText = (flow: Flow) => {

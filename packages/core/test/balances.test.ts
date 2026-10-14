@@ -211,3 +211,15 @@ test('each asset shows what it comes to, its lines under it', async () => {
 
 // Last: every view above, whole, as it was when this was written. A change to what the window shows fails here.
 test('every view these tests make is the one kept', () => golden('balances-views', views));
+
+test('a mint read with other decimals than the token list gives: its amounts may be wrong, and that is critical', async () => {
+    const [mine, theirs] = [key(36), key(37)];
+    const tokens = new Map<string, TokenInfo>([[USDC, { id: USDC, name: 'USD Coin', symbol: 'USDC', icon: null, verified: true, usdPrice: 1, change24h: 0, decimals: 6 }]]);
+    const pay = [getTransferCheckedInstruction({ source: mine, mint: USDC, destination: theirs, authority: me, amount: 1_000_000_000n, decimals: 6 })];
+    const before = [account(PAYER, SYSTEM, SOL), account(mine, TOKEN_PROGRAM_ADDRESS, RENT, tokenAccountData({ mint: USDC, owner: PAYER, amount: 2_000_000_000n })), account(theirs, TOKEN_PROGRAM_ADDRESS, RENT, tokenAccountData({ mint: USDC, owner: THIEF, amount: 0n }))];
+    const after = [account(PAYER, SYSTEM, SOL - FEE), account(mine, TOKEN_PROGRAM_ADDRESS, RENT, tokenAccountData({ mint: USDC, owner: PAYER, amount: 1_000_000_000n })), account(theirs, TOKEN_PROGRAM_ADDRESS, RENT, tokenAccountData({ mint: USDC, owner: THIEF, amount: 1_000_000_000n }))];
+    const lied = await shown(pay, before, after, { tokens, decimals: new Map([[USDC, 9]]) });
+    assert.ok(lied.codes.includes("danger:A token's amounts may be wrong"), lied.codes.join());
+    const told = await shown(pay, before, after, { tokens, decimals: new Map([[USDC, 6]]) });
+    assert.ok(!told.codes.some((c) => c.includes('may be wrong')));
+});
