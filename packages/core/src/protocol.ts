@@ -25,3 +25,6 @@ export type PageMessage =
 export { Refused } from '@otus-wallet/sdk/errors';
 
 export const NO_KEY = 'Otus holds no key for this account';
+
+/** The most transactions one request asks to sign together. */
+export const MAX_BATCH = 10;

@@ -4,7 +4,6 @@ import { test } from 'node:test';
 import { gate } from '../src/gate.ts';
 import type { Request } from '@otus-wallet/core/intake.ts';
 import { Refused } from '@otus-wallet/core/protocol.ts';
-import { DEFAULT_SETTINGS } from '@otus-wallet/core/settings.ts';
 import { key } from '@otus-wallet/core/test/helpers.ts';
 
 const request = (count: number): Request => ({
@@ -16,8 +15,7 @@ const request = (count: number): Request => ({
     transactions: Array.from({ length: count }, () => new Uint8Array([1])),
 });
 
-test('one transaction per call unless sign all is on', () => {
-    assert.equal(gate(request(1), DEFAULT_SETTINGS).kind, 'transaction');
-    assert.throws(() => gate(request(2), DEFAULT_SETTINGS), Refused);
-    assert.equal(gate(request(2), { ...DEFAULT_SETTINGS, signAll: true }).kind, 'transaction');
+test('up to ten transactions in one call, as one asks for one; eleven are refused', () => {
+    for (const n of [1, 2, 10]) assert.equal(gate(request(n)).kind, 'transaction');
+    assert.throws(() => gate(request(11)), new Refused('Otus signs at most 10 transactions in one request'));
 });

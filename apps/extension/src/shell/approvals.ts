@@ -1,13 +1,14 @@
 import { getBase64Encoder, isAddress, type Address, type SignatureBytes } from '@solana/kit';
 
-import { Refused } from '@otus-wallet/core/protocol.ts';
+import { MAX_BATCH, Refused } from '@otus-wallet/core/protocol.ts';
 import type { Approval, Life, Outcome } from '@otus-wallet/core/view.ts';
 import { shielded } from './keys.ts';
 
 const PAGE = 'approve.html';
 const [WIDTH, HEIGHT] = [400, 680];
-/** An answer: no, yes, yes with the signature a Ledger made, or, to connect, yes with the account chosen. */
-export type Answer = boolean | SignatureBytes | { account: Address };
+/** An answer: no, yes, yes with the signature a Ledger made (or, for several transactions, each one's in their order),
+ *  or, to connect, yes with the account chosen. */
+export type Answer = boolean | SignatureBytes | SignatureBytes[] | { account: Address };
 
 // `ready`: the approval is in its final form, the only one a yes counts for; `told`: the window, to hear it; `follow`: its
 // blockhash's life, for the window; `after`: approved, how it goes, for the window that stays; `port`: the window's own;
@@ -154,7 +155,7 @@ function listen(asked: Pending, port: chrome.runtime.Port) {
     port.postMessage(asked.approval);
     asked.told = (approval) => tellPort(port, approval);
     asked.follow?.(listening(port));
-    port.onMessage.addListener((m: { approve?: unknown; signature?: unknown; account?: unknown; beat?: unknown }) => {
+    port.onMessage.addListener((m: { approve?: unknown; signature?: unknown; signatures?: unknown; account?: unknown; beat?: unknown }) => {
         if (m.beat === true) return; // an approved window, still following its transaction: it only keeps Otus awake
         const answer = answerOf(m, asked.approval.kind);
         if (!answer) return asked.decide(false);
@@ -178,17 +179,28 @@ chrome.windows.onRemoved.addListener((window) => {
     if (id !== undefined) pending.get(id)?.decide(false);
 });
 
-/** A window's answer: no, yes, yes with the signature a Ledger made (64 bytes, base64), or, to connect alone, yes with
- *  the account chosen (an address). Anything else is no. */
-export function answerOf(m: { approve?: unknown; signature?: unknown; account?: unknown }, kind: Approval['kind']): Answer {
+/** A window's answer: no, yes, yes with the signature a Ledger made (64 bytes, base64), for several transactions alone
+ *  yes with each one's (at most MAX_BATCH), or, to connect alone, yes with the account chosen (an address). Anything
+ *  else is no. */
+export function answerOf(m: { approve?: unknown; signature?: unknown; signatures?: unknown; account?: unknown }, kind: Approval['kind']): Answer {
     if (m.approve !== true) return false;
-    if (m.account !== undefined) return kind === 'connect' && m.signature === undefined && typeof m.account === 'string' && isAddress(m.account) ? { account: m.account } : false;
+    if (m.account !== undefined) return kind === 'connect' && m.signature === undefined && m.signatures === undefined && typeof m.account === 'string' && isAddress(m.account) ? { account: m.account } : false;
+    if (m.signatures !== undefined) {
+        if (kind !== 'batch' || m.signature !== undefined || !Array.isArray(m.signatures) || m.signatures.length === 0 || m.signatures.length > MAX_BATCH) return false;
+        const all = m.signatures.map(signatureOf);
+        return all.every((s) => s !== null) ? (all as SignatureBytes[]) : false;
+    }
     if (m.signature === undefined) return true;
-    if (typeof m.signature !== 'string' || m.signature.length !== 88) return false;
+    return kind === 'batch' ? false : (signatureOf(m.signature) ?? false);
+}
+
+// A signature as a window sends it: 64 bytes, base64; null for anything else.
+function signatureOf(v: unknown): SignatureBytes | null {
+    if (typeof v !== 'string' || v.length !== 88) return null;
     try {
-        const signature = new Uint8Array(getBase64Encoder().encode(m.signature));
-        return signature.length === 64 ? (signature as SignatureBytes) : false;
+        const signature = new Uint8Array(getBase64Encoder().encode(v));
+        return signature.length === 64 ? (signature as SignatureBytes) : null;
     } catch {
-        return false;
+        return null;
     }
 }

@@ -1,11 +1,9 @@
 import type { Request } from '@otus-wallet/core/intake.ts';
-import { Refused } from '@otus-wallet/core/protocol.ts';
-import type { Settings } from '@otus-wallet/core/settings.ts';
+import { MAX_BATCH, Refused } from '@otus-wallet/core/protocol.ts';
 
-/** Request → the same Request if the user's settings allow it. Throws Refused. */
-export function gate(request: Request, settings: Settings): Request {
-    if (request.kind === 'transaction' && request.transactions.length > 1 && !settings.signAll) {
-        throw new Refused('signing several transactions at once is off in settings');
-    }
+/** Request → the same Request, when Otus takes that much in one: at most MAX_BATCH transactions signed together.
+ *  Throws Refused. */
+export function gate(request: Request): Request {
+    if (request.kind === 'transaction' && request.transactions.length > MAX_BATCH) throw new Refused(`Otus signs at most ${MAX_BATCH} transactions in one request`);
     return request;
 }

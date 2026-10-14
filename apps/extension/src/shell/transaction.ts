@@ -37,7 +37,7 @@ import { SQUADS_V4 } from '@otus-wallet/sdk/programs/squads';
 import { prepare, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Sent } from '@otus-wallet/core/send/send.ts';
 import { networkOf, OTUS_RPC, rpcFor, type Settings } from '@otus-wallet/core/settings.ts';
-import { accountView, describe, LEDGER_CLEAR, type Known, type Life, type Outcome, type Signer, type SiteView, type TransactionView } from '@otus-wallet/core/view.ts';
+import { accountView, describe, describeBatch, LEDGER_CLEAR, type Known, type Life, type Outcome, type Signer, type SiteView, type TransactionView } from '@otus-wallet/core/view.ts';
 import type { Answer } from './approvals.ts';
 import type { Shell } from './serve.ts';
 import type { Account, State as Stored } from '@otus-wallet/core/state.ts';
@@ -167,7 +167,8 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
         watch?.stop();
     }
     if (failed) throw (failed as { error: unknown }).error;
-    if (!answer || (typeof answer === 'object' && 'account' in answer)) throw new Rejected(); // an account chosen answers a connect alone
+    // An account chosen answers a connect alone; signatures, several transactions.
+    if (!answer || Array.isArray(answer) || (typeof answer === 'object' && 'account' in answer)) throw new Rejected();
     if (blocked) throw new Refused('a Ledger cannot sign version 1 transactions');
     // Approved: only the prepared form can be (the window and the popup take no yes before it).
     const { p } = await prepared;
@@ -175,6 +176,131 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
 }
 
 const LEDGER_V1 = "A Ledger can't sign version 1 transactions yet: ask the site for an older one (v0).";
+
+const AT_ONCE = 4; // reviews, or preparations, running at a time: each asks the network several times
+
+/**
+ * Several transactions for this account, asked together → each reviewed alone, against the accounts as they are: they
+ * may land in any order, or need one another (one that fails alone says so, and the user decides); refused by
+ * `checks` when whoever asked says so; shown together at once as reviewed, then each prepared with guards that leave
+ * room for what the others take, and shown again as prepared, the only form that can be approved. One answer for all
+ * of them; their blockhashes watched meanwhile. For a Ledger account, the window signs each in turn on approval, and
+ * the signatures come back in their order. Throws Rejected on a no, or what went wrong preparing them.
+ */
+export async function approvedAll(list: Uint8Array[], account: Account, way: Way, shell: Shell, checks: (r: Review) => void | Promise<void>, after?: (tell: (outcome: Outcome) => void) => void): Promise<{ items: { r: Review; p: Prepared }[]; signatures?: SignatureBytes[] }> {
+    const unsignable = account.ledger !== undefined && (await Promise.all(list.map((b) => decode(b)))).some((d) => d.message.version === 1);
+    const { accounts, contacts, sent, settings } = way.kept ?? (await shell.load());
+    const yours = { wallets: accounts.map((a) => a.address), contacts: new Map(contacts.map((c) => [c.address, c.label])), sent: Object.keys(sent) as Address[] };
+    const tables = way.cluster === 'solana:mainnet' && rpcFor('solana:mainnet', settings) === OTUS_RPC ? shell.tables : undefined;
+    const reading = tables ? { ...way.chain, tables } : way.chain;
+    const reviewing = pooled(list, (bytes) => review(bytes, { ...way.context, ...yours, wallet: account.address }, reading));
+    reviewing.catch(() => {}); // heard below, once the cluster is confirmed
+    await way.confirmed;
+    const reviews = await reviewing;
+    for (const r of reviews) {
+        await notMainnet(r, way.cluster, settings, shell);
+        await checks(r);
+    }
+    const preparing = pooled(reviews, (r, i) =>
+        Promise.all([
+            prepare(
+                r,
+                account.address,
+                way.chain,
+                false,
+                undefined,
+                undefined,
+                reviews.filter((_, j) => j !== i),
+            ),
+            idlTold(r, way.chain),
+        ]),
+    );
+    preparing.catch(() => {}); // heard through `prepared`, below
+    const squads = await Promise.all(reviews.map((r) => squadsIn(r, reading)));
+    const moved = [...new Set(reviews.flatMap((r, i) => [...mintsMoved(r), ...mintsInside(squads[i])]))];
+    const first = tokenInfo(reviews, way, shell, moved);
+    const rest = [...new Set(reviews.flatMap(mintsOf))].filter((m) => !moved.includes(m));
+    const others = rest.length ? tokenInfo(reviews, way, shell, rest) : Promise.resolve(null);
+    const known = await first;
+    const every = others.then((o): Known => (o ? { tokens: new Map([...known.tokens, ...o.tokens]), decimals: new Map([...known.decimals, ...o.decimals]) } : known));
+    const away = way.cluster !== networkOf(settings);
+    const kept: Kept[] = [...accounts.map(({ address, label }) => ({ address, label, kind: 'wallet' as const })), ...contacts.map(({ address, label }) => ({ address, label, kind: 'contact' as const })), ...yours.sent.map((address) => ({ address, label: '', kind: 'sent' as const }))];
+    const shown = { site: way.site, account: accountView(account), signer: signerOf(account), cluster: way.cluster, known, expiry: null, later: way.later, away, kept };
+    const blocked = unsignable ? LEDGER_V1 : undefined;
+    const prepared = preparing.then(async (done) => {
+        const all = await every;
+        const view = describeBatch(
+            done.map(([p, told], i) => ({ r: reviews[i], p, known: { ...all, squads: squads[i], told } })),
+            shown,
+        );
+        const ledger = account.ledger && { path: account.ledger.path, messages: done.map(([p]) => getBase64Decoder().decode(messageOf(p.bytes))) };
+        return { ps: done.map(([p]) => p), approval: { ...view, ...(ledger && !blocked && { ledger }), ...(blocked && { blocked }) } };
+    });
+    let failed: { error: unknown } | null = null;
+    prepared.catch((error: unknown) => (failed ??= { error }));
+    const later = prepared.then((d) => d.approval);
+    later.catch(() => {});
+    const watch = watchedAll(reviews, way.chain, shell.now);
+    let answer: Answer;
+    try {
+        const first = describeBatch(
+            reviews.map((r, i) => ({ r, p: null, known: { ...known, squads: squads[i] } })),
+            shown,
+        );
+        answer = await shell.approve({ ...first, ...(blocked && { blocked }) }, watch?.follow, later, blocked ? undefined : after);
+    } finally {
+        watch?.stop();
+    }
+    if (failed) throw (failed as { error: unknown }).error;
+    if (blocked) throw new Refused('a Ledger cannot sign version 1 transactions');
+    // Yes for all, or a Ledger's signature for each, in their order; anything else answers something else.
+    const signatures = Array.isArray(answer) ? answer : undefined;
+    if (answer !== true && signatures?.length !== list.length) throw new Rejected();
+    const { ps } = await prepared;
+    return { items: reviews.map((r, i) => ({ r, p: ps[i] })), signatures };
+}
+
+// Each of `items` through `work`, AT_ONCE at a time, each result in its item's place.
+async function pooled<T, U>(items: T[], work: (item: T, i: number) => Promise<U>): Promise<U[]> {
+    const out: U[] = new Array(items.length);
+    let next = 0;
+    const lane = async () => {
+        while (next < items.length) {
+            const i = next++;
+            out[i] = await work(items[i], i);
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(AT_ONCE, items.length) }, lane));
+    return out;
+}
+
+// The blockhashes of several transactions, each watched once: the window hears the first to end, as the time to sign
+// all of them. Null when all wait on a nonce instead.
+function watchedAll(reviews: Review[], chain: Chain, now: () => number): ReturnType<typeof watched> | null {
+    const hashes = [...new Set(reviews.filter((r) => !durable(r.message)).map((r) => r.message.lifetimeToken))];
+    if (hashes.length === 0) return null;
+    const watches = hashes.map((h) => watched(h, chain, now));
+    const lives = new Map<number, Life>();
+    const listeners = new Set<(life: Life) => void>();
+    let last: Life | null = null;
+    const tell = () => {
+        const all = [...lives.values()];
+        const life: Life = all.some((l) => 'expired' in l) ? { expired: true } : { until: Math.min(...all.map((l) => ('until' in l ? l.until : Infinity))) };
+        last = life;
+        listeners.forEach((l) => l(life));
+    };
+    watches.forEach((w, i) => w.follow((life) => (lives.set(i, life), tell())));
+    return {
+        follow: (listener) => {
+            listeners.add(listener);
+            if (last) listener(last);
+        },
+        stop: () => {
+            watches.forEach((w) => w.stop());
+            listeners.clear();
+        },
+    };
+}
 
 // The review of a transaction built before its blockhash came, with the blockhash in place: what it does is the same
 // (its simulation replaced whatever blockhash it had), its bytes and hash are those of what will be signed.
@@ -371,7 +497,7 @@ function idlTold(r: Review, chain: Chain): Promise<Map<number, IdlInstruction>> 
 
 // What the window needs of these tokens: their decimals and, on mainnet, their names and prices (on another cluster
 // the same addresses are other tokens). Never fails the review: without them, amounts show as units.
-async function tokenInfo(r: Review, way: Way, shell: Shell, asked: Address[]): Promise<Known> {
+async function tokenInfo(r: Review | Review[], way: Way, shell: Shell, asked: Address[]): Promise<Known> {
     const mints = [...new Set(asked)];
     const [decimals, tokens] = await Promise.all([decimalsOf(r, mints, way.chain), way.cluster === 'solana:mainnet' ? shell.tokens(mints) : Promise.resolve(new Map())]);
     return { tokens, decimals };
@@ -392,10 +518,11 @@ function mintsOf(r: Review): Address[] {
 
 // A mint keeps its decimals at byte 44, after its mint authority and supply, and its "initialized" flag at 45; once
 // initialized, it never changes them. Each mint as the transaction leaves it when it writes it (it may initialize it),
-// else as the review loaded it, else asked for.
-export async function decimalsOf(r: Review, mints: Address[], chain: Chain): Promise<Map<string, number>> {
-    const written = new Map(r.changes.accounts.map((c) => [c.address, c.after]));
-    const loaded = new Map(r.accounts.map((a) => [a.address, a.state]));
+// else as the review loaded it, else asked for. Of several transactions: as any of them leaves or loads it.
+export async function decimalsOf(r: Review | Review[], mints: Address[], chain: Chain): Promise<Map<string, number>> {
+    const reviews = [r].flat();
+    const written = new Map(reviews.flatMap((x) => x.changes.accounts.map((c) => [c.address, c.after] as const)));
+    const loaded = new Map(reviews.flatMap((x) => x.accounts.map((a) => [a.address, a.state] as const)));
     const decimals = new Map<string, number>();
     const add = (mint: Address, s: State) => s && isMint(s) && s.data[45] === 1 && decimals.set(mint, s.data[44]);
     const missing: Address[] = [];

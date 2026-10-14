@@ -6,7 +6,6 @@ export type Network = 'mainnet' | 'devnet' | 'custom';
 
 /** What the user can change. Every default is the cautious choice. */
 export type Settings = {
-    signAll: boolean; // let a site ask for several transactions in one call
     network: Network;
     rpc: string | null; // your own endpoint, used while the network is 'custom'
     custom: Cluster | null; // the network that endpoint serves, by the genesis hash it gave
@@ -15,7 +14,7 @@ export type Settings = {
     preflight: boolean; // the RPC simulates a transaction as it is sent, and refuses one that would fail
 };
 
-export const DEFAULT_SETTINGS: Settings = { signAll: false, network: 'mainnet', rpc: null, custom: null, lockAfter: 15, explorer: 'solscan', preflight: true };
+export const DEFAULT_SETTINGS: Settings = { network: 'mainnet', rpc: null, custom: null, lockAfter: 15, explorer: 'solscan', preflight: true };
 
 const NETWORKS: readonly string[] = ['mainnet', 'devnet', 'custom'];
 const CLUSTERS: readonly string[] = ['solana:mainnet', 'solana:devnet', 'solana:testnet', 'solana:localnet'];

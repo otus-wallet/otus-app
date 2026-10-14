@@ -32,7 +32,7 @@ const chrome = {
     storage: { local: { get: async () => ({}) }, session: { get: async () => ({}) } }, // no vault: nothing to unlock
 };
 Object.assign(globalThis, { chrome });
-const { approve, early } = await import('../src/shell/approvals.ts');
+const { answerOf, approve, early } = await import('../src/shell/approvals.ts');
 
 const tick = () => new Promise((r) => setTimeout(r, 5));
 const form = (kind: string, origin = 'https://jup.ag') => ({ kind, site: { origin, host: new URL(origin).host, note: '', tone: 'plain' }, account: { label: 'Me', address: 'x' } }) as unknown as Approval;
@@ -285,4 +285,22 @@ test('a page that connects before its window is known waits for it, then is take
     assert.deepEqual([own.heard.length, own.cut(), other.cut()], [1, false, true]);
     own.say({ approve: true });
     assert.deepEqual(await state(answer), { answered: true });
+});
+
+test('a window’s yes: with one signature for one transaction, with one for each of several, in order; anything else is no', () => {
+    const sig = (b: number) => Buffer.from(new Uint8Array(64).fill(b)).toString('base64');
+    assert.equal(answerOf({ approve: true }, 'batch'), true);
+    assert.equal((answerOf({ approve: true, signature: sig(1) }, 'transaction') as Uint8Array).length, 64);
+    const two = answerOf({ approve: true, signatures: [sig(1), sig(2)] }, 'batch') as Uint8Array[];
+    assert.deepEqual(two.map((s) => s[0]), [1, 2]);
+    // One signature for several, several for one, too many, a bad one among them, both ways at once: no.
+    assert.equal(answerOf({ approve: true, signature: sig(1) }, 'batch'), false);
+    assert.equal(answerOf({ approve: true, signatures: [sig(1)] }, 'transaction'), false);
+    assert.equal(answerOf({ approve: true, signatures: Array.from({ length: 11 }, () => sig(1)) }, 'batch'), false);
+    assert.equal(answerOf({ approve: true, signatures: [sig(1), 'short'] }, 'batch'), false);
+    assert.equal(answerOf({ approve: true, signatures: [] }, 'batch'), false);
+    assert.equal(answerOf({ approve: true, signatures: 'x' }, 'batch'), false);
+    assert.equal(answerOf({ approve: true, signature: sig(1), signatures: [sig(1)] }, 'batch'), false);
+    assert.equal(answerOf({ approve: true, account: 'x', signatures: [sig(1)] }, 'connect'), false);
+    assert.equal(answerOf({ approve: false, signatures: [sig(1)] }, 'batch'), false);
 });

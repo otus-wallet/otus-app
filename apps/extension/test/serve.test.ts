@@ -676,11 +676,80 @@ test('an RPC that turns Otus away, or does not answer, is said so on both ways i
     assert.deepEqual(await own(bytes(silent.transfer()), silent.me, key(2), silent.shell), noAnswer);
 });
 
-test('several transactions in one call are refused before any review', async () => {
+test('several transactions in one call: one window for all, each reviewed alone, all signed in their order', async () => {
     const w = await wallet();
-    const reply = await w.call('signTransaction', { account: w.me, transactions: [w.transfer(), w.transfer()] });
-    assert.equal(reply.ok, false);
-    assert.equal(w.approvals.length, 0);
+    const asked = [w.transfer(), w.transfer(w.me, w.me, 1), w.transfer()];
+    const { transactions } = result<{ transactions: string[] }>(await w.call('signTransaction', { account: w.me, transactions: asked }));
+    assert.equal(w.approvals.length, 1);
+    const shown = w.approvals[0];
+    assert.equal(shown.kind, 'batch');
+    assert.equal(shown.kind === 'batch' && shown.items.length, 3);
+    assert.equal(w.firsts[0].kind === 'batch' && w.firsts[0].preparing, true); // shown as reviewed first, then prepared
+    assert.equal(transactions.length, 3);
+    for (const t of transactions) {
+        const signed = getTransactionDecoder().decode(bytes(t));
+        assert.ok(await verifySignature(w.pair.publicKey, signed.signatures[w.me]!, signed.messageBytes));
+    }
+    // Each in the order asked: the second is the version 1 one.
+    assert.deepEqual(await Promise.all(transactions.map(async (t) => (await decode(bytes(t))).message.version)), [0, 1, 0]);
+    assert.equal(w.box.state.sites[ORIGIN].signatures, 3);
+    assert.equal(w.box.state.signedHere[w.me].length, 3);
+});
+
+test('more than ten in one call, or one this wallet does not sign among them, is refused before any review', async () => {
+    const w = await wallet();
+    const eleven = await w.call('signTransaction', { account: w.me, transactions: Array.from({ length: 11 }, () => w.transfer()) });
+    assert.deepEqual(eleven, { ok: false, error: 'Otus signs at most 10 transactions in one request' });
+    const ten = await w.call('signTransaction', { account: w.me, transactions: Array.from({ length: 10 }, () => w.transfer()) });
+    assert.equal(result<{ transactions: string[] }>(ten).transactions.length, 10);
+    const stranger = await w.call('signTransaction', { account: w.me, transactions: [w.transfer(), w.transfer(key(5))] });
+    assert.deepEqual(stranger, { ok: false, error: 'transaction 2 of 2: this wallet does not sign this transaction' });
+    assert.equal(w.approvals.length, 1); // only the ten
+});
+
+test('several sent: in order, each once the one before landed; one that fails onchain stops the rest', async () => {
+    let looked = 0;
+    const w = await wallet({ chain: { status: async () => (looked++ === 1 ? { error: { InstructionError: [0, { Custom: 1 }] }, confirmed: true } : { error: null, confirmed: true }) } });
+    const reply = await w.call('signAndSendTransaction', { account: w.me, transactions: [w.transfer(), w.transfer(), w.transfer()] });
+    assert.deepEqual(reply, { ok: false, error: 'transaction 2 of 3 failed onchain, so Otus sent none after it' });
+    assert.equal(w.sent.length, 2);
+    const all = await wallet();
+    const { signatures } = result<{ signatures: string[] }>(await all.call('signAndSendTransaction', { account: all.me, transactions: [all.transfer(), all.transfer(all.me, all.me, 1)] }));
+    assert.equal(all.sent.length, 2);
+    assert.deepEqual(signatures, all.sent.map((t) => getBase58Decoder().decode(getTransactionDecoder().decode(t).signatures[all.me]!)));
+});
+
+test('a Ledger signs each of several on its device, in order; anything but a signature for each signs nothing', async () => {
+    const answers: ((a: Approval, key: CryptoKey) => Promise<Answer>)[] = [
+        async (a, k) => (a.kind === 'batch' && a.ledger ? Promise.all(a.ledger.messages.map((m) => signBytes(k, bytes(m)))) : false),
+        async (a, k) => (a.kind === 'batch' && a.ledger ? signBytes(k, bytes(a.ledger.messages[0])) : false), // one signature for all
+        async (a, k) => (a.kind === 'batch' && a.ledger ? (await Promise.all(a.ledger.messages.map((m) => signBytes(k, bytes(m))))).reverse() : false), // out of order
+    ];
+    const replies = [];
+    for (const answer of answers) {
+        let pair: CryptoKeyPair | null = null;
+        const w = await wallet({ ledger: true, answer: (a) => answer(a, pair!.privateKey) });
+        pair = w.pair;
+        // Two that differ: 0.002 SOL to key(3) beside the usual transfer.
+        const other = base64(
+            new Uint8Array(
+                getTransactionEncoder().encode(
+                    compileTransaction(
+                        pipe(
+                            createTransactionMessage({ version: 0 }),
+                            (m) => setTransactionMessageFeePayer(w.me, m),
+                            (m) => setTransactionMessageLifetimeUsingBlockhash({ blockhash: blockhash(key(9)), lastValidBlockHeight: 0n }, m),
+                            (m) => appendTransactionMessageInstruction(getTransferSolInstruction({ source: createNoopSigner(w.me), destination: key(3), amount: lamports(2_000_000n) }), m),
+                        ),
+                    ),
+                ),
+            ),
+        );
+        replies.push(await w.call('signTransaction', { account: w.me, transactions: [w.transfer(), other] }));
+    }
+    assert.equal(replies[0].ok && (replies[0].result as { transactions: string[] }).transactions.length, 2);
+    assert.equal(replies[1].ok, false);
+    assert.equal(replies[2].ok, false);
 });
 
 test('token names and prices are asked of Jupiter for mainnet only', async () => {

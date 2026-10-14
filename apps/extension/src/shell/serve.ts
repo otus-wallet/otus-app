@@ -49,7 +49,7 @@ import type { TokenInfo } from '@otus-wallet/core/tokens.ts';
 import { accountView, siteView, type Approval, type Life, type Line, type Outcome, type SiteView } from '@otus-wallet/core/view.ts';
 import type { Answer, Early } from './approvals.ts';
 import { connectSite, disconnectSite, MAX_SIGNED_HERE, onDevice, sentTo, signs, type Account, type State } from '@otus-wallet/core/state.ts';
-import { approved, channel, clusterOf, followed, landed, messageOf, Rejected, settled, signerOf, unexpired, withSignature } from './transaction.ts';
+import { approved, approvedAll, channel, clusterOf, followed, landed, messageOf, Rejected, settled, signerOf, unexpired, withSignature } from './transaction.ts';
 
 /** What serve needs from the extension: its state, the user's answer (behind Otus's lock), the keystore, the network
  *  and the time. Tests pass fakes. */
@@ -85,7 +85,7 @@ export function serve(call: unknown, origin: string, shell: Shell): Promise<Repl
         async () => {
             const request = intake(call, origin);
             const state = await shell.load();
-            return handle(gate(request, state.settings), state, shell);
+            return handle(gate(request), state, shell);
         },
         { rejected: 'The user rejected the request', failed: 'Otus could not handle this request' },
     );
@@ -125,14 +125,16 @@ async function handle(request: Request, state: State, shell: Shell): Promise<unk
         }
         case 'transaction': {
             const { account, site } = connected(state, origin, request.account);
-            if (request.transactions.length > 1) throw new Refused('several transactions in one call are not supported yet');
-            const bytes = request.transactions[0];
+            const list = request.transactions; // at most MAX_BATCH: the gate says so
             // What the bytes alone refuse, refused before any network work; and one at a time from a site, which
             // could otherwise spend the user's RPC on reviews no window ever shows.
-            const { signers, signed } = await decode(bytes);
-            if (!signers.includes(account.address)) throw new Refused('this wallet does not sign this transaction');
-            if (request.send && signers.some((s) => s !== account.address && !signed.includes(s))) throw new Refused('another signature is missing, so it cannot be sent');
-            return transact(request, bytes, account, site, state, shell);
+            for (const [i, bytes] of list.entries()) {
+                const which = list.length > 1 ? `transaction ${i + 1} of ${list.length}: ` : '';
+                const { signers, signed } = await decode(bytes);
+                if (!signers.includes(account.address)) throw new Refused(`${which}this wallet does not sign this transaction`);
+                if (request.send && signers.some((s) => s !== account.address && !signed.includes(s))) throw new Refused(`${which}another signature is missing, so it cannot be sent`);
+            }
+            return list.length > 1 ? transactAll(request, account, site, state, shell) : transact(request, list[0], account, site, state, shell);
         }
         case 'message': {
             const { account, site } = connected(state, origin, request.account);
@@ -246,6 +248,91 @@ async function transact(request: Extract<Request, { kind: 'transaction' }>, byte
         outcome.tell({ phase: 'refused', error: e instanceof Refused ? cap(e.message) : 'Otus could not finish it' });
         throw e;
     }
+}
+
+// Several transactions of a site's, asked together: checked as one is, on the one network they are for, reviewed and
+// approved together (all or none), then signed in their order. Sent, when asked, in that order too, each once the one
+// before it landed, so one that needs another finds it there; one that fails or isn't seen landing stops the rest.
+async function transactAll(request: Extract<Request, { kind: 'transaction' }>, account: Account, site: State['sites'][string], state: State, shell: Shell): Promise<unknown> {
+    const { origin } = request;
+    const list = request.transactions;
+    if (reviewing.has(origin)) throw new Refused('Otus is already asking you about a request from this site');
+    reviewing.add(origin);
+    let decided: { items: { r: Review; p: Prepared }[]; signatures?: SignatureBytes[]; chain: Chain; cluster: Cluster };
+    const outcome = channel<Outcome>();
+    let window: Early | undefined;
+    try {
+        window = shell.early?.({ kind: 'pending', site: siteView(origin, site), account: accountView(account) });
+        const asking = window ? { ...shell, approve: window.approve } : shell;
+        const reviewed = (cluster: Cluster, chain: Chain, confirmed?: Promise<unknown>) => {
+            const way = { cluster, chain, site: siteView(origin, site), later: !request.send, confirmed, kept: state, context: { signedBefore: site.since ?? null, programsBefore: site.programs, host: new URL(origin).host } };
+            return approvedAll(list, account, way, asking, () => {}, outcome.follow).then((d) => ({ ...d, chain, cluster }));
+        };
+        // As for one: reviewed where the site says, or the wallet shows, while that is checked; elsewhere if not.
+        const guess = request.chain ?? networkOf(state.settings);
+        const chain = shell.chain(rpcFor(guess, state.settings));
+        const checked = oneCluster(list, request.chain, state.settings, shell);
+        const ahead = request.chain !== null || [OTUS_RPC, state.settings.rpc].includes(rpcFor(guess, state.settings));
+        const deciding = ahead
+            ? reviewed(guess, chain, checked.then((found) => found.cluster === guess || Promise.reject(new Elsewhere(found)))).catch((e: unknown) => {
+                  if (!(e instanceof Elsewhere)) throw e;
+                  return reviewed(e.found.cluster, e.found.chain);
+              })
+            : checked.then((found) => reviewed(found.cluster, found.chain));
+        deciding.catch(() => {});
+        decided = await (window ? Promise.race([deciding, window.no.then(() => Promise.reject(new Rejected()))]) : deciding);
+    } catch (e) {
+        window?.close(e instanceof Rejected ? undefined : (told(e) ?? 'Otus could not handle this request'));
+        throw e;
+    } finally {
+        reviewing.delete(origin);
+    }
+    const { items, signatures, chain, cluster } = decided;
+    const host = new URL(origin).host;
+    const link = (id: string) => explorerOf(state.settings, cluster).tx(id);
+    const of = items.length;
+    try {
+        const signed: Uint8Array[] = [];
+        for (const [i, { r, p }] of items.entries()) {
+            const which = `transaction ${i + 1} of ${of}`;
+            if (!(signatures && onDevice(account))) await unexpired(r, chain).catch((e: unknown) => Promise.reject(e instanceof Refused ? new Refused(`${which}: ${e.message}`) : e));
+            const mine = await signFor(account, messageOf(p.bytes), shell, { origin, programs: programsCalled(r.message) }, signatures?.[i]);
+            await shell.update((s) => usable(s, r, account.address, host, shell.now())).catch(() => {});
+            signed.push(withSignature(p.bytes, account.address, mine));
+        }
+        if (!request.send) {
+            outcome.tell({ phase: 'signed', host });
+            return { transactions: signed.map(base64) };
+        }
+        outcome.tell({ phase: 'sending' });
+        const ids: Signature[] = [];
+        for (const [i, tx] of signed.entries()) {
+            const which = `transaction ${i + 1} of ${of}`;
+            const before = i === 0 ? '' : `; the ${i === 1 ? 'one' : i} before it landed`;
+            const sent = await landed(tx, chain, shell).catch((e: unknown) => Promise.reject(e instanceof Refused ? new Refused(`${which}: ${e.message}${before}`) : e));
+            ids.push(sent.signature);
+            if (sent.outcome === 'confirmed') continue;
+            outcome.tell(sent.outcome === 'failed' ? { phase: 'landed', failed: true, link: link(sent.signature) } : { phase: 'unseen', expired: false, link: link(sent.signature) });
+            throw new Refused(`${which} ${sent.outcome === 'failed' ? 'failed onchain' : "wasn't seen landing"}, so Otus sent none after it`);
+        }
+        outcome.tell({ phase: 'landed', failed: false, link: link(ids[ids.length - 1]) });
+        return { signatures: ids };
+    } catch (e) {
+        outcome.tell({ phase: 'refused', error: e instanceof Refused ? cap(e.message) : 'Otus could not finish it' });
+        throw e;
+    }
+}
+
+// The one network transactions asked together are for: each blockhash (or nonce) checked once; several are refused.
+async function oneCluster(list: Uint8Array[], named: Cluster | null, settings: State['settings'], shell: Shell): Promise<{ cluster: Cluster; chain: Chain }> {
+    const firsts = new Map<string, Uint8Array>();
+    for (const bytes of list) {
+        const { message } = await decode(bytes);
+        if (!firsts.has(message.lifetimeToken)) firsts.set(message.lifetimeToken, bytes);
+    }
+    const found = await Promise.all([...firsts.values()].map((b) => clusterOf(b, named, settings, shell)));
+    if (found.some((f) => f.cluster !== found[0].cluster)) throw new Refused('the transactions are for different networks');
+    return found[0];
 }
 
 // A transaction's id: its fee payer's signature, once there; null while that account has not signed yet.
