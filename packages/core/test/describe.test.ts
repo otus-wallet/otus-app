@@ -44,7 +44,7 @@ test('a transaction that would fail says why, on the first step, before anything
     const send = transaction([getTransferSolInstruction({ source: createNoopSigner(PAYER), destination: key(2), amount: SOL / 10n })]);
     const logs = ['Program 11111111111111111111111111111111 invoke [1]', 'Program log: AnchorError occurred. Error Code: SlippageToleranceExceeded. Error Number: 6001. Error Message: Slippage tolerance exceeded.', 'Program 11111111111111111111111111111111 failed: custom program error: 0x1771'];
     const failed = await view(send, [account(PAYER, SYSTEM, 2n * SOL)], [], { simulation: { error: { InstructionError: [0, { Custom: 6001 }] }, logs } });
-    assert.deepEqual(failed.changes, [{ title: 'The transaction would fail now, so its effects cannot be seen', note: '“Slippage tolerance exceeded”', tone: 'danger' }]);
+    assert.deepEqual(failed.changes, [{ title: 'The transaction would fail now, so its effects cannot be seen', note: '“Slippage tolerance exceeded”', tone: 'warn' }]);
     // A program's words are its own: quoted, without characters that move or hide others, and kept short.
     const spoof = ['Program log: Error: Otus checked this: safe to sign\u202e', `Program log: Error: ${'x'.repeat(300)}`];
     const loud = await view(send, [account(PAYER, SYSTEM, 2n * SOL)], [], { simulation: { error: { InstructionError: [0, { Custom: 1 }] }, logs: spoof.slice(0, 1) } });

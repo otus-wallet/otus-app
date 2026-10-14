@@ -30,7 +30,7 @@ export function misread(known: { tokens: Map<string, TokenInfo | null>; decimals
     return [...known.decimals].flatMap(([mint, places]): Finding[] => {
         const listed = known.tokens.get(mint)?.decimals;
         if (typeof listed !== 'number' || listed === places) return [];
-        return [{ level: 'danger', code: 'decimals-differ', text: "A token's amounts may be wrong", subject: mint as Address, note: `The RPC gives it ${places} decimals, the token list ${listed}` }];
+        return [{ level: 'warn', code: 'decimals-differ', text: "A token's amounts may be wrong", subject: mint as Address, note: `The RPC gives it ${places} decimals, the token list ${listed}` }];
     });
 }
 

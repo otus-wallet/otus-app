@@ -1154,12 +1154,12 @@
       "label": "Me",
       "address": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
     },
-    "verdict": "danger",
-    "title": "Not safe",
-    "sub": "1 critical · 2 warnings",
+    "verdict": "warn",
+    "title": "Caution",
+    "sub": "3 warnings · nothing critical",
     "chip": {
-      "text": "1 critical",
-      "tone": "danger"
+      "text": "3 warnings",
+      "tone": "warn"
     },
     "signer": "ready",
     "network": null,
@@ -1170,12 +1170,12 @@
         "icon": null,
         "verified": true,
         "amount": "−50",
-        "tone": "danger",
+        "tone": "plain",
         "lines": [
           {
             "note": "",
             "amount": "−50",
-            "tone": "danger"
+            "tone": "plain"
           }
         ]
       },
@@ -1185,7 +1185,7 @@
         "icon": null,
         "verified": true,
         "amount": "−0.000005",
-        "tone": "danger",
+        "tone": "plain",
         "lines": [
           {
             "note": "Network fee",
@@ -1210,9 +1210,9 @@
         "name": "Unknown program",
         "address": "3yS1JFVT284y8z1LC9MRoWxZjzFrdoD5axKsZiyMsfC7",
         "standing": "unknown",
-        "tone": "danger",
+        "tone": "warn",
         "sub": "Uses 2 of your accounts",
-        "subTone": "danger",
+        "subTone": "warn",
         "meta": "",
         "metaTone": "plain",
         "inner": "",
@@ -1226,7 +1226,7 @@
               {
                 "name": "Your stake account 3uWi9x2SRpmjztkpkr2WWeBoVq3exjXG2YfDWLvm8KsQ",
                 "role": "account 1 · writable",
-                "tone": "danger"
+                "tone": "plain"
               },
               {
                 "name": "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
@@ -1246,21 +1246,21 @@
               {
                 "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "account 5 · signer · writable",
-                "tone": "danger"
+                "tone": "plain"
               }
             ],
             "effects": [
               {
                 "text": "−50 SOL from your stake account 3uWi9x2SRpmjztkpkr2WWeBoVq3exjXG2YfDWLvm8KsQ",
-                "tone": "danger"
+                "tone": "plain"
               },
               {
                 "text": "Your stake account 3uWi9x2SRpmjztkpkr2WWeBoVq3exjXG2YfDWLvm8KsQ is closed",
-                "tone": "danger"
+                "tone": "plain"
               },
               {
                 "text": "−0.000005 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
-                "tone": "danger"
+                "tone": "plain"
               }
             ]
           }
@@ -1268,11 +1268,6 @@
       }
     ],
     "findings": [
-      {
-        "tone": "danger",
-        "title": "An asset of yours goes to someone else",
-        "note": "−50 SOL → HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk"
-      },
       {
         "tone": "warn",
         "title": "You send almost all your SOL",
@@ -1282,6 +1277,11 @@
         "tone": "warn",
         "title": "3yS1JFVT284y8z1LC9MRoWxZjzFrdoD5axKsZiyMsfC7 is not a program Otus knows",
         "note": "It uses 2 of your accounts · Otus can't read what it does"
+      },
+      {
+        "tone": "warn",
+        "title": "An asset of yours goes to someone else",
+        "note": "−50 SOL → HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk"
       },
       {
         "tone": "ok",

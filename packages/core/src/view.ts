@@ -218,7 +218,7 @@ export function describeBatch(items: { r: Review; p: Prepared | null; known: Kno
     const views = items.map(({ r, p, known }, i) => {
         const v = describe(r, p, { ...shown, known });
         if (i === 0 || r.simulation.error === null) return v;
-        const after = (l: Line): Line => (l.tone === 'danger' && l.title === FAILS ? { ...l, note: [l.note, NEEDS].filter(Boolean).join(' · ') } : l);
+        const after = (l: Line): Line => (l.title === FAILS ? { ...l, note: [l.note, NEEDS].filter(Boolean).join(' · ') } : l);
         return { ...v, changes: v.changes.map(after), findings: v.findings.map(after) };
     });
     const drained = drainedTogether(items);

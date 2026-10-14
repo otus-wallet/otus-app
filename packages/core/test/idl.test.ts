@@ -32,24 +32,24 @@ async function unknownCall(o: { cosigned?: boolean; told?: string; calls?: Addre
     return describe(r, p, { site: siteView('https://app.example.com', { account: PAYER, signatures: 3 }), account: { label: 'Me', address: PAYER }, signer: 'ready', cluster: 'solana:mainnet', known: { tokens: new Map(), decimals: new Map(), told } });
 }
 
-test('a program Otus doesn’t know: a warning, a notice once its own IDL describes it; critical only for what it does', async () => {
-    const said = (v: Awaited<ReturnType<typeof unknownCall>>) => [v.verdict, ...v.findings.filter((f) => f.tone === 'danger' || / not a program Otus knows$/.test(f.title)).map((f) => `${f.tone}: ${f.title}`)];
+test('a program Otus doesn’t know: a warning, a notice once its own IDL describes it; what it reaches is said', async () => {
+    const said = (v: Awaited<ReturnType<typeof unknownCall>>) => [v.verdict, ...v.findings.filter((f) => f.tone === 'danger' || /uses your signature|can't see what|calls itself| not a program Otus knows$/.test(f.title)).map((f) => `${f.tone}: ${f.title}`)];
     const unknown = `${SOME} is not a program Otus knows`; // whole: the window cuts it short
     assert.deepEqual(said(await unknownCall()), ['warn', `warn: ${unknown}`]);
     assert.deepEqual(said(await unknownCall({ told: 'evil' })), ['ok', 'notice: Evil is not a program Otus knows']);
     // What it calls inside with your signature: moving SOL, itself, another program, all as they are; but Kamino Lend,
-    // where it could act on loans of yours that no balance shows, is critical; and so is not seeing what it calls.
+    // where it could act on loans of yours that no balance shows, is said; and so is not seeing what it calls.
     assert.deepEqual(said(await unknownCall({ calls: [SYSTEM, SOME, key(40)] })), ['warn', `warn: ${unknown}`]);
     const KAMINO = 'KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD' as Address;
-    assert.deepEqual(said(await unknownCall({ calls: [SYSTEM, KAMINO], told: 'evil' })), ['danger', 'danger: An unknown program uses your signature in Kamino Lend', 'notice: Evil is not a program Otus knows']);
-    assert.deepEqual(said(await unknownCall({ listed: false })), ['danger', "danger: Otus can't see what an unknown program does with your signature", `warn: ${unknown}`]);
+    assert.deepEqual(said(await unknownCall({ calls: [SYSTEM, KAMINO], told: 'evil' })), ['warn', 'warn: An unknown program uses your signature in Kamino Lend', 'notice: Evil is not a program Otus knows']);
+    assert.deepEqual(said(await unknownCall({ listed: false })), ['warn', `warn: ${unknown}`, "warn: Otus can't see what an unknown program does with your signature"]);
     // Without guards its own IDL binds nothing: a warning still; the Guards line says why there are none.
     const loose = await unknownCall({ cosigned: true });
     assert.deepEqual([loose.guards.held, loose.guards.text], [false, "None: Otus can't add guards because another account must sign the transaction too"]);
     assert.deepEqual(said(loose), ['warn', `warn: ${unknown}`]);
     assert.deepEqual(said(await unknownCall({ cosigned: true, told: 'evil' })), ['warn', 'warn: Evil is not a program Otus knows']);
     // A name borrowed from a program Otus knows.
-    assert.deepEqual(said(await unknownCall({ told: 'jupiterAggregator' })), ['danger', 'danger: An unknown program calls itself Jupiter Aggregator', 'notice: Jupiter Aggregator is not a program Otus knows']);
+    assert.deepEqual(said(await unknownCall({ told: 'jupiterAggregator' })), ['warn', 'warn: An unknown program calls itself Jupiter Aggregator', 'notice: Jupiter Aggregator is not a program Otus knows']);
 });
 
 test('a name borrowed from a brand, a wallet or a program every transaction uses, by whole words; plain words and names forks keep, no', async () => {

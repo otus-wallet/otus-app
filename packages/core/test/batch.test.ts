@@ -75,7 +75,7 @@ test('one that would fail alone, after others, may need one of them: said, and t
     const r = await review(send(3, SOL), { wallet: PAYER, signedBefore: 0, host: 'app.example.com' }, chain);
     const failing = { r, p: await prepare(r, PAYER, chain), known };
     const v = describeBatch([{ ...a, known }, failing], shown);
-    assert.equal(v.verdict, 'danger');
+    assert.equal(v.verdict, 'warn'); // Otus can't see what it does: a warning, the user decides
     assert.match(v.changes[0].title, /^2 · The transaction would fail now/);
     assert.match(v.changes[0].note, /alone: it may need one before it$/);
     // First of all, nothing comes before it: only that it fails.
