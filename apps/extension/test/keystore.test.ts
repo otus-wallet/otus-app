@@ -181,3 +181,19 @@ test('an add from anything but a phrase or a key, as an object, is refused witho
     }
     assert.ok(!JSON.stringify(logged).includes('legal'));
 });
+
+test('a password changed seals the vault again under a new key: the old password and the old key open nothing', async () => {
+    const before = await secrets();
+    const { unlocked: oldKey } = (await chrome.storage.session.get('unlocked')) as { unlocked: string };
+    assert.deepEqual(await keysCall({ keys: 'password', password: 'wrong one', newPassword: 'a new password' }), { ok: false, error: 'Wrong password' });
+    assert.deepEqual(await keysCall({ keys: 'password', password: PASSWORD, newPassword: 'short' }), { ok: false, error: 'Use a password of 8 to 32 characters' });
+    assert.deepEqual(await keysCall({ keys: 'password', password: PASSWORD, newPassword: 'x'.repeat(33) }), { ok: false, error: 'Use a password of 8 to 32 characters' });
+    await call({ keys: 'password', password: PASSWORD, newPassword: 'a new password' });
+    assert.deepEqual(await secrets(), before); // unlocked still, with the new key
+    const { vault } = (await chrome.storage.local.get('vault')) as { vault: Parameters<typeof readSecrets>[0] };
+    await assert.rejects(readSecrets(vault, bytes(oldKey)));
+    await call({ keys: 'lock' });
+    assert.deepEqual(await keysCall({ keys: 'unlock', password: PASSWORD }), { ok: false, error: 'Wrong password' });
+    await call({ keys: 'unlock', password: 'a new password' });
+    assert.deepEqual(await secrets(), before);
+});

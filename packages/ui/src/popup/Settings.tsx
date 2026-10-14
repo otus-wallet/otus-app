@@ -1,5 +1,5 @@
-// Every setting lives here, and only here: auto-lock, the network, the explorer, preflight, the trusted apps and the
-// addresses you know, as sections that open one at a time.
+// Every setting lives here, and only here: auto-lock, the password, the network, the explorer, preflight, the trusted
+// apps and the addresses you know, as sections that open one at a time.
 import { isAddress } from '@solana/kit';
 import { useState, type ReactNode } from 'react';
 
@@ -8,8 +8,11 @@ import { platform } from '@otus-wallet/core/platform.ts';
 import { clusterOfGenesis, EXPLORERS, explorerOf, LOCK_CHOICES, MAX_LOCK_AFTER, networkName, networkOf, type Explorer, type Settings } from '@otus-wallet/core/settings.ts';
 import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
 import { lookalike, named, nameTaken, type State } from '@otus-wallet/core/state.ts';
+import { MAX_PASSWORD, MIN_PASSWORD, passwordProblem } from '@otus-wallet/core/password.ts';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion.tsx';
 import { ShortAddress } from '../components/address.tsx';
+import { PasswordInput } from '../components/password.tsx';
+import { Strength } from '../components/strength.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
 import { Icon, Tile } from '../components/icons.tsx';
@@ -30,6 +33,11 @@ export function Settings({ state, keys, go }: { state: State; keys: KeyStatus; g
                 {keys.vault && (
                     <Section id="lock" icon="lock" title="Auto-lock" value={minutes === 0 ? 'At once' : minutes === 60 ? '1 h' : `${minutes} min`}>
                         <AutoLock minutes={minutes} />
+                    </Section>
+                )}
+                {keys.vault && (
+                    <Section id="password" icon="key" title="Password" value="">
+                        <ChangePassword />
                     </Section>
                 )}
                 <Section id="network" icon="server" title="Network" value={state.settings.network === 'custom' ? `Custom · ${network}` : network}>
@@ -64,7 +72,7 @@ export function Settings({ state, keys, go }: { state: State; keys: KeyStatus; g
     );
 }
 
-function Section({ id, icon, title, value, children }: { id: string; icon: 'lock' | 'server' | 'external' | 'send' | 'shield' | 'book'; title: string; value: ReactNode; children: ReactNode }) {
+function Section({ id, icon, title, value, children }: { id: string; icon: 'lock' | 'key' | 'server' | 'external' | 'send' | 'shield' | 'book'; title: string; value: ReactNode; children: ReactNode }) {
     return (
         <AccordionItem value={id} className="section rounded-[3px] border border-rule-2 bg-panel last:border-b data-[state=open]:border-rule">
             <AccordionTrigger className="section-toggle min-h-[46px] cursor-pointer items-center gap-2.5 rounded-none px-3 py-0 hover:bg-hover">
@@ -109,6 +117,47 @@ function AutoLock({ minutes }: { minutes: number }) {
                     <ErrorLine>{error}</ErrorLine>
                 </div>
             )}
+        </>
+    );
+}
+
+// A new password, with the one Otus has: the vault is sealed again for it. Done, the fields clear and it says so.
+function ChangePassword() {
+    const [current, setCurrent] = useState('');
+    const [first, setFirst] = useState('');
+    const [again, setAgain] = useState('');
+    const [error, setError] = useState('');
+    const [done, setDone] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const change = async () => {
+        if (busy) return;
+        const problem = passwordProblem(first, again);
+        if (problem) return setError(problem);
+        setBusy(true);
+        setError('');
+        setDone(false);
+        const reply = await ask({ keys: 'password', password: current, newPassword: first });
+        setBusy(false);
+        if (!reply.ok) return setError(reply.error);
+        setCurrent('');
+        setFirst('');
+        setAgain('');
+        setDone(true);
+    };
+    return (
+        <>
+            <p className="text-xs text-ink-2">{`${MIN_PASSWORD} to ${MAX_PASSWORD} characters.`}</p>
+            <PasswordInput placeholder="Password" autoComplete="current-password" aria-label="Password" value={current} onChange={(e) => (setCurrent(e.target.value), setDone(false))} />
+            <PasswordInput placeholder="New password" autoComplete="new-password" aria-label="New password" value={first} onChange={(e) => (setFirst(e.target.value), setDone(false))} />
+            <Strength password={first} />
+            <PasswordInput placeholder="The same again" autoComplete="new-password" aria-label="The same again" value={again} onChange={(e) => (setAgain(e.target.value), setDone(false))} onKeyDown={(e) => e.key === 'Enter' && void change()} />
+            <ErrorLine>{error}</ErrorLine>
+            {done && <p className="text-xs text-ok">Password changed</p>}
+            <div className="flex justify-end">
+                <Button size="sm" variant="default" disabled={busy} onClick={() => void change()}>
+                    Change password
+                </Button>
+            </div>
         </>
     );
 }

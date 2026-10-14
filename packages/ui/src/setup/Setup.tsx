@@ -6,7 +6,9 @@ import { useEffect, useState } from 'react';
 import { platform } from '@otus-wallet/core/platform.ts';
 import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
 import { load, type Account, type State } from '@otus-wallet/core/state.ts';
+import { MAX_PASSWORD, MIN_PASSWORD, passwordProblem } from '@otus-wallet/core/password.ts';
 import { PasswordInput } from '../components/password.tsx';
+import { Strength } from '../components/strength.tsx';
 import { ShortAddress } from '../components/address.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
@@ -166,16 +168,16 @@ function usePassword(keys: KeyStatus) {
     const [again, setAgain] = useState('');
     if (keys.vault) return { fields: null, value: (): Credentials | Error => ({}) };
     const value = (): Credentials | Error => {
-        if (first.length < 8) return new Error('Use a password of 8 characters or more');
-        if (first !== again) return new Error('The two passwords differ');
-        return { newPassword: first };
+        const problem = passwordProblem(first, again);
+        return problem ? new Error(problem) : { newPassword: first };
     };
     const fields = (
         <>
             <Heading>Password</Heading>
-            <Muted>It unlocks Otus on this computer: 8 characters or more. Your phrase is the only way back if you forget it.</Muted>
+            <Muted>{`It unlocks Otus on this computer: ${MIN_PASSWORD} to ${MAX_PASSWORD} characters. Your phrase is the only way back if you forget it.`}</Muted>
             <div className="flex flex-col gap-1.5">
                 <PasswordInput placeholder="New password" autoComplete="new-password" aria-label="New password" autoFocus value={first} onChange={(e) => setFirst(e.target.value)} />
+                <Strength password={first} />
                 <PasswordInput placeholder="The same again" autoComplete="new-password" aria-label="The same again" value={again} onChange={(e) => setAgain(e.target.value)} />
             </div>
         </>

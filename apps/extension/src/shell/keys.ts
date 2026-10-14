@@ -6,10 +6,10 @@ import { newPhrase, phraseOf, privateKeyFromText, privateKeyOf, privateKeysOf } 
 import { base64, bytes, createVault, openVault, readSecrets, UnknownVault, writeSecrets, WrongPassword, type Bytes, type Secret, type Vault } from '../keys/vault.ts';
 import { NO_KEY, Refused } from '@otus-wallet/core/protocol.ts';
 import type { KeysCall, KeysReply, KeyStatus } from '@otus-wallet/core/keystore.ts';
+import { MAX_PASSWORD, MIN_PASSWORD } from '@otus-wallet/core/password.ts';
 import { load, named, signs, update, type Account } from '@otus-wallet/core/state.ts';
 
 export const LOCK_ALARM = 'lock'; // the background sets it from how long Otus has been closed
-const MIN_PASSWORD = 8;
 
 const stored = async () => ((await chrome.storage.local.get('vault')).vault as Vault | undefined) ?? null;
 const held = async (): Promise<Bytes | null> => {
@@ -58,6 +58,8 @@ async function run(call: KeysCall): Promise<unknown> {
             return derive(label(call.label));
         case 'reveal':
             return reveal(text(call.account), call.what === 'phrase' ? 'phrase' : 'key', text(call.password));
+        case 'password':
+            return changed(text(call.password), asNew(call.newPassword));
     }
     throw new Refused('unknown call');
 }
@@ -150,8 +152,7 @@ async function add(from: { phrase: string } | { privateKey: string }, name: stri
     let key: Bytes;
     let secrets: Secret[] = [];
     if (!vault) {
-        if (newPassword === undefined || newPassword.length < MIN_PASSWORD) throw new Refused(`Use a password of ${MIN_PASSWORD} characters or more`);
-        ({ vault, key } = await createVault(newPassword, []));
+        ({ vault, key } = await createVault(asNew(newPassword), []));
     } else {
         if (newPassword !== undefined) throw new Refused('Otus has a password already: reload this page');
         key = (await held()) ?? refuse('Unlock Otus first');
@@ -181,6 +182,23 @@ function source(v: unknown): { phrase: string } | { privateKey: string } {
     if ('phrase' in v) return { phrase: text(v.phrase) };
     if ('privateKey' in v) return { privateKey: text(v.privateKey) };
     throw new Refused('bad input');
+}
+
+// A new password: 8 to 32 characters. One already set opens the vault whatever its length.
+function asNew(v: unknown): string {
+    const length = typeof v === 'string' ? [...v].length : 0;
+    if (length < MIN_PASSWORD || length > MAX_PASSWORD) throw new Refused(`Use a password of ${MIN_PASSWORD} to ${MAX_PASSWORD} characters`);
+    return v as string;
+}
+
+// The vault sealed again for a new password, with the password it has: under a new key too, so that one taken while
+// the old password was known no longer opens it. Otus stays unlocked, with the new key.
+async function changed(password: string, newPassword: string) {
+    const key = await opened(password);
+    const secrets = await readSecrets((await stored())!, key);
+    const made = await createVault(newPassword, secrets);
+    await chrome.storage.local.set({ vault: made.vault });
+    await keep(made.key);
 }
 
 // An account's private key as wallets export it (base58 of the key and its public key), or the phrase it comes from.
