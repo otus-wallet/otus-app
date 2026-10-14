@@ -24,7 +24,7 @@ const chrome = {
             await opening;
             if (refusing) throw new Error('Chrome would not open it');
             created.push({ id: 100 + created.length, url });
-            return { id: 100 + created.length - 1 };
+            return { id: 100 + created.length - 1, tabs: [{ id: 1_000 + created.length - 1 }] };
         },
         remove: async (id: number) => void removed.push(id),
         onRemoved: { addListener: (f: typeof closed) => (closed = f) },
@@ -39,7 +39,7 @@ const form = (kind: string, origin = 'https://jup.ag') => ({ kind, site: { origi
 
 // The window's page connecting back, from Otus's own page in that window (or `from` another): what it hears, whether it
 // was cut off, and how it answers.
-function page(window = created.at(-1)!, from = window.id) {
+function page(window = created.at(-1)!, from = window.id, tab?: number) {
     const heard: unknown[] = [];
     let said: (m: object) => void = () => {};
     let gone: () => void = () => {};
@@ -47,7 +47,7 @@ function page(window = created.at(-1)!, from = window.id) {
     const id = window.url.split('#')[1];
     connected({
         name: `approve:${id}`,
-        sender: { id: 'otus', url: window.url, tab: { windowId: from } },
+        sender: { id: 'otus', url: window.url, tab: { windowId: from, id: tab ?? window.id + 900 } },
         postMessage: (m: unknown) => heard.push(m),
         onMessage: { addListener: (f: typeof said) => (said = f) },
         onDisconnect: { addListener: (f: typeof gone) => (gone = f) },
@@ -256,6 +256,10 @@ test('the window answers only from the window Otus opened for it, and only once'
     assert.deepEqual([copy.cut(), copy.heard], [true, []]);
     copy.say({ approve: true });
     assert.equal(await state(answer), 'waiting');
+    // Another tab put in that very window: cut off.
+    const slipped = page(window, window.id, 4_242);
+    await tick();
+    assert.equal(slipped.cut(), true);
     // Its own page is heard; a second one, even from that window, is cut off.
     const own = page(window);
     const again = page(window);

@@ -11,7 +11,7 @@ export type Answer = boolean | SignatureBytes | { account: Address };
 
 // `ready`: the approval is in its final form, the only one a yes counts for; `told`: the window, to hear it; `follow`: its
 // blockhash's life, for the window; `after`: approved, how it goes, for the window that stays; `port`: the window's own;
-// `opened`: the window Otus opened for it, once it has (undefined when it did not open).
+// `opened`: the window Otus opened for it, once it has (undefined when it did not open); `tab`: the page's tab in it.
 type Pending = {
     approval: Approval;
     ready: boolean;
@@ -22,6 +22,7 @@ type Pending = {
     port?: chrome.runtime.Port;
     opened: Promise<number | undefined>;
     window?: number;
+    tab?: number;
 };
 const pending = new Map<string, Pending>();
 const windows = new Map<number, string>(); // approval windows, to the request they ask about
@@ -65,7 +66,7 @@ export function early(first: Approval): Early {
         settle(answer);
     };
     const opened = openWindow(id).then(
-        (window) => (asked.window = window),
+        ({ window, tab }) => ((asked.tab = tab), (asked.window = window)),
         (error: unknown) => {
             failure = error;
             decide(false);
@@ -115,7 +116,7 @@ export function early(first: Approval): Early {
 }
 
 // The window, at the corner of the one focused last; its id.
-async function openWindow(id: string): Promise<number> {
+async function openWindow(id: string): Promise<{ window: number; tab: number | undefined }> {
     const last = await chrome.windows.getLastFocused().catch(() => undefined);
     const corner = last?.left !== undefined && last.width !== undefined ? { left: last.left + last.width - WIDTH - 16, top: (last.top ?? 0) + 72 } : {};
     // Chrome refuses a window mostly off screen, as a corner past the edge of a second monitor; then it places it itself.
@@ -123,7 +124,7 @@ async function openWindow(id: string): Promise<number> {
     const opened = await open(corner).catch(() => open({}));
     if (opened?.id === undefined) throw new Error('the approval window did not open');
     windows.set(opened.id, id);
-    return opened.id;
+    return { window: opened.id, tab: opened.tabs?.[0]?.id };
 }
 
 // What tells the window its blockhash's life.
@@ -139,7 +140,8 @@ chrome.runtime.onConnect.addListener((port) => {
     const fromPage = port.sender?.id === chrome.runtime.id && port.sender.url?.split('#')[0] === chrome.runtime.getURL(PAGE);
     if (!asked || !fromPage) return port.disconnect();
     const take = (window: number | undefined) => {
-        if (pending.get(id) !== asked || window === undefined || port.sender?.tab?.windowId !== window || asked.port) return port.disconnect();
+        const tab = port.sender?.tab;
+        if (pending.get(id) !== asked || window === undefined || tab?.windowId !== window || (asked.tab !== undefined && tab.id !== asked.tab) || asked.port) return port.disconnect();
         listen(asked, port);
     };
     if (asked.window !== undefined) take(asked.window);
