@@ -257,7 +257,8 @@ const RANK: Record<Tone, number> = { danger: 4, warn: 3, notice: 2, ok: 1, plain
 const worst = (verdicts: Verdict[]): Verdict => verdicts.reduce((w, v) => (RANK[v] > RANK[w] ? v : w), 'ok');
 
 // Each transaction's lines → one list: a line some of them share said once, its title after their numbers ("All" for
-// every one of several); a clear one once by its title, without numbers, its different notes together; worst first.
+// every one of several); a clear one once by its title, without numbers, and without its note where theirs differ
+// (each one's own review has it); worst first.
 function byNumbers(each: Line[][]): Line[] {
     const seen = new Map<string, { line: Line; at: number[] }>();
     each.forEach((lines, i) =>
@@ -266,8 +267,7 @@ function byNumbers(each: Line[][]): Line[] {
             const had = seen.get(key);
             if (!had) return void seen.set(key, { line, at: [i] });
             if (!had.at.includes(i)) had.at.push(i);
-            const notes = had.line.note.split(' · ');
-            if (line.tone === 'ok' && line.note && !notes.includes(line.note)) had.line = { ...had.line, note: [had.line.note, line.note].filter(Boolean).join(' · ') };
+            if (line.note !== had.line.note) had.line = { ...had.line, note: '' };
         }),
     );
     const numbers = (at: number[]) => (each.length > 1 && at.length === each.length ? 'All' : at.map((i) => i + 1).join(', '));
