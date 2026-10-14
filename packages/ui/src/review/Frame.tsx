@@ -21,7 +21,8 @@ const TRAVEL = 24; // px the pointer moves after that: a hand on the mouse, not 
 /**
  * False for a moment after the window shows, comes to the front, moves or changes size, and after each change of
  * `step`; then until the pointer moves a little way, with no click or key for a moment before (a tap counts too, but
- * not on the button it would arm). Keys never arm it, and one pressed takes it back: a yes is the pointer's alone.
+ * not on the button it would arm), while the window is in front. Keys never arm it, and one pressed takes it back, as
+ * the window going to the background does: a yes is the pointer's alone.
  * Worked out while drawing, so the render that shows a new step or follows the focus is already unarmed: a click
  * queued right behind them finds the buttons disabled.
  */
@@ -63,7 +64,7 @@ export function useArmed(step: unknown): boolean {
         };
         // A click or a key while it waits starts the wait over; armed, a click is the answer, and a key takes it back.
         const press = (e: PointerEvent) => {
-            if (armed) return;
+            if (armed || !document.hasFocus()) return;
             const now = performance.now();
             const tap = e.pointerType !== 'mouse' && !(e.target instanceof Element && e.target.closest('[data-arms]'));
             if (tap && ready(now)) return arm();
@@ -75,18 +76,26 @@ export function useArmed(step: unknown): boolean {
             armed = false;
             flushSync(() => setArmedFor(null)); // before the key's own default, as Enter clicking a button
         };
+        // In the background, the window takes no arming: a pointer passing over it, a click made elsewhere. Back to the
+        // front, it waits again from the start.
+        const away = () => {
+            last = null;
+            key();
+        };
         const move = (e: PointerEvent) => {
             const now = performance.now();
             const from = last;
             last = [e.clientX, e.clientY];
-            if (armed || e.pointerType !== 'mouse' || !from || now - since < ARMING) return;
+            if (armed || e.pointerType !== 'mouse' || !from || now - since < ARMING || !document.hasFocus()) return;
             travel += Math.hypot(e.clientX - from[0], e.clientY - from[1]);
             if (travel >= TRAVEL && ready(now)) arm();
         };
         addEventListener('pointerdown', press, true);
         addEventListener('keydown', key, true);
         addEventListener('pointermove', move, true);
+        addEventListener('blur', away);
         return () => {
+            removeEventListener('blur', away);
             removeEventListener('pointerdown', press, true);
             removeEventListener('keydown', key, true);
             removeEventListener('pointermove', move, true);
