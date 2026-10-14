@@ -236,3 +236,35 @@ test('a password is changed only while unlocked; cut short between its writes, t
     assert.deepEqual(await call({ keys: 'status' }), { vault: true, unlocked: false }); // the key that opens nothing let go
     await call({ keys: 'unlock', password: 'a new password' });
 });
+
+test('the first password can come before any phrase or key: an empty vault, unlocked, that a phrase joins later', async () => {
+    const { vault } = (await chrome.storage.local.get('vault')) as { vault: unknown };
+    assert.deepEqual(await keysCall({ keys: 'seal', newPassword: 'a sealed one' }), { ok: false, error: 'Otus has a password already: reload this page' });
+    assert.deepEqual((await chrome.storage.local.get('vault')).vault, vault); // the one there stands
+
+    // A fresh Otus: only a Ledger, or an address watched, to come.
+    const kept = await chrome.storage.local.get(null);
+    await chrome.storage.local.remove(Object.keys(kept));
+    await chrome.storage.session.remove('unlocked');
+    assert.deepEqual(await call({ keys: 'status' }), { vault: false, unlocked: false });
+    for (const short of ['short', 'x'.repeat(33), 42]) assert.deepEqual(await keysCall({ keys: 'seal', newPassword: short as string }), { ok: false, error: 'Use a password of 8 to 32 characters' });
+    assert.deepEqual(await call({ keys: 'status' }), { vault: false, unlocked: false });
+    await call({ keys: 'seal', newPassword: 'a sealed one' });
+    assert.deepEqual(await call({ keys: 'status' }), { vault: true, unlocked: true });
+    assert.deepEqual(await secrets(), []);
+    await call({ keys: 'lock' });
+    assert.deepEqual(await keysCall({ keys: 'unlock', password: 'something else' }), { ok: false, error: 'Wrong password' });
+    await call({ keys: 'unlock', password: 'a sealed one' });
+    // A phrase later goes in with that password, asked no new one; the password changes as any other.
+    assert.deepEqual(await keysCall({ keys: 'add', from: { phrase: A }, label: 'A', newPassword: 'another one' }), { ok: false, error: 'Otus has a password already: reload this page' });
+    await call({ keys: 'add', from: { phrase: A }, label: 'A' });
+    assert.deepEqual(await secrets(), [A]);
+    await call({ keys: 'password', password: 'a sealed one', newPassword: 'changed since' });
+    await call({ keys: 'lock' });
+    await call({ keys: 'unlock', password: 'changed since' });
+    assert.deepEqual(await secrets(), [A]);
+
+    await chrome.storage.local.remove(Object.keys(await chrome.storage.local.get(null)));
+    await chrome.storage.local.set(kept);
+    await chrome.storage.session.remove('unlocked');
+});

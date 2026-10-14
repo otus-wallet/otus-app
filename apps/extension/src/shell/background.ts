@@ -14,7 +14,7 @@ import { lockMinutes, OTUS_RPC, rpcFor, walletRpc } from '@otus-wallet/core/sett
 import { keepTokens, tokens } from '@otus-wallet/core/tokens.ts';
 import type { Approval, Life } from '@otus-wallet/core/view.ts';
 import { answerOf, approve, early, kept, type Answer } from './approvals.ts';
-import { keysCall, lock, LOCK_ALARM, locked, prune, shielded, sign } from './keys.ts';
+import { keysCall, lock, LOCK_ALARM, locked, prune, shielded, sign, vaulted } from './keys.ts';
 import { mainnetTables } from './tables.ts';
 import { own, serve, stakeOwn, swapOwn, takeBack } from './serve.ts';
 import { connectedTo, edited, load, moved, update, type Edit, type State } from '@otus-wallet/core/state.ts';
@@ -83,6 +83,8 @@ chrome.runtime.onMessage.addListener((message: { call?: unknown; keys?: unknown;
         if ('edit' in message) {
             void (async () => {
                 if (await shielded()) return respond({ ok: false, error: 'Otus is locked' });
+                // A Ledger's account or an address watched comes after a password, as a phrase or key does.
+                if (WALLETS.has((message as Edit).edit) && !(await vaulted())) return respond({ ok: false, error: 'Set a password first' });
                 let changed = false;
                 let gone: string | undefined; // the secret of a wallet removed
                 await update((state) => {
@@ -128,7 +130,8 @@ const APPROVE_PAGE = chrome.runtime.getURL('approve.html');
 const lockAfter = async () => lockMinutes((await load()).settings.lockAfter);
 const arm = (minutes: number) => chrome.alarms.create(LOCK_ALARM, { delayInMinutes: Math.max(minutes, 1) });
 
-const UNLOCKING = new Set(['unlock', 'add', 'derive']); // keystore calls that leave Otus unlocked
+const UNLOCKING = new Set(['unlock', 'add', 'derive', 'seal']); // keystore calls that leave Otus unlocked
+const WALLETS = new Set<string>(['watch', 'ledger']); // edits that add a wallet of yours
 
 // Locked, by whatever: what a review window's unlock held open is over.
 chrome.storage.onChanged.addListener((changes, area) => void (area === 'session' && changes.unlocked && changes.unlocked.newValue === undefined && (grace = false)));

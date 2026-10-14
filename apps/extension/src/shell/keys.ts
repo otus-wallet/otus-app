@@ -60,6 +60,8 @@ async function run(call: KeysCall): Promise<unknown> {
             return reveal(text(call.account), call.what === 'phrase' ? 'phrase' : 'key', text(call.password));
         case 'password':
             return changed(text(call.password), asNew(call.newPassword));
+        case 'seal':
+            return seal(asNew(call.newPassword));
     }
     throw new Refused('unknown call');
 }
@@ -72,6 +74,9 @@ async function locking() {
 }
 
 export const locked = async () => (await held()) === null;
+
+/** Whether Otus has a password: every wallet comes after one. */
+export const vaulted = async () => (await stored()) !== null;
 
 // Whether the key held opens the vault: one that doesn't (a change of password cut short between its writes) is let go,
 // and Otus is locked.
@@ -212,6 +217,15 @@ async function changed(password: string, newPassword: string) {
     const made = await createVault(newPassword, secrets);
     await keep(made.key);
     await chrome.storage.local.set({ vault: made.vault });
+}
+
+// The first password, before any phrase or key: Otus locks with only a Ledger, or an address watched, too. The vault
+// starts empty, and Otus is unlocked with it, as after a first add.
+async function seal(newPassword: string) {
+    if (await stored()) throw new Refused('Otus has a password already: reload this page');
+    const made = await createVault(newPassword, []);
+    await chrome.storage.local.set({ vault: made.vault });
+    await keep(made.key);
 }
 
 // An account's private key as wallets export it (base58 of the key and its public key), or the phrase it comes from.
