@@ -14,10 +14,10 @@ import { Settled } from './Settled.tsx';
 const port = platform.connect(`approve:${location.hash.slice(1)}`);
 let answered = false;
 // No closes the window; yes too, unless it is a transaction's: the background then tells how it goes.
-const answer = (yes: boolean, signature?: string, account?: string) => {
+const answer = (yes: boolean, signature?: string, account?: string, signatures?: string[]) => {
     answered = true;
-    if (yes && heard.approval?.kind === 'transaction') hear({ approved: true });
-    port.postMessage({ approve: yes, ...(signature && { signature }), ...(account && { account }) });
+    if (yes && (heard.approval?.kind === 'transaction' || heard.approval?.kind === 'batch')) hear({ approved: true });
+    port.postMessage({ approve: yes, ...(signature && { signature }), ...(account && { account }), ...(signatures && { signatures }) });
 };
 addEventListener('keydown', (e) => e.key === 'Escape' && !heard.approved && answer(false));
 

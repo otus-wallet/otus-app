@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/toolti
 import { Icon, Logo } from '../components/icons.tsx';
 import { AddressNames, NameTag, ShortAddress } from '../components/address.tsx';
 import { cn } from '../lib/cn.ts';
-import type { AssetChange, InstructionView, Line, ProgramView, Tone, TransactionView } from '@otus-wallet/core/view.ts';
+import type { AssetChange, InstructionView, Line, ProgramView, Reviewed, Tone, TransactionView } from '@otus-wallet/core/view.ts';
 import { Block, Heading, Notice, WATCH_ONLY } from './Frame.tsx';
 import { filled, MARK, text } from './tone.ts';
 import { Tagged, YouTag, YourWallet } from '../components/you.tsx';
@@ -133,7 +133,7 @@ function Yours({ text: line }: { text: string }) {
     );
 }
 
-export function Balances({ t }: { t: TransactionView }) {
+export function Balances({ t }: { t: Reviewed }) {
     return (
         <>
             {t.recipient && <To address={t.recipient} />}
@@ -211,7 +211,7 @@ export function Balances({ t }: { t: TransactionView }) {
     );
 }
 
-export function Programs({ t }: { t: TransactionView }) {
+export function Programs({ t }: { t: Reviewed }) {
     const { programs: p, instructions: i, inner } = t.counts;
     return (
         <>
@@ -420,7 +420,8 @@ export const Findings = ({ lines }: { lines: Line[] }) => (
     </ul>
 );
 
-export function Verdict({ t, ack, onAck }: { t: TransactionView; ack: boolean; onAck: (ack: boolean) => void }) {
+/** `onAck`: where signing it is asked, the box to say it is understood, for one not safe; without, it is only shown. */
+export function Verdict({ t, ack = false, onAck }: { t: Reviewed; ack?: boolean; onAck?: (ack: boolean) => void }) {
     return (
         <>
             <div className={cn('verdict flex items-center gap-3 rounded-[3px] border border-current p-3.5', filled(t.verdict))}>
@@ -433,7 +434,7 @@ export function Verdict({ t, ack, onAck }: { t: TransactionView; ack: boolean; o
                 </div>
             </div>
             <Findings lines={t.findings} />
-            {t.signer !== 'none' && t.verdict === 'danger' && <Ack ack={ack} onAck={onAck} />}
+            {onAck && t.signer !== 'none' && t.verdict === 'danger' && <Ack ack={ack} onAck={onAck} />}
             {t.signer === 'none' && <Notice>{WATCH_ONLY}</Notice>}
         </>
     );

@@ -9,16 +9,16 @@ import { YourWallet } from '../components/you.tsx';
 import { addressesIn, cutAmong, NOT_WORDS } from '@otus-wallet/core/view/names.ts';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../components/ui/select.tsx';
 import { short } from '../dom.ts';
-import type { AccountView, Approval, Life, Line, TransactionView } from '@otus-wallet/core/view.ts';
+import type { AccountView, Approval, BatchView, Life, Line, TransactionView } from '@otus-wallet/core/view.ts';
 import { Answer, Block, Frame, Heading, Left, Notice, Steps, useArmed, useNow, WATCH_ONLY } from './Frame.tsx';
-import { OnLedger } from './Ledger.tsx';
+import { OnLedger, OnLedgerAll } from './Ledger.tsx';
 import { Ack, Balances, CopyTransaction, Findings, Programs, Verdict } from './Transaction.tsx';
 import { cn } from '../lib/cn.ts';
-import { filled, MARK } from './tone.ts';
+import { filled, MARK, text } from './tone.ts';
 
-/** No, or yes: for a Ledger account, with the signature its device made (base64); to connect, with another of your
- *  accounts, chosen in the window. */
-export type Answers = { answer: (yes: boolean, signature?: string, account?: string) => void };
+/** No, or yes: for a Ledger account, with the signature its device made (base64), or each one's for several
+ *  transactions at once; to connect, with another of your accounts, chosen in the window. */
+export type Answers = { answer: (yes: boolean, signature?: string, account?: string, signatures?: string[]) => void };
 /** How long the transaction can be signed; for one made in Otus, how to build it again with a fresh blockhash. */
 export type Expiry = { from: number; until: number; refresh?: () => void };
 
@@ -30,7 +30,7 @@ export function Approve({ approval, answers, expiry, life }: { approval: Approva
     const died = life !== undefined && 'expired' in life;
     // Your other wallets and contacts it names, tagged by your names; addresses that look alike in what it asks, yours
     // and theirs among them, cut as far as where they part.
-    const kept = approval.kind === 'transaction' ? (approval.kept ?? []) : []; // none in a view kept from before
+    const kept = approval.kind === 'transaction' || approval.kind === 'batch' ? (approval.kept ?? []) : []; // none in a view kept from before
     const names = useMemo(() => new Map(kept.map((k) => [k.address, k.label])), [kept]);
     const cut = useMemo(() => cutAmong([approval.account.address, ...kept.map((k) => k.address), ...addressesIn(approval, NOT_WORDS)]), [approval, kept]);
     return (
@@ -47,6 +47,7 @@ export function Approve({ approval, answers, expiry, life }: { approval: Approva
 // The page for what is asked.
 function Asked({ approval, answers, expiry, died }: { approval: Approval; answers: Answers; expiry?: Expiry; died: boolean }) {
     if (approval.kind === 'transaction') return <Transaction t={approval} answers={answers} expiry={expiry} died={died} />;
+    if (approval.kind === 'batch') return <Batch b={approval} answers={answers} expiry={expiry} died={died} />;
     if (approval.kind === 'pending') return <Pending a={approval} answers={answers} />;
     return <Single a={approval} answers={answers} />;
 }
@@ -99,7 +100,7 @@ const Rights = ({ rights }: { rights: string[] }) => (
 );
 
 // Connect, sign a message, sign in: one page each. To connect, the account can be another of yours, chosen on top.
-function Single({ a, answers: { answer } }: { a: Exclude<Approval, TransactionView | { kind: 'pending' }>; answers: Answers }) {
+function Single({ a, answers: { answer } }: { a: Exclude<Approval, TransactionView | BatchView | { kind: 'pending' }>; answers: Answers }) {
     const signs = a.kind !== 'connect';
     const signer = signs ? a.signer : 'ready';
     const armed = useArmed(a);
@@ -279,6 +280,121 @@ function Transaction({ t, answers, expiry, died }: { t: TransactionView; answers
             {step === 0 && <Balances t={t} />}
             {step === 1 && <Programs t={t} />}
             {step === 2 && !t.preparing && <Verdict t={t} ack={ack} onAck={setAck} />}
+        </Frame>
+    );
+}
+
+// Several transactions at once, in the same three steps as one: balances (all of them summed, then each one by its
+// number, which opens its own review), programs, verdict; Sign all at the end, as Sign is for one. One opened shows
+// only to look: back to all of them, it is signed with the rest or not at all.
+function Batch({ b, answers, expiry, died }: { b: BatchView; answers: Answers; expiry?: Expiry; died: boolean }) {
+    const [step, setStep] = useState(0);
+    const [reached, setReached] = useState(0);
+    const [open, setOpen] = useState<number | null>(null);
+    const go = (to: number) => (setStep(to), setReached((r) => Math.max(r, to)));
+    const now = useNow(expiry ? 250 : null);
+    const [ack, setAck] = useState(false);
+    const armed = useArmed(b.preparing ? -1 - step : step);
+    const opened = useArmed('next');
+    const risky = b.verdict === 'danger';
+    const [onDevice, setOnDevice] = useState(false);
+    const all = b.items.length;
+    const allowed = () => armed && !b.preparing && b.signer !== 'none' && !b.blocked && !died && (!risky || ack);
+    if (onDevice && b.ledger) return <OnLedgerAll b={{ ...b, ledger: b.ledger }} answer={answers.answer} expiry={expiry} died={died} />;
+    if (open !== null && b.items[open]) return <Alone t={b.items[open]} n={open + 1} of={all} back={() => setOpen(null)} />;
+    const actions = () => {
+        if (died) return <Answer onClick={() => answers.answer(false)}>Reject</Answer>;
+        if (step < 2) {
+            return (
+                <>
+                    {step === 0 ? <Answer onClick={() => answers.answer(false)}>Reject</Answer> : <Answer onClick={() => go(0)}>Back</Answer>}
+                    <Answer variant="default" arms armed={opened} onClick={() => go(step + 1)}>
+                        Next
+                    </Answer>
+                </>
+            );
+        }
+        return (
+            <>
+                <Answer variant={risky ? 'default' : 'outline'} onClick={() => answers.answer(false)}>
+                    Reject
+                </Answer>
+                <Answer variant={risky ? 'risky' : b.verdict === 'warn' ? 'warn' : 'default'} arms armed={armed} disabled={b.preparing || b.signer === 'none' || !!b.blocked || (risky && !ack)} onClick={() => allowed() && (b.ledger ? setOnDevice(true) : answers.answer(true))}>
+                    {risky ? `Sign all ${all} anyway` : `Sign all ${all}`}
+                </Answer>
+            </>
+        );
+    };
+    return (
+        <Frame site={b.site} account={b.account} network={b.network} steps={<Steps at={step} reached={reached} go={go} />} chip={b.preparing ? undefined : b.chip} left={expiry && <Left from={expiry.from} until={expiry.until} now={now} />} page={step} actions={actions()}>
+            {died && (
+                <Notice>
+                    A <span className="font-bold text-warn">blockhash expired</span> before you signed them, so nothing was sent. Ask the site for them again.
+                </Notice>
+            )}
+            {b.blocked && <Notice>{b.blocked}</Notice>}
+            {step === 0 && (
+                <>
+                    <Each items={b.items} open={setOpen} />
+                    <Balances t={b} />
+                </>
+            )}
+            {step === 1 && <Programs t={b} />}
+            {step === 2 && !b.preparing && <Verdict t={b} ack={ack} onAck={setAck} />}
+        </Frame>
+    );
+}
+
+// The transactions asked together, a row each: its number, what it does to your balances, and its verdict; a row
+// opens its own review.
+function Each({ items, open }: { items: TransactionView[]; open: (i: number) => void }) {
+    return (
+        <Block>
+            <Heading extra={<span className="font-bold">{items.length}</span>}>Transactions</Heading>
+            <ul className="flex flex-col gap-1.5">
+                {items.map((t, i) => (
+                    <li key={i}>
+                        <button type="button" onClick={() => open(i)} aria-label={`Transaction ${i + 1}`} className="flex w-full cursor-pointer items-center gap-2.5 rounded-[3px] border border-rule bg-panel px-3 py-2 text-left hover:bg-hover">
+                            <span className="w-4 text-right text-xs text-ink-3">{i + 1}</span>
+                            <span className="min-w-0 flex-1 truncate text-xs">{whatItDoes(t)}</span>
+                            {!t.preparing && <span className={cn('text-xs font-bold whitespace-nowrap', text(t.chip.tone))}>{t.chip.text}</span>}
+                            <Icon name="right" size={13} className="text-ink-3" />
+                        </button>
+                    </li>
+                ))}
+            </ul>
+        </Block>
+    );
+}
+
+// What a transaction does to your balances, on one line: each asset by what it comes to; or the programs it calls.
+function whatItDoes(t: TransactionView): string {
+    if (t.balances.length > 0) return t.balances.map((a) => `${a.amount} ${a.asset}`).join(' · ');
+    return t.programs.map((p) => p.name).join(', ') || 'No balance of yours changes';
+}
+
+// One of several, in its own three steps, only to look: its verdict, and back to all of them.
+function Alone({ t, n, of, back }: { t: TransactionView; n: number; of: number; back: () => void }) {
+    const [step, setStep] = useState(0);
+    return (
+        <Frame
+            site={t.site}
+            account={t.account}
+            network={t.network}
+            steps={<Steps at={step} reached={2} go={setStep} />}
+            chip={t.preparing ? undefined : t.chip}
+            left={<span className="text-xs font-bold text-ink-2">{`${n} of ${of}`}</span>}
+            page={step}
+            actions={
+                <Answer variant="default" onClick={back}>
+                    {`Back to all ${of}`}
+                </Answer>
+            }
+        >
+            {t.blocked && <Notice>{t.blocked}</Notice>}
+            {step === 0 && <Balances t={t} />}
+            {step === 1 && <Programs t={t} />}
+            {step === 2 && !t.preparing && <Verdict t={t} />}
         </Frame>
     );
 }

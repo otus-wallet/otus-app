@@ -13,7 +13,7 @@ import { NOTHING_TO_HOLD, SIMULATION_FAILED, type Prepared } from '@otus-wallet/
 import type { ProposalTold } from '@otus-wallet/sdk/review/squads';
 import type { Account, Site } from './state.ts';
 import type { TokenInfo } from './tokens.ts';
-import { balances } from './view/balances.ts';
+import { balances, batchBalances } from './view/balances.ts';
 import { imitations, misread, noteOf } from './view/findings.ts';
 import { keptIn, names, type Kept } from './view/names.ts';
 import { programs, selfNamed } from './view/programs.ts';
@@ -57,7 +57,8 @@ export type Approval =
     | { kind: 'message'; site: SiteView; account: AccountView; text: string; findings: Line[]; signer: Signer } // findings: data, not words
     | { kind: 'signIn'; site: SiteView; account: AccountView; fields: [string, string][]; findings: Line[]; signer: Signer } // findings: what is known of the site, when signing in connects it
     | { kind: 'pending'; site: SiteView; account: AccountView; refused?: string } // a site's transaction, while it is reviewed: who asks, for which account; refused: why it ended before it was shown
-    | TransactionView;
+    | TransactionView
+    | BatchView;
 
 export type TransactionView = {
     kind: 'transaction';
@@ -88,6 +89,18 @@ export type TransactionView = {
     blocked?: string; // why it cannot be signed at all, though shown
     preparing?: true; // shown as reviewed while Otus still adds its guards and fees: no verdict, no hash, no signing yet
     kept: Kept[]; // your other wallets and contacts it names (tagged), or like an address it names (to cut that one apart)
+};
+
+/** What a review shows, one transaction's or several together: all but what only one alone has. */
+export type Reviewed = Omit<TransactionView, 'kind' | 'ledger'>;
+
+/** Several transactions signed at once, as one approval: all of them together as one review reads (the worst verdict,
+ *  your balances summed, each line, finding and loss by the numbers of the transactions it comes from, every program
+ *  once, the fees summed) and each one alone. No hash nor wire of its own: each one's are in `items`. */
+export type BatchView = Reviewed & {
+    kind: 'batch';
+    items: TransactionView[];
+    ledger?: { path: string; messages: string[] }; // for a Ledger account: the path of its key, and each message to sign (base64), in order
 };
 
 /** How a site's transaction went once approved, for its window: on its way (Otus sends it, or the site does and Otus
@@ -149,7 +162,7 @@ export function describe(r: Review, p: Prepared | null, { site, account, signer,
         site,
         account,
         verdict,
-        ...summary(verdict, findings),
+        ...summary(verdict, findings.map((f) => f.level)),
         signer,
         network: mainnet && !away ? null : cluster.slice('solana:'.length),
         balances: balances(r, p, wallet, n, verdict),
@@ -181,15 +194,98 @@ function proposedTo(proposals: ProposalView[], r: Review, wallet: Address, kept:
     return lookalikes(parties, { wallet, wallets: of('wallet').map((k) => k.address as Address), contacts: new Map(of('contact').map((k) => [k.address as Address, k.label])), sent: of('sent').map((k) => k.address as Address) });
 }
 
-// The verdict in words: its title, what the findings come to, and the chip beside the steps.
-function summary(verdict: Verdict, findings: Finding[]): Pick<TransactionView, 'title' | 'sub' | 'chip'> {
-    const count = (level: Level) => findings.filter((f) => f.level === level).length;
+// The verdict in words: its title, what the findings (by their levels) come to, and the chip beside the steps.
+function summary(verdict: Verdict, levels: Tone[]): Pick<TransactionView, 'title' | 'sub' | 'chip'> {
+    const count = (level: Level) => levels.filter((l) => l === level).length;
     const [danger, warn, notice] = [count('danger'), count('warn'), count('notice')];
     const notices = notice ? plural(notice, 'notice') : '';
     if (verdict === 'danger') return { title: 'Not safe', sub: [`${danger} critical`, warn && plural(warn, 'warning'), notices].filter(Boolean).join(' · '), chip: { text: `${danger} critical`, tone: 'danger' } };
     if (verdict === 'warn') return { title: 'Caution', sub: `${plural(warn, 'warning')} · nothing critical`, chip: { text: plural(warn, 'warning'), tone: 'warn' } };
     if (notice) return { title: 'Looks safe', sub: notices, chip: { text: notices, tone: 'notice' } };
     return { title: 'Looks safe', sub: 'No warnings', chip: { text: 'All clear', tone: 'ok' } };
+}
+
+/** Several transactions signed at once → what the window shows: each as `describe` tells it alone, and all of them
+ *  together. A finding or a loss several of them have is said once, with their numbers ("All" for every one); what is
+ *  clear, once, without numbers. `p` null: shown as reviewed while they are prepared. */
+export function describeBatch(items: { r: Review; p: Prepared | null; known: Known }[], shown: Shown): BatchView {
+    const wallet = shown.account.address as Address;
+    const mainnet = shown.cluster === 'solana:mainnet';
+    const views = items.map(({ r, p, known }) => describe(r, p, { ...shown, known }));
+    const verdict = worst(views.map((v) => v.verdict));
+    const preparing = items.some((i) => i.p === null);
+    const findings = byNumbers(views.map((v) => v.findings));
+    const paid = items.reduce((sum, { r, p }) => (p && r.signers[0] === wallet ? sum + p.fee : sum), 0n);
+    const sum = (k: keyof TransactionView['counts']) => views.reduce((n, v) => n + v.counts[k], 0);
+    return {
+        kind: 'batch',
+        site: shown.site,
+        account: shown.account,
+        verdict,
+        ...summary(verdict, findings.map((f) => f.tone)),
+        signer: shown.signer,
+        network: views[0].network,
+        balances: batchBalances(items.map(({ r, p, known }) => ({ r, p, n: names(r, known, wallet, mainnet) })), wallet, verdict),
+        proposals: views.flatMap((v, i) => v.proposals.map((p) => ({ ...p, title: `${i + 1} · ${p.title}` }))),
+        changes: byNumbers(views.map((v) => v.changes)),
+        accounts: new Set(items.flatMap(({ r }) => [...r.assessment.kinds.keys()])).size,
+        hash: '',
+        wire: '',
+        counts: { programs: new Set(views.flatMap((v) => v.programs.map((p) => p.address))).size, instructions: sum('instructions'), inner: sum('inner') },
+        programs: everyProgram(views),
+        findings,
+        fee: preparing ? '' : `${sol(paid)} SOL`,
+        guards: preparing ? { held: false, text: '' } : guardedAll(views),
+        added: [],
+        cluster: shown.cluster,
+        expiry: null,
+        ...(preparing && { preparing: true as const }),
+        kept: [...new Map(views.flatMap((v) => v.kept).map((k) => [k.address, k])).values()],
+        items: views,
+    };
+}
+
+const RANK: Record<Tone, number> = { danger: 4, warn: 3, notice: 2, ok: 1, plain: 0 };
+const worst = (verdicts: Verdict[]): Verdict => verdicts.reduce((w, v) => (RANK[v] > RANK[w] ? v : w), 'ok');
+
+// Each transaction's lines → one list: a line some of them share said once, its title after their numbers ("All" for
+// every one of several); a clear one once by its title, without numbers, its different notes together; worst first.
+function byNumbers(each: Line[][]): Line[] {
+    const seen = new Map<string, { line: Line; at: number[] }>();
+    each.forEach((lines, i) =>
+        lines.forEach((line) => {
+            const key = line.tone === 'ok' ? `ok\u0000${line.title}` : `${line.tone}\u0000${line.title}\u0000${line.note}`;
+            const had = seen.get(key);
+            if (!had) return void seen.set(key, { line, at: [i] });
+            if (!had.at.includes(i)) had.at.push(i);
+            const notes = had.line.note.split(' · ');
+            if (line.tone === 'ok' && line.note && !notes.includes(line.note)) had.line = { ...had.line, note: [had.line.note, line.note].filter(Boolean).join(' · ') };
+        }),
+    );
+    const numbers = (at: number[]) => (each.length > 1 && at.length === each.length ? 'All' : at.map((i) => i + 1).join(', '));
+    return [...seen.values()]
+        .map(({ line, at }) => (line.tone === 'ok' ? line : { ...line, title: `${numbers(at)} · ${line.title}` }))
+        .toSorted((a, b) => RANK[b.tone] - RANK[a.tone]);
+}
+
+// Every program the transactions call, once: its worst standing among them, its instructions from all of them.
+function everyProgram(views: TransactionView[]): ProgramView[] {
+    const all = new Map<string, ProgramView>();
+    for (const p of views.flatMap((v) => v.programs)) {
+        const had = all.get(p.address);
+        if (!had) all.set(p.address, { ...p, instructions: [...p.instructions] });
+        else all.set(p.address, { ...(RANK[p.tone] > RANK[had.tone] ? p : had), instructions: [...had.instructions, ...p.instructions] });
+    }
+    return [...all.values()].map((p) => ({ ...p, instructions: p.instructions.map((ix, k) => ({ ...ix, number: k + 1 })) }));
+}
+
+// Guards across them: in all, or in how many; nothing when none of them has anything to say of guards.
+function guardedAll(views: TransactionView[]): TransactionView['guards'] {
+    const said = views.filter((v) => v.guards.text);
+    if (said.length === 0) return { held: false, text: '' };
+    const held = views.filter((v) => v.guards.held).length;
+    if (held === views.length) return { held: true, text: `Guards lock your accounts in all ${views.length}` };
+    return { held: false, text: `Guards in ${held} of ${views.length}: each one says why` };
 }
 
 /** Why a transfer a Ledger shows in clear goes without guards: its own screen shows it whole. */
