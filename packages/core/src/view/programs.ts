@@ -6,7 +6,7 @@ import type { Address } from '@solana/kit';
 import { cap, told } from '@otus-wallet/sdk/format';
 import { CORE_PROGRAMS } from '@otus-wallet/sdk/programs/core';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
-import type { Finding, Level, ProgramUse, Verdict } from '@otus-wallet/sdk/review/assess';
+import type { Finding, Level, ProgramUse } from '@otus-wallet/sdk/review/assess';
 import { story, type Names } from '@otus-wallet/sdk/review/effects';
 import type { Explained } from '@otus-wallet/sdk/review/explain';
 import type { IdlInstruction } from '@otus-wallet/sdk/idl/idl';
@@ -17,17 +17,15 @@ import type { InstructionView, ProgramView } from '../view.ts';
 // The programs, in the order the transaction first calls them, each with its instructions; those no plugin reads as
 // their IDLs tell them (`told`, by their place), where they publish one. `named`: the programs Otus doesn't know that
 // their own IDLs describe, by the name each gives itself.
-export function programs(r: Review, findings: Finding[], n: Names, verdict: Verdict, told: Map<number, IdlInstruction>, named: Map<Address, string>): ProgramView[] {
+export function programs(r: Review, findings: Finding[], n: Names, told: Map<number, IdlInstruction>, named: Map<Address, string>): ProgramView[] {
     const levelOf = (program: Address, codes: string[]) => findings.find((f) => f.subject === program && codes.includes(f.code) && f.level !== 'ok')?.level ?? null;
     const accounts = new Map(r.accounts.map((a) => [a.address, a]));
     return r.assessment.programs.map((use) => {
-        // In a review that is critical anyway, a program Otus doesn't know that gets you is a suspect: its card, and
-        // your accounts in its instructions, show red. Otherwise it is as what is found of it says.
-        const suspect = use.name === null && (use.signature || use.writable) && verdict === 'danger';
-        // The channel of what leaves you: a known program too, then, shows how it went.
+        // A program is as what is found of it says, never red for what the review finds elsewhere. The channel of what
+        // leaves you: a known program too, then, shows how it went.
         const channel = findings.find((f) => f.programs?.includes(use.program) && (f.level === 'danger' || f.level === 'warn'))?.level ?? null;
         const own = levelOf(use.program, ['imitation-program', 'reaches-holdings', 'reach-unseen', 'unknown-program']);
-        const level = suspect ? 'danger' : worse(own, channel);
+        const level = worse(own, channel);
         const instructions = r.explained.flatMap((e, i) => (e.program === use.program ? [instructionView(e, i, accounts, n, level === 'danger', told.get(i))] : []));
         return programView(r, use, level, instructions, named.get(use.program) ?? null);
     });

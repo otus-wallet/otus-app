@@ -42,7 +42,7 @@ export function noteOf(f: Finding, r: Review, p: Prepared | null, n: Names): str
     };
     if (f.code === 'simulated') return r.assessment.flows.map(flowText).join(' · ') || 'No balance of yours changes';
     if (f.code === 'normal-fee' || f.code === 'high-fee') return p ? `${sol(p.fee)} SOL for this transaction` : '';
-    if (f.code === 'simulation-failed') return failure(r, n) ?? f.note ?? '';
+    if (f.code === 'simulation-failed') return [failure(r, n), f.note].filter(Boolean).join(' · '); // its words, then why that hides nothing
     if (f.code === 'sends-to-wallet') {
         const out = r.assessment.flows.filter((flow) => flow.change < 0n);
         return `${out.map(flowText).join(' and ')} → ${f.subject ?? 'someone else'}`;

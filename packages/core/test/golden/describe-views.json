@@ -83,9 +83,9 @@
         "name": "Unknown program",
         "address": "2VDW9dFE1ZXz4zWAbaBDQFynNVdRpQ73HyfSHMzBSL6Z",
         "standing": "unknown",
-        "tone": "danger",
+        "tone": "warn",
         "sub": "Uses 2 of your accounts",
-        "subTone": "danger",
+        "subTone": "warn",
         "meta": "",
         "metaTone": "plain",
         "inner": "",
@@ -99,12 +99,12 @@
               {
                 "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "account 1 · signer · writable",
-                "tone": "danger"
+                "tone": "plain"
               },
               {
                 "name": "Your 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9 account",
                 "role": "account 2 · writable",
-                "tone": "danger"
+                "tone": "plain"
               },
               {
                 "name": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
@@ -115,23 +115,23 @@
             "effects": [
               {
                 "text": "−0.000005 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
-                "tone": "danger"
+                "tone": "plain"
               },
               {
                 "text": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) now belongs to 2VDW9dFE1ZXz4zWAbaBDQFynNVdRpQ73HyfSHMzBSL6Z",
-                "tone": "danger"
+                "tone": "plain"
               },
               {
                 "text": "-1000 units 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9 from your 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9 account",
-                "tone": "danger"
+                "tone": "plain"
               },
               {
                 "text": "Your 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9 account now belongs to 2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr",
-                "tone": "danger"
+                "tone": "plain"
               },
               {
                 "text": "2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr may move the tokens in your 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9 account",
-                "tone": "danger"
+                "tone": "plain"
               }
             ]
           }

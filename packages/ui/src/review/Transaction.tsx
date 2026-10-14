@@ -348,7 +348,7 @@ function Step({ ix, open, flip }: { ix: InstructionView; open: boolean; flip: ()
                         </span>
                     )}
                 </span>
-                <Badge tone={ix.source === 'unknown' ? 'danger' : 'plain'}>{ix.source}</Badge>
+                <Badge tone={ix.source === 'unknown' ? 'warn' : 'plain'}>{ix.source}</Badge>
             </button>
             {open && (
                 <div className="details flex flex-col gap-[3px] pb-2.5 pl-[30px] text-xs">

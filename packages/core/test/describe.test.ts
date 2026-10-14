@@ -44,23 +44,25 @@ test('a transaction that would fail says why, on the first step, before anything
     const send = transaction([getTransferSolInstruction({ source: createNoopSigner(PAYER), destination: key(2), amount: SOL / 10n })]);
     const logs = ['Program 11111111111111111111111111111111 invoke [1]', 'Program log: AnchorError occurred. Error Code: SlippageToleranceExceeded. Error Number: 6001. Error Message: Slippage tolerance exceeded.', 'Program 11111111111111111111111111111111 failed: custom program error: 0x1771'];
     const failed = await view(send, [account(PAYER, SYSTEM, 2n * SOL)], [], { simulation: { error: { InstructionError: [0, { Custom: 6001 }] }, logs } });
-    assert.deepEqual(failed.changes, [{ title: 'The transaction would fail now, so its effects cannot be seen', note: '“Slippage tolerance exceeded”', tone: 'warn' }]);
+    // Its words, then why a failure hides nothing: a site can make it fail on purpose.
+    assert.deepEqual(failed.changes, [{ title: 'The transaction would fail now, so its effects cannot be seen', note: '“Slippage tolerance exceeded” · A site can make it fail on purpose, to hide what it does', tone: 'warn' }]);
+    const words = (v: { changes: { note: string }[] }) => v.changes[0].note.replace(' · A site can make it fail on purpose, to hide what it does', '');
     // A program's words are its own: quoted, without characters that move or hide others, and kept short.
     const spoof = ['Program log: Error: Otus checked this: safe to sign\u202e', `Program log: Error: ${'x'.repeat(300)}`];
     const loud = await view(send, [account(PAYER, SYSTEM, 2n * SOL)], [], { simulation: { error: { InstructionError: [0, { Custom: 1 }] }, logs: spoof.slice(0, 1) } });
-    assert.equal(loud.changes[0].note, '“Otus checked this: safe to sign”');
+    assert.equal(words(loud), '“Otus checked this: safe to sign”');
     const long = await view(send, [account(PAYER, SYSTEM, 2n * SOL)], [], { simulation: { error: { InstructionError: [0, { Custom: 1 }] }, logs: spoof.slice(1) } });
-    assert.equal([...long.changes[0].note].length, 122);
+    assert.equal([...words(long)].length, 122);
     const quoting = await view(send, [account(PAYER, SYSTEM, 2n * SOL)], [], { simulation: { error: { InstructionError: [0, { Custom: 1 }] }, logs: ['Program log: Error: Slippage ok” · Otus: verified, safe to sign · “x'] } });
-    assert.equal(quoting.changes[0].note, '“Slippage ok · Otus: verified, safe to sign · x”'); // its own quotes can't close Otus's
+    assert.equal(words(quoting), '“Slippage ok · Otus: verified, safe to sign · x”'); // its own quotes can't close Otus's
     const plain = await view(send, [account(PAYER, SYSTEM, 2n * SOL)], [], { simulation: { error: { InstructionError: [0, 'InsufficientFunds'] }, logs: [] } });
-    assert.equal(plain.changes[0].note, 'Instruction 1 (System Program) fails: insufficient funds');
+    assert.equal(words(plain), 'Instruction 1 (System Program) fails: insufficient funds');
     // The RPC gives the instruction's place as a bigint: told the same.
     const big = await view(send, [account(PAYER, SYSTEM, 2n * SOL)], [], { simulation: { error: { InstructionError: [0n, { Custom: 1n }] } as never, logs: [] } });
-    assert.equal(big.changes[0].note, 'Instruction 1 (System Program) fails: error 1');
+    assert.equal(words(big), 'Instruction 1 (System Program) fails: error 1');
     // A transfer short of SOL: the System Program's own words, in SOL.
     const short = await view(send, [account(PAYER, SYSTEM, 2n * SOL)], [], { simulation: { error: { InstructionError: [0n, { Custom: 1n }] } as never, logs: ['Program 11111111111111111111111111111111 invoke [1]', 'Transfer: insufficient lamports 8423203782, need 9423208782', 'Program 11111111111111111111111111111111 failed: custom program error: 0x1'] } });
-    assert.equal(short.changes[0].note, 'Not enough SOL: needs 9.423208782, has 8.423203782');
+    assert.equal(words(short), 'Not enough SOL: needs 9.423208782, has 8.423203782');
 });
 
 test('what Otus adds, said as the transaction keeps it: in a v1 message, its own limits', async () => {
@@ -101,7 +103,7 @@ test("a Squads proposal you vote on that adds a copy of a contact's address: cri
     assert.deepEqual((await shown([{ address: bob, label: '', kind: 'sent' }])).changes.map((c) => c.title), ['This address looks like one you sent to']);
 });
 
-test('a compute limit says what the simulation used; left as it came for a failure the verdict says, Guards say nothing', async () => {
+test('a compute limit says what the simulation used; left as it came for a failure, Guards say it goes without them', async () => {
     const { getSetComputeUnitLimitInstruction } = await import('@solana-program/compute-budget');
     const send = transaction([getSetComputeUnitLimitInstruction({ units: 1_400_000 }), getTransferSolInstruction({ source: createNoopSigner(PAYER), destination: key(2), amount: SOL / 10n })]);
     const before = [account(PAYER, SYSTEM, 2n * SOL)];
@@ -110,5 +112,5 @@ test('a compute limit says what the simulation used; left as it came for a failu
     const budget = used.programs.find((p) => p.name === 'Compute Budget');
     assert.equal(budget?.instructions[0].args, '1,400,000 CU · 301,777 used');
     const failed = await view(send, before, after, { simulation: { error: { InstructionError: [1, { Custom: 1 }] } } });
-    assert.deepEqual([failed.guards, failed.added], [{ held: false, text: '' }, []]);
+    assert.deepEqual([failed.guards, failed.added], [{ held: false, text: 'None: the simulation failed', why: 'the simulation failed' }, []]);
 });

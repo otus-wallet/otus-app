@@ -10,7 +10,7 @@ import type { Effect } from '@otus-wallet/sdk/review/effects';
 import type { Review } from '@otus-wallet/sdk/review/review';
 import { holdings, units, type State } from '@otus-wallet/sdk/review/changes';
 import { lookalike } from '@otus-wallet/sdk/review/sites';
-import { NOTHING_TO_HOLD, SIMULATION_FAILED, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
+import { NOTHING_TO_HOLD, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { ProposalTold } from '@otus-wallet/sdk/review/squads';
 import type { Account, Site } from './state.ts';
 import type { TokenInfo } from './tokens.ts';
@@ -136,7 +136,7 @@ export type Known = { tokens: Map<string, TokenInfo | null>; decimals: Map<strin
 export type Shown = { site: SiteView; account: AccountView; signer: Signer; cluster: Cluster; known: Known; expiry?: Expiry | null; recipient?: string; later?: boolean; away?: boolean; kept?: Kept[] };
 
 // Findings shown on the first step, before anything else: what you would lose, and a transaction that would fail.
-const FIRST = new Set(['simulation-failed', 'wallet-change', 'owner-change', 'token-owner-change', 'authority-change', 'delegate', 'close-authority', 'program-change', 'lookalike-address']);
+const FIRST = new Set(['simulation-failed', 'wallet-change', 'owner-change', 'token-owner-change', 'authority-change', 'delegate', 'close-authority', 'program-change', 'lookalike-address', 'stake-withdrawer', 'stake-lockup', 'high-fee', 'durable-nonce', 'guards-fail', 'guards-differ']);
 
 export function siteView(origin: string, site: Site | undefined): SiteView {
     const host = new URL(origin).host;
@@ -175,7 +175,7 @@ export function describe(r: Review, p: Prepared | null, { site, account, signer,
         hash: p ? (p.hash.match(/.{1,4}/g)?.join(' ') ?? p.hash) : '', // of the message signed: the site's, with guards and fees when prepared
         wire: p ? getBase64Decoder().decode(p.bytes) : '',
         counts: { programs: r.assessment.programs.length, instructions: r.message.instructions.length, inner: r.simulation.inner.reduce((k, g) => k + g.calls.length, 0) },
-        programs: programs(r, findings, names(r, known, wallet, mainnet, true), verdict, told, named),
+        programs: programs(r, findings, names(r, known, wallet, mainnet, true), told, named),
         findings: findings.map((f) => ({ tone: f.level, title: f.text, note: note(f) })),
         fee: p ? `${sol(p.fee)} SOL` : '',
         guards: p ? guards(p) : { held: false, text: '' },
@@ -355,7 +355,7 @@ function guardedAll(views: TransactionView[]): TransactionView['guards'] {
 export const LEDGER_CLEAR = 'its Ledger shows it in clear';
 
 // Why Otus left a transaction as it came that go without saying: nothing to hold, or a failure the verdict says already.
-const UNSAID = new Set([NOTHING_TO_HOLD, SIMULATION_FAILED]);
+const UNSAID = new Set([NOTHING_TO_HOLD]); // a failed simulation's none is said: it goes as sent, nothing held
 
 // Whether guards hold the outcome, in words. Left as it came (no limits set either), why, unless it goes without
 // saying; one Otus set limits on and needs none (its own that only takes access back, a transfer a Ledger shows in
