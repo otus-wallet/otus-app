@@ -26,7 +26,9 @@ export function programs(r: Review, findings: Finding[], n: Names, told: Map<num
         const channel = findings.find((f) => f.programs?.includes(use.program) && (f.level === 'danger' || f.level === 'warn'))?.level ?? null;
         const own = levelOf(use.program, ['imitation-program', 'reaches-holdings', 'reach-unseen', 'unknown-program']);
         const level = worse(own, channel);
-        const instructions = r.explained.flatMap((e, i) => (e.program === use.program ? [instructionView(e, i, accounts, n, level === 'danger', told.get(i))] : []));
+        // An instruction is red where the program is, or where it names an account a critical finding is about.
+        const hurt = new Set(findings.filter((f) => f.level === 'danger' && f.subject).map((f) => f.subject!));
+        const instructions = r.explained.flatMap((e, i) => (e.program === use.program ? [instructionView(e, i, accounts, n, level === 'danger' || e.accounts.some((a) => hurt.has(a.address)), told.get(i))] : []));
         return programView(r, use, level, instructions, named.get(use.program) ?? null);
     });
 }

@@ -40,7 +40,7 @@ import { networkOf, OTUS_RPC, rpcFor, type Settings } from '@otus-wallet/core/se
 import { accountView, describe, describeBatch, LEDGER_CLEAR, type Known, type Life, type Outcome, type Signer, type SiteView, type TransactionView } from '@otus-wallet/core/view.ts';
 import type { Answer } from './approvals.ts';
 import type { Shell } from './serve.ts';
-import type { Account, State as Stored } from '@otus-wallet/core/state.ts';
+import { signs, type Account, type State as Stored } from '@otus-wallet/core/state.ts';
 import type { Kept } from '@otus-wallet/core/view/names.ts';
 
 /** The user said no. */
@@ -111,7 +111,7 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     const unsignable = account.ledger !== undefined && (await decode(bytes)).message.version === 1;
     // Yours, and the addresses you keep: what lands with them is not someone else's.
     const { accounts, contacts, sent, settings } = way.kept ?? (await shell.load());
-    const yours = { wallets: accounts.map((a) => a.address), contacts: new Map(contacts.map((c) => [c.address, c.label])), sent: Object.keys(sent) as Address[] };
+    const yours = { wallets: accounts.map((a) => a.address), signers: accounts.filter(signs).map((a) => a.address), contacts: new Map(contacts.map((c) => [c.address, c.label])), sent: Object.keys(sent) as Address[] };
     // Mainnet's lookup tables as kept, read only past what they held, as Otus's server reads them: another network may
     // start over, and an endpoint of your own may say it is mainnet when it is not.
     const tables = way.cluster === 'solana:mainnet' && rpcFor('solana:mainnet', settings) === OTUS_RPC ? shell.tables : undefined;
@@ -190,7 +190,7 @@ const AT_ONCE = 4; // reviews, or preparations, running at a time: each asks the
 export async function approvedAll(list: Uint8Array[], account: Account, way: Way, shell: Shell, checks: (r: Review) => void | Promise<void>, after?: (tell: (outcome: Outcome) => void) => void): Promise<{ items: { r: Review; p: Prepared }[]; signatures?: SignatureBytes[] }> {
     const unsignable = account.ledger !== undefined && (await Promise.all(list.map((b) => decode(b)))).some((d) => d.message.version === 1);
     const { accounts, contacts, sent, settings } = way.kept ?? (await shell.load());
-    const yours = { wallets: accounts.map((a) => a.address), contacts: new Map(contacts.map((c) => [c.address, c.label])), sent: Object.keys(sent) as Address[] };
+    const yours = { wallets: accounts.map((a) => a.address), signers: accounts.filter(signs).map((a) => a.address), contacts: new Map(contacts.map((c) => [c.address, c.label])), sent: Object.keys(sent) as Address[] };
     const tables = way.cluster === 'solana:mainnet' && rpcFor('solana:mainnet', settings) === OTUS_RPC ? shell.tables : undefined;
     const reading = tables ? { ...way.chain, tables } : way.chain;
     // On a network that turns out not to be theirs, no more reviews start there.
