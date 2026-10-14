@@ -224,8 +224,19 @@ export function describeBatch(items: { r: Review; p: Prepared | null; known: Kno
     const drained = drainedTogether(items, views);
     const verdict = worst([...views.map((v) => v.verdict), ...(drained.length ? (['warn'] as const) : [])]);
     const preparing = items.some((i) => i.p === null);
-    const findings = [...drained, ...byNumbers(views.map((v) => v.findings))].toSorted((a, b) => RANK[b.tone] - RANK[a.tone]);
     const paid = items.reduce((sum, { r, p }) => (p && r.signers[0] === wallet ? sum + p.fee : sum), 0n);
+    const balances = batchBalances(items.map(({ r, p, known }) => ({ r, p, n: names(r, known, wallet, mainnet) })), wallet, verdict);
+    const programs = everyProgram(views);
+    // The clear lines every one of them has that sum something up, said for all of them: what your balances come to,
+    // the fees, the programs.
+    const summed = (l: Line): Line => {
+        if (l.tone !== 'ok') return l;
+        if (l.title === 'Changes') return { ...l, note: balances.map((a) => `${a.amount} ${a.asset}`).join(' · ') || 'No balance of yours changes' };
+        if (l.title.endsWith('network fee') && !preparing) return { ...l, note: `${sol(paid)} SOL for all ${items.length}` };
+        if (l.title === 'Known programs') return { ...l, note: programs.map((p) => p.name).join(', ') };
+        return l;
+    };
+    const findings = [...drained, ...byNumbers(views.map((v) => v.findings)).map(summed)].toSorted((a, b) => RANK[b.tone] - RANK[a.tone]);
     const sum = (k: keyof TransactionView['counts']) => views.reduce((n, v) => n + v.counts[k], 0);
     return {
         kind: 'batch',
@@ -235,14 +246,14 @@ export function describeBatch(items: { r: Review; p: Prepared | null; known: Kno
         ...summary(verdict, findings.map((f) => f.tone)),
         signer: shown.signer,
         network: views[0].network,
-        balances: batchBalances(items.map(({ r, p, known }) => ({ r, p, n: names(r, known, wallet, mainnet) })), wallet, verdict),
+        balances,
         proposals: views.flatMap((v, i) => v.proposals.map((p) => ({ ...p, title: `${i + 1} · ${p.title}` }))),
         changes: byNumbers(views.map((v) => v.changes)),
         accounts: new Set(items.flatMap(({ r }) => [...r.assessment.kinds.keys()])).size,
         hash: '',
         wire: '',
         counts: { programs: new Set(views.flatMap((v) => v.programs.map((p) => p.address))).size, instructions: sum('instructions'), inner: sum('inner') },
-        programs: everyProgram(views),
+        programs,
         findings,
         fee: preparing ? '' : `${sol(paid)} SOL`,
         guards: preparing ? { held: false, text: '' } : guardedAll(views),

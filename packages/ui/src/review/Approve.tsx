@@ -12,7 +12,7 @@ import { short } from '../dom.ts';
 import type { AccountView, Approval, BatchView, Life, Line, TransactionView } from '@otus-wallet/core/view.ts';
 import { Answer, Block, Frame, Heading, Left, Notice, Steps, useArmed, useNow, WATCH_ONLY } from './Frame.tsx';
 import { OnLedger, OnLedgerAll } from './Ledger.tsx';
-import { Ack, Balances, CopyTransaction, Findings, Programs, Verdict } from './Transaction.tsx';
+import { Ack, Assets, Balances, CopyTransaction, Findings, Programs, Verdict } from './Transaction.tsx';
 import { cn } from '../lib/cn.ts';
 import { filled, MARK, text } from './tone.ts';
 
@@ -284,13 +284,11 @@ function Transaction({ t, answers, expiry, died }: { t: TransactionView; answers
     );
 }
 
-// Several transactions at once, in the same three steps as one: balances (all of them summed, then each one by its
-// number, which opens its own review), programs, verdict; Sign all at the end, as Sign is for one. One opened shows
-// only to look: back to all of them, it is signed with the rest or not at all.
+// Several transactions at once, in the same three steps as one: balances (each one by its number, which opens to its
+// own balances, then all of them summed), programs (all of them), verdict; Sign all at the end, as Sign is for one.
 function Batch({ b, answers, expiry, died }: { b: BatchView; answers: Answers; expiry?: Expiry; died: boolean }) {
     const [step, setStep] = useState(0);
     const [reached, setReached] = useState(0);
-    const [open, setOpen] = useState<number | null>(null);
     const go = (to: number) => (setStep(to), setReached((r) => Math.max(r, to)));
     const now = useNow(expiry ? 250 : null);
     const [ack, setAck] = useState(false);
@@ -301,7 +299,6 @@ function Batch({ b, answers, expiry, died }: { b: BatchView; answers: Answers; e
     const all = b.items.length;
     const allowed = () => armed && !b.preparing && b.signer !== 'none' && !b.blocked && !died && (!risky || ack);
     if (onDevice && b.ledger) return <OnLedgerAll b={{ ...b, ledger: b.ledger }} answer={answers.answer} expiry={expiry} died={died} />;
-    if (open !== null && b.items[open]) return <Alone t={b.items[open]} n={open + 1} of={all} back={() => setOpen(null)} />;
     const actions = () => {
         if (died) return <Answer onClick={() => answers.answer(false)}>Reject</Answer>;
         if (step < 2) {
@@ -335,7 +332,7 @@ function Batch({ b, answers, expiry, died }: { b: BatchView; answers: Answers; e
             {b.blocked && <Notice>{b.blocked}</Notice>}
             {step === 0 && (
                 <>
-                    <Each items={b.items} open={setOpen} />
+                    <Each items={b.items} />
                     <Balances t={b} />
                 </>
             )}
@@ -346,20 +343,26 @@ function Batch({ b, answers, expiry, died }: { b: BatchView; answers: Answers; e
 }
 
 // The transactions asked together, a row each: its number, what it does to your balances, and its verdict; a row
-// opens its own review.
-function Each({ items, open }: { items: TransactionView[]; open: (i: number) => void }) {
+// opens to its own balances, under it.
+function Each({ items }: { items: TransactionView[] }) {
+    const [open, setOpen] = useState<number | null>(null);
     return (
         <Block>
             <Heading extra={<span className="font-bold">{items.length}</span>}>Transactions</Heading>
             <ul className="flex flex-col gap-1.5">
                 {items.map((t, i) => (
-                    <li key={i}>
-                        <button type="button" onClick={() => open(i)} aria-label={`Transaction ${i + 1}`} className="flex w-full cursor-pointer items-center gap-2.5 rounded-[3px] border border-rule bg-panel px-3 py-2 text-left hover:bg-hover">
+                    <li key={i} className="rounded-[3px] border border-rule bg-panel">
+                        <button type="button" onClick={() => setOpen(open === i ? null : i)} aria-label={`Transaction ${i + 1}`} aria-expanded={open === i} className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left hover:bg-hover">
                             <span className="w-4 text-right text-xs text-ink-3">{i + 1}</span>
                             <span className="min-w-0 flex-1 truncate text-xs">{whatItDoes(t)}</span>
                             {!t.preparing && <span className={cn('text-xs font-bold whitespace-nowrap', text(t.chip.tone))}>{t.chip.text}</span>}
-                            <Icon name="right" size={13} className="text-ink-3" />
+                            <Icon name={open === i ? 'down' : 'right'} size={13} className="text-ink-3" />
                         </button>
+                        {open === i && (
+                            <div className="px-3 pb-2">
+                                <Assets balances={t.balances} />
+                            </div>
+                        )}
                     </li>
                 ))}
             </ul>
@@ -371,30 +374,4 @@ function Each({ items, open }: { items: TransactionView[]; open: (i: number) => 
 function whatItDoes(t: TransactionView): string {
     if (t.balances.length > 0) return t.balances.map((a) => `${a.amount} ${a.asset}`).join(' · ');
     return t.programs.map((p) => p.name).join(', ') || 'No balance of yours changes';
-}
-
-// One of several, in its own three steps, only to look: its verdict, and back to all of them.
-function Alone({ t, n, of, back }: { t: TransactionView; n: number; of: number; back: () => void }) {
-    const [step, setStep] = useState(0);
-    return (
-        <Frame
-            site={t.site}
-            account={t.account}
-            network={t.network}
-            steps={<Steps at={step} reached={2} go={setStep} />}
-            chip={t.preparing ? undefined : t.chip}
-            left={<span className="text-xs font-bold text-ink-2">{`${n} of ${of}`}</span>}
-            page={step}
-            actions={
-                <Answer variant="default" onClick={back}>
-                    {`Back to all ${of}`}
-                </Answer>
-            }
-        >
-            {t.blocked && <Notice>{t.blocked}</Notice>}
-            {step === 0 && <Balances t={t} />}
-            {step === 1 && <Programs t={t} />}
-            {step === 2 && !t.preparing && <Verdict t={t} />}
-        </Frame>
-    );
 }

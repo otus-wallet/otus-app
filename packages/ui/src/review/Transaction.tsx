@@ -79,6 +79,18 @@ function Line({ change, note, amount, tone, still = false, className }: { change
 }
 
 // An asset of yours that moves. One line says it whole; several are summed up, and opened they are listed as lines.
+/** Each asset of yours that moves, a row each, or that none does. */
+export const Assets = ({ balances }: { balances: AssetChange[] }) =>
+    balances.length ? (
+        <ul>
+            {balances.map((change, i) => (
+                <Asset key={i} change={change} />
+            ))}
+        </ul>
+    ) : (
+        <p className="text-xs text-ink-3">No balance of yours changes</p>
+    );
+
 function Asset({ change }: { change: AssetChange }) {
     const [open, setOpen] = useState(false);
     if (change.lines.length === 1) {
@@ -153,15 +165,7 @@ export function Balances({ t }: { t: Reviewed }) {
             ))}
             <Block>
                 <Heading extra={<span className="text-xs text-ink-3">{`simulated · ${t.network ?? 'mainnet'}`}</span>}>Balance changes</Heading>
-                {t.balances.length ? (
-                    <ul>
-                        {t.balances.map((change, i) => (
-                            <Asset key={i} change={change} />
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="text-xs text-ink-3">No balance of yours changes</p>
-                )}
+                <Assets balances={t.balances} />
                 {t.changes.map((c, i) => (
                     <div key={i} className={cn('change mt-1.5 flex items-start gap-2.5 rounded-[3px] border border-current px-3 py-2.5', filled(c.tone))}>
                         <Icon name={MARK[c.tone]} size={16} stroke={2.5} />

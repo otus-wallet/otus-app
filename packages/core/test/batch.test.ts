@@ -38,6 +38,11 @@ test('two transfers: one verdict, the SOL summed with each line by its number, t
     assert.equal(v.fee, `${Number(a.p.fee + b.p.fee) / 1e9} SOL`);
     assert.deepEqual(v.guards, { held: true, text: 'Guards lock your accounts in all 2' });
     assert.equal(v.hash, '');
+    // The verdict's clear lines sum up all of them: what your balances come to, the fees, the programs.
+    const note = (title: string) => v.findings.find((f) => f.title === title)?.note;
+    assert.equal(note('Changes'), `${v.balances[0].amount} SOL`);
+    assert.equal(note('Normal network fee'), `${Number(a.p.fee + b.p.fee) / 1e9} SOL for all 2`);
+    assert.equal(note('Known programs'), 'System Program');
 });
 
 test('one bad among good: the worst verdict leads, its findings by its number, what all share said once', async () => {
