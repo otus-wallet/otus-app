@@ -61,3 +61,17 @@ test('while any is prepared: no fee, no guards, no verdict to sign yet', async (
     assert.equal(v.fee, '');
     assert.deepEqual(v.guards, { held: false, text: '' });
 });
+
+test('one that would fail alone, after others, may need one of them: said, and the user decides', async () => {
+    const a = await reviewed(send(2, SOL / 10n), [account(PAYER, SYSTEM, 2n * SOL)], sent(2, SOL / 10n));
+    const chain = fakeChain([account(PAYER, SYSTEM, 2n * SOL)], [], { error: { InstructionError: [0, 'InvalidAccountData'] }, logs: [] });
+    const r = await review(send(3, SOL), { wallet: PAYER, signedBefore: 0, host: 'app.example.com' }, chain);
+    const failing = { r, p: await prepare(r, PAYER, chain), known };
+    const v = describeBatch([{ ...a, known }, failing], shown);
+    assert.equal(v.verdict, 'danger');
+    assert.match(v.changes[0].title, /^2 · The transaction would fail now/);
+    assert.match(v.changes[0].note, /alone: it may need one before it$/);
+    // First of all, nothing comes before it: only that it fails.
+    const firstFails = describeBatch([failing, { ...a, known }], shown);
+    assert.doesNotMatch(firstFails.changes[0].note, /may need/);
+});

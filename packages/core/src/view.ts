@@ -211,7 +211,13 @@ function summary(verdict: Verdict, levels: Tone[]): Pick<TransactionView, 'title
 export function describeBatch(items: { r: Review; p: Prepared | null; known: Known }[], shown: Shown): BatchView {
     const wallet = shown.account.address as Address;
     const mainnet = shown.cluster === 'solana:mainnet';
-    const views = items.map(({ r, p, known }) => describe(r, p, { ...shown, known }));
+    // One that fails alone, after others: it may need what one of them does first, which only signing them tells.
+    const views = items.map(({ r, p, known }, i) => {
+        const v = describe(r, p, { ...shown, known });
+        if (i === 0 || r.simulation.error === null) return v;
+        const after = (l: Line): Line => (l.tone === 'danger' && l.title === FAILS ? { ...l, note: [l.note, NEEDS].filter(Boolean).join(' · ') } : l);
+        return { ...v, changes: v.changes.map(after), findings: v.findings.map(after) };
+    });
     const verdict = worst(views.map((v) => v.verdict));
     const preparing = items.some((i) => i.p === null);
     const findings = byNumbers(views.map((v) => v.findings));
@@ -245,6 +251,8 @@ export function describeBatch(items: { r: Review; p: Prepared | null; known: Kno
     };
 }
 
+const FAILS = 'The transaction would fail now, so its effects cannot be seen'; // the review's words for it
+const NEEDS = 'alone: it may need one before it';
 const RANK: Record<Tone, number> = { danger: 4, warn: 3, notice: 2, ok: 1, plain: 0 };
 const worst = (verdicts: Verdict[]): Verdict => verdicts.reduce((w, v) => (RANK[v] > RANK[w] ? v : w), 'ok');
 
