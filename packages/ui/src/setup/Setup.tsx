@@ -6,9 +6,7 @@ import { useEffect, useState } from 'react';
 import { platform } from '@otus-wallet/core/platform.ts';
 import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
 import { load, type Account, type State } from '@otus-wallet/core/state.ts';
-import { MAX_PASSWORD, MIN_PASSWORD, passwordProblem } from '@otus-wallet/core/password.ts';
 import { PasswordInput } from '../components/password.tsx';
-import { Strength } from '../components/strength.tsx';
 import { ShortAddress } from '../components/address.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Input } from '../components/ui/input.tsx';
@@ -17,7 +15,8 @@ import { Icon, Tile } from '../components/icons.tsx';
 import { ask } from '../ask.ts';
 import { cn } from '../lib/cn.ts';
 import { LedgerAccounts } from './Ledger.tsx';
-import { ErrorLine, Heading, Lead, Muted, Row, Soft } from './parts.tsx';
+import { NOTES, usePassword } from './newPassword.tsx';
+import { ErrorLine, Lead, Muted, Row, Soft } from './parts.tsx';
 
 export type Page = 'start' | 'create' | 'password' | 'phrase' | 'key' | 'watch' | 'ledger' | 'done';
 const CLIPBOARD_SECONDS = 60;
@@ -61,8 +60,8 @@ export function Setup() {
             {page === 'password' && (shown ? <Password phrase={shown} state={state} keys={keys} go={go} finished={finished} /> : <Create length={length} setLength={setLength} shown={shown} setShown={setShown} go={go} />)}
             {page === 'phrase' && <ImportPhrase state={state} keys={keys} go={go} finished={finished} />}
             {page === 'key' && <ImportKey state={state} keys={keys} go={go} finished={finished} />}
-            {page === 'watch' && <Watch state={state} go={go} finished={finished} />}
-            {page === 'ledger' && <LedgerAccounts state={state} go={go} finished={finished} />}
+            {page === 'watch' && <Watch state={state} keys={keys} go={go} finished={finished} />}
+            {page === 'ledger' && <LedgerAccounts state={state} keys={keys} go={go} finished={finished} />}
             {page === 'done' && <Done made={made} go={go} />}
         </main>
     );
@@ -160,31 +159,6 @@ function Create({ length, setLength, shown, setShown, go }: { length: 12 | 24; s
     );
 }
 
-// A new password when there is no vault yet. With one, nothing: this page shows only while Otus is unlocked.
-type Credentials = { newPassword?: string };
-
-function usePassword(keys: KeyStatus) {
-    const [first, setFirst] = useState('');
-    const [again, setAgain] = useState('');
-    if (keys.vault) return { fields: null, value: (): Credentials | Error => ({}) };
-    const value = (): Credentials | Error => {
-        const problem = passwordProblem(first, again);
-        return problem ? new Error(problem) : { newPassword: first };
-    };
-    const fields = (
-        <>
-            <Heading>Password</Heading>
-            <Muted>{`It unlocks Otus on this computer: ${MIN_PASSWORD} to ${MAX_PASSWORD} characters. Your phrase is the only way back if you forget it.`}</Muted>
-            <div className="flex flex-col gap-1.5">
-                <PasswordInput placeholder="New password" autoComplete="new-password" aria-label="New password" autoFocus value={first} onChange={(e) => setFirst(e.target.value)} />
-                <Strength password={first} />
-                <PasswordInput placeholder="The same again" autoComplete="new-password" aria-label="The same again" value={again} onChange={(e) => setAgain(e.target.value)} />
-            </div>
-        </>
-    );
-    return { fields, value };
-}
-
 // Adds a phrase or a key (the first with a new password), then shows it done. The button waits while the background
 // works.
 function useAdding(state: State, keys: KeyStatus, finished: (a: Account) => void) {
@@ -275,18 +249,28 @@ function ImportKey({ state, keys, go, finished }: { state: State; keys: KeyStatu
     );
 }
 
-function Watch({ state, go, finished }: { state: State; go: (to: Page) => void; finished: (a: Account) => void }) {
+function Watch({ state, keys, go, finished }: { state: State; keys: KeyStatus; go: (to: Page) => void; finished: (a: Account) => void }) {
     const [address, setAddress] = useState('');
     const [name, setName] = useState('');
     const [error, setError] = useState('');
+    const [busy, setBusy] = useState(false);
+    const password = usePassword(keys, NOTES.watch, false);
     const add = async () => {
         const a = address.trim();
         if (!isAddress(a)) return setError('That is not a Solana address');
         const now = await load();
         if (now.accounts.some((x) => x.address === a)) return setError('That account is in Otus already');
-        const reply = (await platform.send({ edit: 'watch', address: a, label: name.trim() })) as { ok: boolean } | undefined; // the background writes accounts, and names one left unnamed
-        if (!reply?.ok) return setError(name.trim() ? 'Otus did not add it: it looks like an address you have, or that name is taken' : 'Otus did not add it: it looks like an address you have');
-        finished((await load()).accounts.find((x) => x.address === a) ?? { address: a, label: name.trim() });
+        setBusy(true);
+        setError('');
+        try {
+            const unsealed = await password.seal(); // a password first, as for any wallet
+            if (unsealed) return setError(unsealed);
+            const reply = (await platform.send({ edit: 'watch', address: a, label: name.trim() })) as { ok: boolean } | undefined; // the background writes accounts, and names one left unnamed
+            if (!reply?.ok) return setError(name.trim() ? 'Otus did not add it: it looks like an address you have, or that name is taken' : 'Otus did not add it: it looks like an address you have');
+            finished((await load()).accounts.find((x) => x.address === a) ?? { address: a, label: name.trim() });
+        } finally {
+            setBusy(false);
+        }
     };
     return (
         <>
@@ -294,14 +278,15 @@ function Watch({ state, go, finished }: { state: State; go: (to: Page) => void; 
             <div className="flex flex-col gap-1.5">
                 <Input placeholder="Solana address" spellCheck={false} autoComplete="off" aria-label="Address" autoFocus value={address} onChange={(e) => setAddress(e.target.value)} />
                 <Input placeholder={nextName(state)} maxLength={32} aria-label="Name" value={name} onChange={(e) => setName(e.target.value)} />
-                <ErrorLine>{error}</ErrorLine>
             </div>
             <Muted>An address alone: Otus shows you every request for it, but cannot sign.</Muted>
+            {password.fields}
+            <ErrorLine>{error}</ErrorLine>
             <Row>
                 <Button size="sm" onClick={() => go('start')}>
                     Back
                 </Button>
-                <Button size="sm" variant="default" onClick={() => void add()}>
+                <Button size="sm" variant="default" disabled={busy} onClick={() => void add()}>
                     Add
                 </Button>
             </Row>

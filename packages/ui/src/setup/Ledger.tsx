@@ -11,6 +11,7 @@ import { sol } from '@otus-wallet/sdk/format';
 import { rpcAt } from '@otus-wallet/sdk/rpc';
 import { platform } from '@otus-wallet/core/platform.ts';
 import { walletRpc } from '@otus-wallet/core/settings.ts';
+import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
 import { load, nameTaken, signs, type Account, type State } from '@otus-wallet/core/state.ts';
 import { Checkbox } from '../components/ui/checkbox.tsx';
 import { Addressed } from '../components/you.tsx';
@@ -19,6 +20,7 @@ import { Input } from '../components/ui/input.tsx';
 import { Tile } from '../components/icons.tsx';
 import { short } from '../dom.ts';
 import type { Page } from './Setup.tsx';
+import { NOTES, usePassword } from './newPassword.tsx';
 import { ErrorLine, Lead, Muted, Row, Soft } from './parts.tsx';
 
 // Where wallets keep Ledger accounts: Phantom, Solflare and Backpack's n'/0', Ledger Live's n' and n'/0'/0', Solflare
@@ -35,7 +37,7 @@ const paths = (from: number, to: number) => [...(from === 0 ? [ROOT] : []), ...A
 
 type Found = { path: string; address: Address; lamports: bigint | null };
 
-export function LedgerAccounts({ state, go, finished }: { state: State; go: (to: Page) => void; finished: (a: Account) => void }) {
+export function LedgerAccounts({ state, keys, go, finished }: { state: State; keys: KeyStatus; go: (to: Page) => void; finished: (a: Account) => void }) {
     const [found, setFound] = useState<Found[] | null>(null);
     const [picked, setPicked] = useState<Set<Address>>(new Set());
     const [error, setError] = useState('');
@@ -44,6 +46,7 @@ export function LedgerAccounts({ state, go, finished }: { state: State; go: (to:
     const [all, setAll] = useState(false); // the empty ones shown too
     const [query, setQuery] = useState('');
     const device = useRef<HidDevice | null>(null);
+    const password = usePassword(keys, NOTES.ledger, false);
     const [owned, setOwned] = useState(() => new Set(state.accounts.filter(signs).map((a) => a.address))); // and the ones added here
     const had = (a: Address) => owned.has(a);
 
@@ -107,6 +110,8 @@ export function LedgerAccounts({ state, go, finished }: { state: State; go: (to:
         setError('');
         let last: Account | undefined;
         try {
+            const unsealed = await password.seal(); // a password first, as for any wallet
+            if (unsealed) return setError(unsealed);
             for (const r of found!.filter((f) => picked.has(f.address) && !had(f.address))) {
                 const now = await load();
                 if (!now.accounts.some((a) => a.address === r.address && signs(a))) {
@@ -165,6 +170,7 @@ export function LedgerAccounts({ state, go, finished }: { state: State; go: (to:
                             </Button>
                         </div>
                     </div>
+                    {waiting > 0 && password.fields}
                 </>
             )}
             <ErrorLine>{error && <Addressed text={error} />}</ErrorLine>
