@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import type { Address } from '@solana/kit';
+
 import { DEFAULT_SETTINGS } from '../src/settings.ts';
-import { acquaintance, edited, lookalike, named, sentTo, signs, type State } from '../src/state.ts';
+import { acquaintance, connectedTo, edited, lookalike, moved, named, sentTo, signs, type State } from '../src/state.ts';
 import { key } from './helpers.ts';
 
 const [MINE, WATCHED, FRIEND, STRANGER] = [key(1), key(2), key(3), key(4)];
@@ -170,4 +172,17 @@ test('disconnecting a site in Settings takes its access and keeps when you first
     for (const origin of ['toString', '__proto__', 'constructor']) assert.equal(edited({ edit: 'disconnect', origin }, s), null, origin);
     // Removing the account the sites were connected to takes them; what is kept of those disconnected stays, by site.
     assert.deepEqual(after(s, { edit: 'remove', address: MINE }).disconnected, s.disconnected);
+});
+
+test('a site hears a change of its own account only: connected, disconnected, moved; not another site’s', () => {
+    const [a, b] = ['4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi', 'HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk'] as Address[];
+    const site = (account: Address) => ({ account, signatures: 0 });
+    const was = { 'https://dapp.example': site(a) };
+    assert.equal(moved(was, { ...was, 'https://other.example': site(a) }, 'https://dapp.example'), false);
+    assert.equal(moved(was, { ...was, 'https://other.example': site(a) }, 'https://other.example'), true);
+    assert.equal(moved(was, { 'https://dapp.example': { ...site(a), signatures: 3 } }, 'https://dapp.example'), false);
+    assert.equal(moved(was, { 'https://dapp.example': site(b) }, 'https://dapp.example'), true);
+    assert.equal(moved(was, {}, 'https://dapp.example'), true);
+    assert.equal(moved(undefined, undefined, 'https://dapp.example'), false);
+    assert.equal(connectedTo(was, '__proto__'), undefined);
 });

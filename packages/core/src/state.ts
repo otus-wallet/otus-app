@@ -80,6 +80,12 @@ export function disconnectSite(state: Sites, origin: string): Sites {
     return { sites, disconnected: [...state.disconnected.filter((d) => d.origin !== origin), gone].slice(-MAX_DISCONNECTED) };
 }
 
+/** The account a site is connected to, in these sites; undefined for none. */
+export const connectedTo = (sites: State['sites'] | undefined, origin: string) => (sites && Object.hasOwn(sites, origin) ? sites[origin].account : undefined);
+
+/** Whether a site's account is another from one state of the sites to the next: connected, disconnected, or moved. */
+export const moved = (was: State['sites'] | undefined, now: State['sites'] | undefined, origin: string) => connectedTo(was, origin) !== connectedTo(now, origin);
+
 /** A site connected to an account: with what it has, when connected already (a sign-in may have connected it while
  *  the user decided), or with what was kept of it once disconnected. */
 export function connectSite(state: Sites, origin: string, account: Address): Sites {

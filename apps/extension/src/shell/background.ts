@@ -17,7 +17,7 @@ import { answerOf, approve, early, kept, type Answer } from './approvals.ts';
 import { keysCall, lock, LOCK_ALARM, locked, prune, shielded, sign } from './keys.ts';
 import { mainnetTables } from './tables.ts';
 import { own, serve, stakeOwn, swapOwn, takeBack } from './serve.ts';
-import { edited, load, update, type Edit, type State } from '@otus-wallet/core/state.ts';
+import { connectedTo, edited, load, moved, update, type Edit, type State } from '@otus-wallet/core/state.ts';
 
 void keepTokens(); // what Jupiter said of tokens, kept while the worker sleeps
 const WARM_EVERY = 60_000; // ms
@@ -282,13 +282,16 @@ async function busy<T>(work: Promise<T>): Promise<T> {
     }
 }
 
-// A site disconnected in Otus, or connected to another account, hears it at once: only the document that called.
+// A site disconnected in Otus, or connected to another account, hears it at once: only the document that called, and
+// only for its own site; one whose account stays as it was hears nothing, so no site learns when others change.
 chrome.storage.onChanged.addListener((changes, area) => {
     const sites = changes.sites?.newValue as State['sites'] | undefined;
     if (area !== 'local' || !changes.sites) return;
+    const was = changes.sites.oldValue as State['sites'] | undefined;
     void load().then(({ accounts }) => {
         for (const [tab, { origin, documentId }] of tabs) {
-            const account = sites?.[origin]?.account;
+            if (!moved(was, sites, origin)) continue;
+            const account = connectedTo(sites, origin);
             const held = accounts.find((a) => a.address === account);
             const v1 = !held?.ledger; // a Ledger misreads v1
             chrome.tabs.sendMessage(tab, { accounts: account ? [account] : [], origin, v1 }, documentId ? { documentId } : {}).catch(() => tabs.delete(tab));
