@@ -136,8 +136,9 @@ function ChangePassword() {
         setBusy(true);
         setError('');
         setDone(false);
-        const reply = await ask({ keys: 'password', password: current, newPassword: first });
+        const reply = await ask({ keys: 'password', password: current, newPassword: first }).catch(() => null);
         setBusy(false);
+        if (!reply) return setError("Otus didn't answer, so it may not have changed: if it asks for your password, try both");
         if (!reply.ok) return setError(reply.error);
         setCurrent('');
         setFirst('');

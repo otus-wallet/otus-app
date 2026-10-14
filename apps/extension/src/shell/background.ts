@@ -84,12 +84,14 @@ chrome.runtime.onMessage.addListener((message: { call?: unknown; keys?: unknown;
             void (async () => {
                 if (await shielded()) return respond({ ok: false, error: 'Otus is locked' });
                 let changed = false;
+                let gone: string | undefined; // the secret of a wallet removed
                 await update((state) => {
                     const part = edited(message as Edit, state, Date.now());
                     changed = part !== null;
+                    if ((message as Edit).edit === 'remove') gone = state.accounts.find((a) => a.address === (message as { address?: unknown }).address)?.key?.secret;
                     return part;
                 });
-                if (changed && (message as Edit).edit === 'remove') await prune(); // its phrase or key too, once no account uses it
+                if (changed && gone) await prune(gone); // its phrase or key too, once no account uses it
                 respond(changed ? { ok: true } : { ok: false, error: 'Otus could not save it' });
             })().catch(() => respond({ ok: false, error: 'Otus could not save it' }));
             return true;

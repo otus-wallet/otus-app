@@ -30,10 +30,11 @@ const call = async (c: Parameters<typeof keysCall>[0]) => {
     if (!reply.ok) throw new Error(reply.error);
     return reply.result as { address: string };
 };
-// A removal as the background makes it: the edit, then the vault without what no account uses.
+// A removal as the background makes it: the edit, then the vault without its secret, once no account uses it.
 const remove = async (address: string) => {
+    const secret = (await load()).accounts.find((a) => a.address === address)?.key?.secret;
     await update((s) => edited({ edit: 'remove', address }, s));
-    await prune();
+    if (secret) await prune(secret);
 };
 const secrets = async () => {
     const { vault } = (await chrome.storage.local.get('vault')) as { vault: Parameters<typeof readSecrets>[0] };
@@ -196,4 +197,42 @@ test('a password changed seals the vault again under a new key: the old password
     assert.deepEqual(await keysCall({ keys: 'unlock', password: PASSWORD }), { ok: false, error: 'Wrong password' });
     await call({ keys: 'unlock', password: 'a new password' });
     assert.deepEqual(await secrets(), before);
+});
+
+test('a place on a phrase that is no place makes that account watched only; the others are still put back', async () => {
+    const { accounts } = await load();
+    const real = accounts[0].address;
+    const forged = '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU';
+    const odd = 'DRpbCBMxVnDK7maPM5tGv6MvB3v1sRMC86PZ8okm21hy';
+    await call({ keys: 'lock' });
+    await chrome.storage.local.set({ accounts: [{ ...accounts[0], address: forged }, ...accounts.slice(1), { address: odd, label: 'Odd', key: { secret: accounts[0].key!.secret, index: -1 } }] });
+    await call({ keys: 'unlock', password: 'a new password' });
+    const after = (await load()).accounts;
+    assert.equal(after[0].address, real); // put back all the same
+    assert.deepEqual(after.find((a) => a.address === odd), { address: odd, label: 'Odd' });
+    await chrome.storage.local.set({ accounts });
+});
+
+test('removing a wallet drops its own secret only: one a cut-short list stopped naming stays', async () => {
+    const zoo = 'zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong';
+    const { accounts } = await load();
+    const kept = accounts.filter((a) => !(a.label === 'Zoo'));
+    await chrome.storage.local.set({ accounts: kept }); // Zoo's account lost some other way
+    const extra = await call({ keys: 'add', from: { phrase: B }, label: 'B again' }).catch(() => null);
+    const other = kept.find((a) => a.key?.index !== undefined && a.key.secret !== kept[0].key?.secret) ?? (extra && (await load()).accounts.find((a) => a.address === extra.address));
+    if (other) await remove(other.address);
+    assert.ok((await secrets()).includes(zoo));
+    await chrome.storage.local.set({ accounts });
+});
+
+test('a password is changed only while unlocked; cut short between its writes, the old one stands', async () => {
+    await call({ keys: 'lock' });
+    assert.deepEqual(await keysCall({ keys: 'password', password: 'a new password', newPassword: 'another password' }), { ok: false, error: 'Unlock Otus first' });
+    await call({ keys: 'unlock', password: 'a new password' });
+    // Cut short: the new key held, the vault not written.
+    const { vault } = (await chrome.storage.local.get('vault')) as { vault: unknown };
+    await call({ keys: 'password', password: 'a new password', newPassword: 'another password' });
+    await chrome.storage.local.set({ vault });
+    assert.deepEqual(await call({ keys: 'status' }), { vault: true, unlocked: false }); // the key that opens nothing let go
+    await call({ keys: 'unlock', password: 'a new password' });
 });

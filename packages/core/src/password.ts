@@ -3,9 +3,12 @@
 export const MIN_PASSWORD = 8;
 export const MAX_PASSWORD = 32;
 
+/** A password's length as its key is made from it: its characters, compatibility forms folded (NFKC). */
+export const passwordLength = (password: string) => [...password.normalize('NFKC')].length;
+
 /** Why a new password, typed twice, can't be used; null when it can. */
 export function passwordProblem(first: string, again: string): string | null {
-    const length = [...first].length;
+    const length = passwordLength(first);
     if (length < MIN_PASSWORD || length > MAX_PASSWORD) return `Use a password of ${MIN_PASSWORD} to ${MAX_PASSWORD} characters`;
     if (first !== again) return 'The two passwords differ';
     return null;
@@ -24,7 +27,8 @@ const COMMON = ['password', 'passw0rd', 'qwerty', 'letmein', 'welcome', 'iloveyo
  * keyboard) counts for a quarter, and a word tried first counts as one guess among a thousand. Weak under 40 bits,
  * strong from 60.
  */
-export function strength(password: string): Strength {
+export function strength(typed: string): Strength {
+    const password = typed.normalize('NFKC'); // as its key is made from it
     const pool = (/[a-z]/.test(password) ? 26 : 0) + (/[A-Z]/.test(password) ? 26 : 0) + (/\d/.test(password) ? 10 : 0) + (/[^a-zA-Z\d]/.test(password) ? 33 : 0);
     // The words tried first taken out, each a gap where it was.
     let rest = password.toLowerCase();

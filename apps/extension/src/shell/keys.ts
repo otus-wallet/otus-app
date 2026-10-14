@@ -6,7 +6,7 @@ import { newPhrase, phraseOf, privateKeyFromText, privateKeyOf, privateKeysOf } 
 import { base64, bytes, createVault, openVault, readSecrets, UnknownVault, writeSecrets, WrongPassword, type Bytes, type Secret, type Vault } from '../keys/vault.ts';
 import { NO_KEY, Refused } from '@otus-wallet/core/protocol.ts';
 import type { KeysCall, KeysReply, KeyStatus } from '@otus-wallet/core/keystore.ts';
-import { MAX_PASSWORD, MIN_PASSWORD } from '@otus-wallet/core/password.ts';
+import { MAX_PASSWORD, MIN_PASSWORD, passwordLength } from '@otus-wallet/core/password.ts';
 import { load, named, signs, update, type Account } from '@otus-wallet/core/state.ts';
 
 export const LOCK_ALARM = 'lock'; // the background sets it from how long Otus has been closed
@@ -41,11 +41,11 @@ export async function keysCall(call: KeysCall): Promise<KeysReply> {
 async function run(call: KeysCall): Promise<unknown> {
     switch (call.keys) {
         case 'status':
-            return { vault: (await stored()) !== null, unlocked: (await held()) !== null } satisfies KeyStatus;
+            return { vault: (await stored()) !== null, unlocked: await opens() } satisfies KeyStatus;
         case 'unlock': {
             const key = await opened(text(call.password));
             await keep(key);
-            return void (await verified(key).catch((e) => console.error('Otus: checking accounts', e)));
+            return void (await verified(key).catch((e) => console.error('Otus: checking accounts', e instanceof Error ? e.name : typeof e)));
         }
         case 'lock':
             return locking();
@@ -72,6 +72,16 @@ async function locking() {
 }
 
 export const locked = async () => (await held()) === null;
+
+// Whether the key held opens the vault: one that doesn't (a change of password cut short between its writes) is let go,
+// and Otus is locked.
+async function opens(): Promise<boolean> {
+    const [key, vault] = [await held(), await stored()];
+    if (!key) return false;
+    if (!vault || (await readSecrets(vault, key).then(() => true, () => false))) return true;
+    await locking();
+    return false;
+}
 
 /** Whether Otus's pages show only its lock: a vault exists, and its key is not held. Then nothing but unlocking, the
  *  status and saying no goes through, whatever a page asks. */
@@ -184,21 +194,24 @@ function source(v: unknown): { phrase: string } | { privateKey: string } {
     throw new Refused('bad input');
 }
 
-// A new password: 8 to 32 characters. One already set opens the vault whatever its length.
+// A new password: 8 to 32 characters, as the key is made from it (NFKC). One already set opens the vault whatever its
+// length.
 function asNew(v: unknown): string {
-    const length = typeof v === 'string' ? [...v].length : 0;
+    const length = typeof v === 'string' ? passwordLength(v) : 0;
     if (length < MIN_PASSWORD || length > MAX_PASSWORD) throw new Refused(`Use a password of ${MIN_PASSWORD} to ${MAX_PASSWORD} characters`);
     return v as string;
 }
 
-// The vault sealed again for a new password, with the password it has: under a new key too, so that one taken while
-// the old password was known no longer opens it. Otus stays unlocked, with the new key.
+// The vault sealed again for a new password, with the password it has, while unlocked: under a new key too, so that one
+// taken while the old password was known no longer opens it. The new key is held before the vault is written: cut short
+// in between, the old vault and its password stand, and the key that opens nothing is let go at the next look.
 async function changed(password: string, newPassword: string) {
+    if (!(await held())) throw new Refused('Unlock Otus first');
     const key = await opened(password);
     const secrets = await readSecrets((await stored())!, key);
     const made = await createVault(newPassword, secrets);
-    await chrome.storage.local.set({ vault: made.vault });
     await keep(made.key);
+    await chrome.storage.local.set({ vault: made.vault });
 }
 
 // An account's private key as wallets export it (base58 of the key and its public key), or the phrase it comes from.
@@ -252,30 +265,33 @@ async function unremoved(phrase: string) {
     await update((s) => ({ removed: s.removed.filter((a) => !addresses.has(a)) }));
 }
 
-/** Drops from the vault the phrases and keys no account of yours uses any more, once a wallet is removed: it is gone
- *  from Otus. Only then: an account list that lost entries some other way (cut short, changed outside Otus) must not
- *  take secrets with it. */
-export const prune = () => serial(pruned);
-async function pruned() {
+/** Drops from the vault the phrase or key of a wallet removed, once no account of yours uses it: it is gone from Otus.
+ *  Only that one: an account list that lost entries some other way (cut short, changed outside Otus) must not take
+ *  their secrets with it. */
+export const prune = (secret: string) => serial(() => pruned(secret));
+async function pruned(secret: string) {
     const [key, vault] = [await held(), await stored()];
     if (!key || !vault) return;
-    const { accounts } = await load();
+    if ((await load()).accounts.some((a) => a.key?.secret === secret)) return;
     const secrets = await readSecrets(vault, key);
-    const used = secrets.filter((s) => accounts.some((a) => a.key?.secret === s.id));
-    if (used.length < secrets.length) await chrome.storage.local.set({ vault: await writeSecrets(vault, key, used) });
+    const kept = secrets.filter((s) => s.id !== secret);
+    if (kept.length < secrets.length) await chrome.storage.local.set({ vault: await writeSecrets(vault, key, kept) });
 }
 
 // Each account of yours as its key in the vault gives it: an address written into storage by anything but Otus (as
 // malware may, while Chrome is closed) is put back, so Receive never shows someone else's under your wallet's name.
-// One whose key the vault does not hold keeps its address as one Otus only watches; one that comes back to an address
-// another account has already goes. A key that gives no address at all stops the check: nothing is changed then.
+// One whose key the vault does not hold, or whose place on its phrase is no place, keeps its address as one Otus only
+// watches; one that comes back to an address another account has already goes. A key in the vault that gives no
+// address at all stops the check: nothing is changed then.
 async function verified(key: Bytes) {
     const secrets = new Map((await readSecrets((await stored())!, key)).map((s) => [s.id, s]));
     const fixed = new Map<string, Address | null>();
     for (const a of (await load()).accounts) {
         if (!a.key) continue;
         const secret = secrets.get(a.key.secret);
-        const real = secret ? await addressOf(secret, a.key.index) : null;
+        const index = a.key.index;
+        const placed = index === undefined || (Number.isInteger(index) && index >= 0 && index < 2 ** 31);
+        const real = secret && placed ? await addressOf(secret, index) : null;
         if (real !== a.address) fixed.set(a.address, real);
     }
     if (fixed.size === 0) return;
