@@ -714,6 +714,10 @@ test('several sent: in order, each once the one before landed; one that fails on
     assert.equal(w.sent.length, 2);
     const first = getBase58Decoder().decode(getTransactionDecoder().decode(w.sent[0]).signatures[w.me]!);
     assert.deepEqual(reply, { ok: false, error: `transaction 2 of 3 failed onchain, so Otus sent none after it (landed: ${first})` });
+    // The first failing: nothing landed before it, and the site is told no signature as landed.
+    let seen = 0;
+    const firstFails = await wallet({ chain: { status: async () => (seen++ === 0 ? { error: { InstructionError: [0, { Custom: 1 }] }, confirmed: true } : { error: null, confirmed: true }) } });
+    assert.deepEqual(await firstFails.call('signAndSendTransaction', { account: firstFails.me, transactions: [firstFails.transfer(), firstFails.transfer()] }), { ok: false, error: 'transaction 1 of 2 failed onchain, so Otus sent none after it' });
     // The window says it landed and failed, and what came before: not "Not sent".
     assert.deepEqual(w.outcomes.at(-1), { phase: 'landed', failed: true, link: w.outcomes.at(-1)!.phase === 'landed' ? (w.outcomes.at(-1) as { link: string }).link : '', words: 'Transaction 2 of 3 landed and failed: 1 confirmed before it; none after it was sent.' });
     const all = await wallet();
@@ -1452,11 +1456,8 @@ test('several: all checked before any is signed, so one out of time counts nothi
     assert.equal(w.box.state.signedHere[w.me], undefined);
 });
 
-test('several the site sends, all paid by this account: followed until all land, and Otus’s pages hear it', async () => {
+test('several the site sends: signed, Otus’s part is done, and the window says so at once', async () => {
     const w = await wallet();
     result<{ transactions: string[] }>(await w.call('signTransaction', { account: w.me, transactions: [w.transfer(), w.transfer(w.me, w.me, 1)] }));
-    for (let i = 0; i < 50 && w.outcomes.at(-1)?.phase !== 'landed'; i++) await new Promise((r) => setTimeout(r, 20));
-    assert.equal(w.outcomes[0].phase, 'waiting');
-    assert.deepEqual({ ...w.outcomes.at(-1), link: '' }, { phase: 'landed', failed: false, link: '', words: 'All 2 confirmed by the network.' });
-    assert.ok(w.settled.count > 0);
+    assert.deepEqual(w.outcomes, [{ phase: 'signed', host: 'jup.ag', words: 'Signed all 2: jup.ag sends them.' }]);
 });

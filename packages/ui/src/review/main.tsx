@@ -32,7 +32,7 @@ port.onMessage.addListener((m: Approval | { life: Life } | { outcome: Outcome })
 const going = (o: Outcome | undefined) => !o || o.phase === 'sending' || o.phase === 'waiting';
 port.onDisconnect.addListener(() => {
     if (!answered) return hear({ gone: true });
-    if (heard.approved && going(heard.outcome)) hear({ outcome: { phase: 'unseen', expired: false, link: heard.outcome && 'link' in heard.outcome ? heard.outcome.link : '' } });
+    if (heard.approved && going(heard.outcome)) hear({ outcome: { phase: 'unseen', expired: false, link: heard.outcome && 'link' in heard.outcome ? (heard.outcome.link ?? '') : '' } });
 });
 // While it is on its way, a beat keeps the background awake to follow it.
 setInterval(() => {

@@ -43,7 +43,7 @@ function told(outcome: Outcome | null): [Tone, string, string] {
         case 'waiting':
             return ['plain', 'Signed', `${outcome.host} sends it now: Otus watches it land.`];
         case 'signed':
-            return ['plain', 'Signed', `${outcome.host} sends it. Another account pays for it, so Otus can't follow it.`];
+            return ['ok', 'Signed', `${outcome.host} sends it. Another account pays for it, so Otus can't follow it.`]; // Otus's part is done
         case 'landed':
             return outcome.failed ? ['danger', 'Failed onchain', 'It landed and failed: only the fee was spent.'] : ['ok', 'Confirmed', 'Confirmed by the network.'];
         case 'unseen':

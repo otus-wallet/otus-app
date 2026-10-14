@@ -113,7 +113,7 @@ export type Outcome = (
     | { phase: 'signed'; host: string }
     | { phase: 'landed'; failed: boolean; link: string }
     | { phase: 'unseen'; expired: boolean; link: string }
-    | { phase: 'refused'; error: string }
+    | { phase: 'refused'; error: string; link?: string } // link: of several, the last that landed before it
 ) & { words?: string }; // what it says, for several transactions at once
 
 /** How long a transaction's blockhash lives, as the network tells while the user decides: until about when (ms since
@@ -221,7 +221,7 @@ export function describeBatch(items: { r: Review; p: Prepared | null; known: Kno
         const after = (l: Line): Line => (l.tone === 'danger' && l.title === FAILS ? { ...l, note: [l.note, NEEDS].filter(Boolean).join(' · ') } : l);
         return { ...v, changes: v.changes.map(after), findings: v.findings.map(after) };
     });
-    const drained = drainedTogether(items, views);
+    const drained = drainedTogether(items);
     const verdict = worst([...views.map((v) => v.verdict), ...(drained.length ? (['warn'] as const) : [])]);
     const preparing = items.some((i) => i.p === null);
     const paid = items.reduce((sum, { r, p }) => (p && r.signers[0] === wallet ? sum + p.fee : sum), 0n);
@@ -273,9 +273,10 @@ const worst = (verdicts: Verdict[]): Verdict => verdicts.reduce((w, v) => (RANK[
 
 // Nine tenths or more of your SOL, or of one of your tokens, leaving with all of them together, fees included, as one
 // transaction alone would be warned of: split into several, none of them says it. Each account of yours counted once,
-// as it was before; a transaction alone that says it already says it.
-function drainedTogether(items: { r: Review }[], views: TransactionView[]): Line[] {
-    if (items.length < 2 || views.some((v) => v.findings.some((f) => f.title.startsWith(ALMOST_ALL)))) return [];
+// as it was before; an asset one transaction alone says it of is said there.
+function drainedTogether(items: { r: Review }[]): Line[] {
+    if (items.length < 2) return [];
+    const said = new Set<string>(items.flatMap(({ r }) => r.assessment.findings.filter((f) => f.code === 'large-outflow').map((f) => f.subject ?? 'SOL'))); // one alone says it of that asset
     const had = new Map<Address, State>();
     const moved = new Map<string, bigint>();
     for (const { r } of items) {
@@ -285,6 +286,7 @@ function drainedTogether(items: { r: Review }[], views: TransactionView[]): Line
     }
     const amount = (s: State, asset: string) => (asset === 'SOL' ? (s?.lamports ?? 0n) : units(s, asset));
     return [...moved].flatMap(([asset, change]): Line[] => {
+        if (said.has(asset)) return [];
         const before = [...had.values()].reduce((sum, s) => sum + amount(s, asset), 0n);
         if (before <= 0n || -change * 10n < before * 9n) return [];
         return [{ tone: 'warn', title: `All · ${ALMOST_ALL} ${asset === 'SOL' ? 'your SOL' : 'of one of your tokens'}`, note: asset === 'SOL' ? '' : asset }];
@@ -342,9 +344,11 @@ function everyProgram(views: TransactionView[]): ProgramView[] {
 function guardedAll(views: TransactionView[]): TransactionView['guards'] {
     const said = views.filter((v) => v.guards.text);
     if (said.length === 0) return { held: false, text: '' };
-    const held = views.filter((v) => v.guards.held).length;
-    if (held === views.length) return { held: true, text: `Guards lock your accounts in all ${views.length}` };
-    return { held: false, text: `Guards in ${held} of ${views.length}: each one says why` };
+    const all = views.length;
+    if (views.every((v) => v.guards.held)) return { held: true, text: `Guards lock your accounts in all ${all}` };
+    // Some guards, held less or with room: guarded all the same.
+    const guarded = views.filter((v) => v.guards.text && !v.guards.text.startsWith('None')).length;
+    return { held: false, text: guarded === all ? `Guards in all ${all}, some holding less: each one says why` : `Guards in ${guarded} of ${all}: each one says why` };
 }
 
 /** Why a transfer a Ledger shows in clear goes without guards: its own screen shows it whole. */
