@@ -23,7 +23,19 @@ type Moved = { key: string; asset: string; logo: Logo; icon: string | null; veri
 // by its own direction: a wallet that is not yours first, as that is where a drainer sends, then program accounts by
 // the program the transaction gives them to, then your own. A trade out to a program reads "Via". The lines are then
 // put under their asset, which says what they come to.
-export function balances(r: Review, p: Prepared | null, wallet: Address, n: Names, verdict: Verdict): AssetChange[] {
+export const balances = (r: Review, p: Prepared | null, wallet: Address, n: Names, verdict: Verdict): AssetChange[] => grouped(moves(r, p, wallet, n), verdict);
+
+/** Your balances across transactions signed together: what each asset comes to with all of them, and under it each
+ *  line of each, by its number. */
+export function batchBalances(items: { r: Review; p: Prepared | null; n: Names }[], wallet: Address, verdict: Verdict): AssetChange[] {
+    return grouped(
+        items.flatMap(({ r, p, n }, i) => moves(r, p, wallet, n).map((m) => ({ ...m, note: m.note ? `${i + 1} · ${m.note}` : `${i + 1}` }))),
+        verdict,
+    );
+}
+
+// The lines of one transaction, before they are put under their assets.
+function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[] {
     const moved: Moved[] = [];
     const all = r.changes.accounts;
     const yours = r.assessment.yours.accounts;
@@ -107,7 +119,7 @@ export function balances(r: Review, p: Prepared | null, wallet: Address, n: Name
     for (const [note, units] of rents) solRow(note, units);
     // The fee once prepared: Otus sets its priority part. Not guessed before.
     if (p && r.signers[0] === wallet && p.fee > 0n) moved.push({ key: 'SOL', asset: 'SOL', logo: 'sol', icon: null, verified: true, note: p.fee > HIGH_FEE ? 'High network fee' : 'Network fee', units: -p.fee, places: SOL_DECIMALS, tone: p.fee > HIGH_FEE ? 'warn' : 'plain' });
-    return grouped(moved, verdict);
+    return moved;
 }
 
 // Each asset's lines under it, in the order the assets first move: what they come to, and each line as it is.
