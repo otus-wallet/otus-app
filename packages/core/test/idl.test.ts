@@ -22,7 +22,10 @@ async function unknownCall(o: { cosigned?: boolean; told?: string; calls?: Addre
     const extra = o.cosigned ? [getTransferSolInstruction({ source: createNoopSigner(key(32)), destination: key(33), amount: 1n })] : [];
     const tx = transaction([call, ...extra, ...(o.cosigned ? [] : [getTransferSolInstruction({ source: payer, destination: key(33), amount: 1n })])]);
     const simulation: Partial<Simulation> = { inner: [{ index: 0, calls: (o.calls ?? []).map((program) => ({ program, type: null })) }], innerListed: o.listed ?? true };
-    const chain = fakeChain([account(PAYER, SYSTEM, 5_000_000n)], [account(PAYER, SYSTEM, 4_994_999n)], simulation);
+    // The lamport sent shows: from the wallet, or from the other signer.
+    const [sender, receiver] = [key(32), key(33)];
+    const after = o.cosigned ? [account(PAYER, SYSTEM, 4_995_000n), account(sender, SYSTEM, 999_999n), account(receiver, SYSTEM, 1n)] : [account(PAYER, SYSTEM, 4_994_999n), account(receiver, SYSTEM, 1n)];
+    const chain = fakeChain([account(PAYER, SYSTEM, 5_000_000n), account(sender, SYSTEM, 1_000_000n)], after, simulation);
     const r = await review(tx, { wallet: PAYER, signedBefore: 0, host: 'app.example.com' }, chain);
     const p = await prepare(r, PAYER, chain);
     const told = new Map(o.told ? [[0, { name: 'Boom', args: 'x 1', accounts: [{ role: 'user', address: PAYER }], program: o.told, from: 'anchor' as const }]] : []);

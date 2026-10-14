@@ -358,9 +358,9 @@
     },
     "verdict": "warn",
     "title": "Caution",
-    "sub": "1 warning · nothing critical",
+    "sub": "2 warnings · nothing critical",
     "chip": {
-      "text": "1 warning",
+      "text": "2 warnings",
       "tone": "warn"
     },
     "signer": "ready",
@@ -506,6 +506,11 @@
       }
     ],
     "findings": [
+      {
+        "tone": "warn",
+        "title": "You move tokens from someone else's account",
+        "note": "Your wallet is allowed to: check that it should"
+      },
       {
         "tone": "warn",
         "title": "A token calls itself USDC, and it is not the real one",
