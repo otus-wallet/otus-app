@@ -68,7 +68,7 @@ const LEDGER_PATH = "44'/501'/0'/0'";
 
 /** A wallet with a real key, a site connected to it, and a fake extension around serve. `chain` changes the network's
  *  answers; sends are watched without waiting between checks. */
-async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; answer?: (a: Approval, s: { state: State }) => Answer | Promise<Answer>; validOn?: string[]; chain?: Partial<Chain>; slow?: number; early?: boolean | 'no'; settings?: Partial<State['settings']>; relay?: Partial<Chain> } = {}) {
+async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; answer?: (a: Approval, s: { state: State }) => Answer | Promise<Answer>; validOn?: string[]; chain?: Partial<Chain>; slow?: number; early?: boolean | 'no' } = {}) {
     const pair = await generateKeyPair();
     const me = await getAddressFromPublicKey(pair.publicKey);
     const box = {
@@ -84,7 +84,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
             signedHere: {},
             outside: {},
             disconnected: [],
-            settings: { ...DEFAULT_SETTINGS, ...o.settings },
+            settings: DEFAULT_SETTINGS,
         } as State,
     };
     const approvals: Approval[] = [];
@@ -128,8 +128,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
             if (o.locked) throw new Refused('Otus is locked');
             return signBytes(pair.privateKey, data);
         },
-        // validOn: the RPCs that know the blockhash; relay: how Otus's own answers, where it differs.
-        chain: (rpc) => ({ ...chain, ...(rpc === OTUS_RPC && o.relay), valid: o.chain?.valid ?? (async () => !o.validOn || o.validOn.includes(rpc)) }),
+        chain: (rpc) => ({ ...chain, valid: o.chain?.valid ?? (async () => !o.validOn || o.validOn.includes(rpc)) }), // validOn: the RPCs that know the blockhash
         send: (tx, on) => send(tx, on, async () => {}),
         tokens: async (mints) => (looked.push(mints), new Map()),
         now: () => NOW,
@@ -1353,34 +1352,4 @@ test('a swap Otus could not guard is refused before it can be approved', async (
     const reply = (await swapOwn(await swapFor(w.me), w.me, ASKED, w.shell)) as { error: string };
     assert.equal(reply.error, "Otus can't add guards because the transaction fails with them, so nothing was sent");
     assert.equal(w.sent.length, 0);
-});
-
-test('on an endpoint of your own for mainnet, what the review read is read again through Otus’s: agreeing, silent or not', async () => {
-    const own = { network: 'custom' as const, rpc: 'https://rpc.example.com/?api-key=x', custom: 'solana:mainnet' as const };
-    // Otus's own answer: the fee payer, the wallet, first, holding `lamports`; the rest as the review read them.
-    const accountsOf = (lamports: bigint) => async (addresses: readonly Address[]) => ({ slot: 1n, accounts: addresses.map((a, i) => (i === 0 ? account(a, SYSTEM, lamports) : { exists: false as const, address: a })) });
-    let asked = 0;
-    const w0 = await wallet({ settings: own, relay: { accounts: async (a) => (asked++, accountsOf(5_000_000_000n)(a)) } });
-    result(await w0.call('signTransaction', { account: w0.me, transactions: [w0.transfer()] }));
-    const codes = (a: Approval) => (a.kind === 'transaction' ? a.findings.map((f) => `${f.tone}:${f.title}`) : []);
-    assert.ok(asked > 0);
-    assert.ok(!codes(w0.approvals[0]).some((c) => /second source|disagree/.test(c)));
-
-    // Otus's own says the wallet holds more than yours said: it can't be signed, and the window says why.
-    const w1 = await wallet({ settings: own, relay: { accounts: async (a) => accountsOf(900_000_000_000n)(a) } });
-    const reply = await w1.call('signTransaction', { account: w1.me, transactions: [w1.transfer()] });
-    const shown = w1.approvals[0];
-    assert.equal(shown.kind === 'transaction' && shown.verdict, 'danger');
-    assert.match(shown.kind === 'transaction' ? (shown.blocked ?? '') : '', /disagree about the accounts it writes/);
-    assert.deepEqual(reply, { ok: false, error: "Otus can't trust this review because your RPC and Otus's own disagree about the accounts it writes" });
-
-    // Not answering: a warning, and it rests on yours.
-    const w2 = await wallet({ settings: own, relay: { accounts: async () => Promise.reject(new Error('429')) } });
-    result(await w2.call('signTransaction', { account: w2.me, transactions: [w2.transfer()] }));
-    assert.ok(codes(w2.approvals[0]).includes('warn:Not checked against a second source'));
-
-    // On Otus's own, it is the review's: nothing to read twice.
-    const w3 = await wallet();
-    result(await w3.call('signTransaction', { account: w3.me, transactions: [w3.transfer()] }));
-    assert.ok(!codes(w3.approvals[0]).some((c) => /second source|disagree/.test(c)));
 });

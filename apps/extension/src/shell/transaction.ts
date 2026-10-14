@@ -27,11 +27,10 @@ import type { Chain } from '@otus-wallet/sdk/chain';
 import { toldByIdl, type IdlInstruction } from '@otus-wallet/sdk/idl/idl';
 import type { Cluster } from '@otus-wallet/core/intake.ts';
 import { Refused } from '@otus-wallet/core/protocol.ts';
-import { LIGHTHOUSE, STAKE_PROGRAM } from '@otus-wallet/sdk/programs/addresses';
-import { isMint, type Context, type Finding } from '@otus-wallet/sdk/review/assess';
+import { LIGHTHOUSE } from '@otus-wallet/sdk/programs/addresses';
+import { isMint, type Context } from '@otus-wallet/sdk/review/assess';
 import { read, type State } from '@otus-wallet/sdk/review/changes';
 import { decode, durable, encode, type Message } from '@otus-wallet/sdk/review/decode';
-import { resolve } from '@otus-wallet/sdk/review/resolve';
 import { review, type Review } from '@otus-wallet/sdk/review/review';
 import { notice, squadsTold, type Inside, type ProposalTold } from '@otus-wallet/sdk/review/squads';
 import { SQUADS_V4 } from '@otus-wallet/sdk/programs/squads';
@@ -127,9 +126,9 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     // A Ledger shows a plain SOL transfer in clear, amount and recipient, where guards would leave it only a hash.
     const clear = way.context.own === true && account.ledger !== undefined && plainTransfer(r);
     const bare = clear ? LEDGER_CLEAR : way.bare;
-    // Prepared and its IDLs read while it is shown as reviewed, and, on an endpoint of your own, what it read checked
-    // against Otus's. Squads proposals first: their tokens are named with the transaction's.
-    const preparing = Promise.all([prepare(r, account.address, way.chain, way.context.own === true, bare, way.trade), idlTold(r, way.chain), secondLook(r, account.address, way.cluster, settings, shell)]);
+    // Prepared and its IDLs read while it is shown as reviewed. Squads proposals first: their tokens are named with
+    // the transaction's.
+    const preparing = Promise.all([prepare(r, account.address, way.chain, way.context.own === true, bare, way.trade), idlTold(r, way.chain)]);
     preparing.catch(() => {}); // heard through `prepared`, below
     // Shown once the tokens of what moves for you are named (most are, from before); the rest, a route's pools' named
     // only in the programs' details, come with the final form. Asked first, yours get a search of their own.
@@ -147,14 +146,12 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     const kept: Kept[] = [...accounts.map(({ address, label }) => ({ address, label, kind: 'wallet' as const })), ...contacts.map(({ address, label }) => ({ address, label, kind: 'contact' as const })), ...yours.sent.map((address) => ({ address, label: '', kind: 'sent' as const }))];
     const shown = { site: way.site, account: accountView(account), signer: signerOf(account), cluster: way.cluster, known, expiry: null, recipient: way.recipient, later: way.later, away, kept };
     const blocked = unsignable ? LEDGER_V1 : undefined;
-    const prepared = preparing.then(async ([found, told, look]): Promise<{ p: Prepared; approval: TransactionView }> => {
-        const p = look ? { ...found, findings: [...found.findings, look.finding] } : found;
+    const prepared = preparing.then(async ([p, told]): Promise<{ p: Prepared; approval: TransactionView }> => {
         ready?.(p); // refused as prepared: the window says no before it can be approved
         const view = describe(r, p, { ...shown, known: { ...(await every), squads, told } });
         // A Ledger signs in the window, on approval: it gets the very message to sign, and its signature comes back.
         const ledger = account.ledger && { path: account.ledger.path, message: getBase64Decoder().decode(messageOf(p.bytes)) };
-        const stop = blocked ?? look?.blocked;
-        return { p, approval: { ...view, ...(ledger && !stop && { ledger }), ...(stop && { blocked: stop }) } };
+        return { p, approval: { ...view, ...(ledger && !blocked && { ledger }), ...(blocked && { blocked }) } };
     });
     // What went wrong preparing it is heard first, before the window, which then says no: the request ends with it.
     let failed: { error: unknown } | null = null;
@@ -172,55 +169,9 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     if (failed) throw (failed as { error: unknown }).error;
     if (!answer || (typeof answer === 'object' && 'account' in answer)) throw new Rejected(); // an account chosen answers a connect alone
     if (blocked) throw new Refused('a Ledger cannot sign version 1 transactions');
-    // Approved: only the prepared form can be (the window and the popup take no yes before it), and not one that can't
-    // be signed at all.
-    const { p, approval } = await prepared;
-    if (approval.blocked) throw new Refused(approval.blocked === DISAGREEING ? DISAGREED : 'it cannot be signed');
+    // Approved: only the prepared form can be (the window and the popup take no yes before it).
+    const { p } = await prepared;
     return { r, p, signature: answer === true ? undefined : answer };
-}
-
-const UNCHECKED: Finding = { level: 'warn', code: 'unchecked', text: 'Not checked against a second source', note: "Otus's own RPC didn't answer, so this rests on yours alone" };
-const DISAGREE: Finding = { level: 'danger', code: 'rpc-disagrees', text: "Your RPC and Otus's disagree", note: 'They read the accounts it writes differently' };
-const DISAGREED = "Otus can't trust this review because your RPC and Otus's own disagree about the accounts it writes";
-const DISAGREEING = `${DISAGREED}. If it happens again, your RPC may be wrong.`;
-
-/**
- * On an endpoint of your own that says it serves mainnet, what the review read, read again through Otus's own: the
- * lookup tables and every account. An RPC that lied about whose an account is, or what yours hold, would have the review
- * and the guards made from it miss a drain; Otus's says otherwise. Otus's server learns the addresses the transaction
- * names, never the transaction. Disagreeing, it can't be signed; not answering, a warning says it rests on yours alone.
- * Null on Otus's own, and off mainnet.
- */
-async function secondLook(r: Review, wallet: Address, cluster: Cluster, settings: Settings, shell: Shell): Promise<{ finding: Finding; blocked?: string } | null> {
-    if (cluster !== 'solana:mainnet' || rpcFor(cluster, settings) === OTUS_RPC) return null;
-    const again = await resolve(r, shell.chain(OTUS_RPC)).catch(() => null);
-    if (!again) return { finding: UNCHECKED };
-    return disagree(r, again.accounts, wallet) ? { finding: DISAGREE, blocked: DISAGREEING } : null;
-}
-
-/** Whether accounts read again (`again`, in the transaction's order) tell another story than the review's: other
- *  addresses from its lookup tables; for an account it can write, another owner, kind, mint, delegate, close
- *  authority or authorities; and for one that is yours by either, other balances. What any other account holds
- *  moves by the block, and is not compared. */
-export function disagree(r: Pick<Review, 'accounts' | 'assessment'>, again: { address: Address; state: Review['accounts'][number]['state'] }[], wallet: Address): boolean {
-    if (again.length !== r.accounts.length || again.some((a, i) => a.address !== r.accounts[i].address)) return true;
-    return r.accounts.some((a, i) => {
-        if (!a.writable) return false;
-        const [was, now] = [read(a.state), read(again[i].state)];
-        if (whose(was) !== whose(now)) return true;
-        const yours = r.assessment.mine.has(a.address) || now?.token?.owner === wallet;
-        return yours && ((was?.lamports ?? 0n) !== (now?.lamports ?? 0n) || (was?.token?.amount ?? 0n) !== (now?.token?.amount ?? 0n));
-    });
-}
-
-// What makes an account whose it is: its program and size; a token account's mint, owner, delegate and close
-// authority; the authorities kept in a stake or nonce account.
-function whose(s: State): string {
-    if (!s) return 'none';
-    const t = s.token;
-    if (t) return `${s.program} ${t.mint} ${t.owner} ${t.delegate} ${t.closer}`;
-    const kept = s.program === STAKE_PROGRAM ? s.data.slice(0, 124) : s.program === SYSTEM_PROGRAM_ADDRESS && s.space === 80 ? s.data.slice(0, 40) : new Uint8Array();
-    return `${s.program} ${s.space} ${[...kept].join(',')}`;
 }
 
 const LEDGER_V1 = "A Ledger can't sign version 1 transactions yet: ask the site for an older one (v0).";
