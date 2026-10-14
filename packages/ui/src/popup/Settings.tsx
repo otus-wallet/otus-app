@@ -30,16 +30,12 @@ export function Settings({ state, keys, go }: { state: State; keys: KeyStatus; g
     return (
         <Sheet bar={<Bar title="Settings" />} foot={<TabBar at="settings" go={go} state={state} />}>
             <Accordion type="single" collapsible className="sections flex flex-col gap-2">
-                {keys.vault && (
-                    <Section id="lock" icon="lock" title="Auto-lock" value={minutes === 0 ? 'At once' : minutes === 60 ? '1 h' : `${minutes} min`}>
-                        <AutoLock minutes={minutes} />
-                    </Section>
-                )}
-                {keys.vault && (
-                    <Section id="password" icon="key" title="Password" value="">
-                        <ChangePassword />
-                    </Section>
-                )}
+                <Section id="lock" icon="lock" title="Auto-lock" value={minutes === 0 ? 'At once' : minutes === 60 ? '1 h' : `${minutes} min`}>
+                    <AutoLock minutes={minutes} />
+                </Section>
+                <Section id="password" icon="key" title="Password" value="">
+                    <ChangePassword />
+                </Section>
                 <Section id="network" icon="server" title="Network" value={state.settings.network === 'custom' ? `Custom · ${network}` : network}>
                     <NetworkChoice settings={state.settings} />
                 </Section>
