@@ -291,36 +291,71 @@ async function transactAll(request: Extract<Request, { kind: 'transaction' }>, a
     const host = new URL(origin).host;
     const link = (id: string) => explorerOf(state.settings, cluster).tx(id);
     const of = items.length;
+    const which = (i: number) => `transaction ${i + 1} of ${of}`;
+    const named = (i: number, e: unknown) => (e instanceof Refused ? new Refused(`${which(i)}: ${e.message}`) : e);
+    const ids: Signature[] = []; // sent by Otus, in order
     try {
+        // All checked before any is signed: each still in time, and a Ledger's signature for each its own; then each
+        // signed. A refusal on the way leaves nothing counted for the ones before it.
+        const onDev = signatures !== undefined && onDevice(account);
+        for (const [i, { r, p }] of items.entries()) {
+            if (onDev) await deviceSigned(account, messageOf(p.bytes), signatures[i]).catch((e: unknown) => Promise.reject(named(i, e)));
+            else await unexpired(r, chain).catch((e: unknown) => Promise.reject(named(i, e)));
+        }
         const signed: Uint8Array[] = [];
         for (const [i, { r, p }] of items.entries()) {
-            const which = `transaction ${i + 1} of ${of}`;
-            if (!(signatures && onDevice(account))) await unexpired(r, chain).catch((e: unknown) => Promise.reject(e instanceof Refused ? new Refused(`${which}: ${e.message}`) : e));
-            const mine = await signFor(account, messageOf(p.bytes), shell, { origin, programs: programsCalled(r.message) }, signatures?.[i]);
+            const mine = await signFor(account, messageOf(p.bytes), shell, { origin, programs: programsCalled(r.message) }, signatures?.[i]).catch((e: unknown) => Promise.reject(named(i, e)));
             await shell.update((s) => usable(s, r, account.address, host, shell.now())).catch(() => {});
             signed.push(withSignature(p.bytes, account.address, mine));
         }
         if (!request.send) {
-            outcome.tell({ phase: 'signed', host });
+            // The site sends them: Otus follows them by their ids when this account pays for each (another payer's id
+            // is the site's to give, and could be any bytes).
+            const followable = items.every(({ r }) => r.signers[0] === account.address);
+            if (!followable) outcome.tell({ phase: 'signed', host, words: `${host} sends them. Not all are paid by this account, so Otus can't follow them.` });
+            else void followAll(signed.map((tx) => idOf(tx, account.address)!), items, chain, shell, outcome.tell, link, host);
             return { transactions: signed.map(base64) };
         }
-        outcome.tell({ phase: 'sending' });
-        const ids: Signature[] = [];
+        outcome.tell({ phase: 'sending', words: `Signed. The network confirms them one by one: ${of} in all.` });
         for (const [i, tx] of signed.entries()) {
-            const which = `transaction ${i + 1} of ${of}`;
-            const before = i === 0 ? '' : `; the ${i === 1 ? 'one' : i} before it landed`;
-            const sent = await landed(tx, chain, shell).catch((e: unknown) => Promise.reject(e instanceof Refused ? new Refused(`${which}: ${e.message}${before}`) : e));
+            const sent = await landed(tx, chain, shell).catch((e: unknown) => Promise.reject(named(i, e)));
             ids.push(sent.signature);
             if (sent.outcome === 'confirmed') continue;
-            outcome.tell(sent.outcome === 'failed' ? { phase: 'landed', failed: true, link: link(sent.signature) } : { phase: 'unseen', expired: false, link: link(sent.signature) });
-            throw new Refused(`${which} ${sent.outcome === 'failed' ? 'failed onchain' : "wasn't seen landing"}, so Otus sent none after it`);
+            const before = i === 0 ? '' : `${i} confirmed before it; `;
+            if (sent.outcome === 'failed') {
+                outcome.tell({ phase: 'landed', failed: true, link: link(sent.signature), words: `${cap(which(i))} landed and failed: ${before}none after it was sent.` });
+                throw new Refused(`${which(i)} failed onchain, so Otus sent none after it${landedIds(ids.slice(0, -1))}`);
+            }
+            outcome.tell({ phase: 'unseen', expired: false, link: link(sent.signature), words: `${cap(which(i))} isn't confirmed yet: ${before}none after it was sent. Check it before trying again.` });
+            throw new Refused(`${which(i)} wasn't seen landing, so Otus sent none after it${landedIds(ids.slice(0, -1))}`);
         }
-        outcome.tell({ phase: 'landed', failed: false, link: link(ids[ids.length - 1]) });
+        outcome.tell({ phase: 'landed', failed: false, link: link(ids[ids.length - 1]), words: `All ${of} confirmed by the network.` });
         return { signatures: ids };
     } catch (e) {
-        outcome.tell({ phase: 'refused', error: e instanceof Refused ? cap(e.message) : 'Otus could not finish it' });
-        throw e;
+        // Once one went out, the window keeps what it said of them; only a refusal before any did is "Not sent".
+        if (ids.length === 0) outcome.tell({ phase: 'refused', error: e instanceof Refused ? cap(e.message) : 'Otus could not finish it' });
+        else if (e instanceof Refused && !/failed onchain|wasn't seen landing/.test(e.message)) outcome.tell({ phase: 'refused', error: `${cap(e.message)}. ${ids.length} confirmed before it.` });
+        throw ids.length && e instanceof Refused && !/landed: /.test(e.message) ? new Refused(`${e.message}${landedIds(ids)}`) : e;
     }
+}
+
+// The ones that landed, for a site told that a later one did not: so it does not ask for them again.
+const landedIds = (ids: Signature[]) => (ids.length ? ` (landed: ${ids.join(', ')})` : '');
+
+// Several the site sends, each followed by its id until it lands: the window hears when all did, or the first that
+// failed or expired; Otus's pages hear once any landed.
+async function followAll(ids: Signature[], items: { r: Review }[], chain: Chain, shell: Shell, tell: (o: Outcome) => void, link: (id: string) => string, host: string) {
+    tell({ phase: 'waiting', host, link: link(ids[0]), words: `${host} sends them now: Otus watches all ${ids.length} land.` });
+    const ends = await Promise.all(ids.map((id, i) => followed(id, items[i].r, chain)));
+    const failed = ends.findIndex((f) => 'failed' in f && f.failed);
+    const unseen = ends.findIndex((f) => !('failed' in f));
+    if (ends.some((f) => 'failed' in f)) settled(shell);
+    if (failed >= 0) return tell({ phase: 'landed', failed: true, link: link(ids[failed]), words: `Transaction ${failed + 1} of ${ids.length} landed and failed.` });
+    if (unseen >= 0) {
+        const f = ends[unseen] as { expired: boolean };
+        return tell({ phase: 'unseen', expired: f.expired, link: link(ids[unseen]), words: f.expired ? `Transaction ${unseen + 1} of ${ids.length} can no longer land: its blockhash expired.` : `Transaction ${unseen + 1} of ${ids.length} isn't confirmed yet: check it before trying again.` });
+    }
+    tell({ phase: 'landed', failed: false, link: link(ids[ids.length - 1]), words: `All ${ids.length} confirmed by the network.` });
 }
 
 // The one network transactions asked together are for: each blockhash (or nonce) checked once; several are refused.

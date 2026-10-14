@@ -711,8 +711,11 @@ test('several sent: in order, each once the one before landed; one that fails on
     let looked = 0;
     const w = await wallet({ chain: { status: async () => (looked++ === 1 ? { error: { InstructionError: [0, { Custom: 1 }] }, confirmed: true } : { error: null, confirmed: true }) } });
     const reply = await w.call('signAndSendTransaction', { account: w.me, transactions: [w.transfer(), w.transfer(), w.transfer()] });
-    assert.deepEqual(reply, { ok: false, error: 'transaction 2 of 3 failed onchain, so Otus sent none after it' });
     assert.equal(w.sent.length, 2);
+    const first = getBase58Decoder().decode(getTransactionDecoder().decode(w.sent[0]).signatures[w.me]!);
+    assert.deepEqual(reply, { ok: false, error: `transaction 2 of 3 failed onchain, so Otus sent none after it (landed: ${first})` });
+    // The window says it landed and failed, and what came before: not "Not sent".
+    assert.deepEqual(w.outcomes.at(-1), { phase: 'landed', failed: true, link: w.outcomes.at(-1)!.phase === 'landed' ? (w.outcomes.at(-1) as { link: string }).link : '', words: 'Transaction 2 of 3 landed and failed: 1 confirmed before it; none after it was sent.' });
     const all = await wallet();
     const { signatures } = result<{ signatures: string[] }>(await all.call('signAndSendTransaction', { account: all.me, transactions: [all.transfer(), all.transfer(all.me, all.me, 1)] }));
     assert.equal(all.sent.length, 2);
@@ -1421,4 +1424,39 @@ test('a swap Otus could not guard is refused before it can be approved', async (
     const reply = (await swapOwn(await swapFor(w.me), w.me, ASKED, w.shell)) as { error: string };
     assert.equal(reply.error, "Otus can't add guards because the transaction fails with them, so nothing was sent");
     assert.equal(w.sent.length, 0);
+});
+
+test('several: all checked before any is signed, so one out of time counts nothing for the others', async () => {
+    // The second, on a blockhash of its own, runs out of time right as the user says yes.
+    let yes = false;
+    const late = blockhash(key(8));
+    const w = await wallet({ answer: () => ((yes = true), true), chain: { valid: async (hash: string) => !(yes && hash === late) } });
+    const second = base64(
+        new Uint8Array(
+            getTransactionEncoder().encode(
+                compileTransaction(
+                    pipe(
+                        createTransactionMessage({ version: 0 }),
+                        (m) => setTransactionMessageFeePayer(w.me, m),
+                        (m) => setTransactionMessageLifetimeUsingBlockhash({ blockhash: late, lastValidBlockHeight: 0n }, m),
+                        (m) => appendTransactionMessageInstruction(getTransferSolInstruction({ source: createNoopSigner(w.me), destination: key(3), amount: lamports(2_000_000n) }), m),
+                    ),
+                ),
+            ),
+        ),
+    );
+    const reply = await w.call('signTransaction', { account: w.me, transactions: [w.transfer(), second] });
+    assert.equal(reply.ok, false);
+    assert.match(reply.ok ? '' : reply.error, /^transaction 2 of 2: /);
+    assert.equal(w.box.state.sites[ORIGIN].signatures, 0);
+    assert.equal(w.box.state.signedHere[w.me], undefined);
+});
+
+test('several the site sends, all paid by this account: followed until all land, and Otus’s pages hear it', async () => {
+    const w = await wallet();
+    result<{ transactions: string[] }>(await w.call('signTransaction', { account: w.me, transactions: [w.transfer(), w.transfer(w.me, w.me, 1)] }));
+    for (let i = 0; i < 50 && w.outcomes.at(-1)?.phase !== 'landed'; i++) await new Promise((r) => setTimeout(r, 20));
+    assert.equal(w.outcomes[0].phase, 'waiting');
+    assert.deepEqual({ ...w.outcomes.at(-1), link: '' }, { phase: 'landed', failed: false, link: '', words: 'All 2 confirmed by the network.' });
+    assert.ok(w.settled.count > 0);
 });

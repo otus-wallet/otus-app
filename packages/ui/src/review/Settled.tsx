@@ -7,7 +7,8 @@ import { Answer, Frame } from './Frame.tsx';
 import { filled, MARK } from './tone.ts';
 
 export function Settled({ site, account, outcome }: { site: SiteView; account: AccountView; outcome: Outcome | null }) {
-    const [tone, title, words] = told(outcome);
+    const [tone, title, said] = told(outcome);
+    const words = outcome?.words ?? said;
     const link = outcome && 'link' in outcome ? outcome.link : null;
     const going = !outcome || outcome.phase === 'sending' || outcome.phase === 'waiting';
     const heard = outcome !== null; // until the background's first word, only the yes was said

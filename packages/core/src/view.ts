@@ -8,6 +8,7 @@ import type { Cluster } from './intake.ts';
 import { described, lookalikes, ranked, type Finding, type Level, type Tone, type Verdict } from '@otus-wallet/sdk/review/assess';
 import type { Effect } from '@otus-wallet/sdk/review/effects';
 import type { Review } from '@otus-wallet/sdk/review/review';
+import { holdings, units, type State } from '@otus-wallet/sdk/review/changes';
 import { lookalike } from '@otus-wallet/sdk/review/sites';
 import { NOTHING_TO_HOLD, SIMULATION_FAILED, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { ProposalTold } from '@otus-wallet/sdk/review/squads';
@@ -106,13 +107,14 @@ export type BatchView = Reviewed & {
 /** How a site's transaction went once approved, for its window: on its way (Otus sends it, or the site does and Otus
  *  watches for it), signed for the site to send when Otus can't follow it (another account pays, unsigned yet), then
  *  how it ended: landed (worked or failed), not seen landing (`expired`: its blockhash ran out first), or refused. */
-export type Outcome =
+export type Outcome = (
     | { phase: 'sending' }
     | { phase: 'waiting'; host: string; link: string }
     | { phase: 'signed'; host: string }
     | { phase: 'landed'; failed: boolean; link: string }
     | { phase: 'unseen'; expired: boolean; link: string }
-    | { phase: 'refused'; error: string };
+    | { phase: 'refused'; error: string }
+) & { words?: string }; // what it says, for several transactions at once
 
 /** How long a transaction's blockhash lives, as the network tells while the user decides: until about when (ms since
  *  1970), or gone. */
@@ -218,9 +220,10 @@ export function describeBatch(items: { r: Review; p: Prepared | null; known: Kno
         const after = (l: Line): Line => (l.tone === 'danger' && l.title === FAILS ? { ...l, note: [l.note, NEEDS].filter(Boolean).join(' · ') } : l);
         return { ...v, changes: v.changes.map(after), findings: v.findings.map(after) };
     });
-    const verdict = worst(views.map((v) => v.verdict));
+    const drained = drainedTogether(items, views);
+    const verdict = worst([...views.map((v) => v.verdict), ...(drained.length ? (['warn'] as const) : [])]);
     const preparing = items.some((i) => i.p === null);
-    const findings = byNumbers(views.map((v) => v.findings));
+    const findings = [...drained, ...byNumbers(views.map((v) => v.findings))].toSorted((a, b) => RANK[b.tone] - RANK[a.tone]);
     const paid = items.reduce((sum, { r, p }) => (p && r.signers[0] === wallet ? sum + p.fee : sum), 0n);
     const sum = (k: keyof TransactionView['counts']) => views.reduce((n, v) => n + v.counts[k], 0);
     return {
@@ -256,9 +259,30 @@ const NEEDS = 'alone: it may need one before it';
 const RANK: Record<Tone, number> = { danger: 4, warn: 3, notice: 2, ok: 1, plain: 0 };
 const worst = (verdicts: Verdict[]): Verdict => verdicts.reduce((w, v) => (RANK[v] > RANK[w] ? v : w), 'ok');
 
+// Nine tenths or more of your SOL, or of one of your tokens, leaving with all of them together, fees included, as one
+// transaction alone would be warned of: split into several, none of them says it. Each account of yours counted once,
+// as it was before; a transaction alone that says it already says it.
+function drainedTogether(items: { r: Review }[], views: TransactionView[]): Line[] {
+    if (items.length < 2 || views.some((v) => v.findings.some((f) => f.title.startsWith(ALMOST_ALL)))) return [];
+    const had = new Map<Address, State>();
+    const moved = new Map<string, bigint>();
+    for (const { r } of items) {
+        const yours = r.assessment.yours;
+        for (const c of yours.accounts) if (!had.has(c.address)) had.set(c.address, c.before);
+        for (const [asset, [before, after]] of holdings(yours)) moved.set(asset, (moved.get(asset) ?? 0n) + after - before - (asset === 'SOL' ? yours.fee : 0n));
+    }
+    const amount = (s: State, asset: string) => (asset === 'SOL' ? (s?.lamports ?? 0n) : units(s, asset));
+    return [...moved].flatMap(([asset, change]): Line[] => {
+        const before = [...had.values()].reduce((sum, s) => sum + amount(s, asset), 0n);
+        if (before <= 0n || -change * 10n < before * 9n) return [];
+        return [{ tone: 'warn', title: `All · ${ALMOST_ALL} ${asset === 'SOL' ? 'your SOL' : 'of one of your tokens'}`, note: asset === 'SOL' ? '' : asset }];
+    });
+}
+const ALMOST_ALL = 'You send almost all'; // the review's words for it
+
 // Each transaction's lines → one list: a line some of them share said once, its title after their numbers ("All" for
-// every one of several); a clear one once by its title, without numbers, and without its note where theirs differ
-// (each one's own review has it); worst first.
+// every one of several); a clear one once by its title, without numbers only when every one of them says it, and
+// without its note where theirs differ (each one's own review has it); worst first.
 function byNumbers(each: Line[][]): Line[] {
     const seen = new Map<string, { line: Line; at: number[] }>();
     each.forEach((lines, i) =>
@@ -272,19 +296,34 @@ function byNumbers(each: Line[][]): Line[] {
     );
     const numbers = (at: number[]) => (each.length > 1 && at.length === each.length ? 'All' : at.map((i) => i + 1).join(', '));
     return [...seen.values()]
-        .map(({ line, at }) => (line.tone === 'ok' ? line : { ...line, title: `${numbers(at)} · ${line.title}` }))
+        .map(({ line, at }) => (line.tone === 'ok' && at.length === each.length ? line : { ...line, title: `${numbers(at)} · ${line.title}` }))
         .toSorted((a, b) => RANK[b.tone] - RANK[a.tone]);
 }
 
-// Every program the transactions call, once: its worst standing among them, its instructions from all of them.
+// Every program the transactions call, once: its worst standing among them; what it gets from you and calls inside,
+// by the numbers of the transactions where that differs; its instructions from all of them.
 function everyProgram(views: TransactionView[]): ProgramView[] {
-    const all = new Map<string, ProgramView>();
-    for (const p of views.flatMap((v) => v.programs)) {
-        const had = all.get(p.address);
-        if (!had) all.set(p.address, { ...p, instructions: [...p.instructions] });
-        else all.set(p.address, { ...(RANK[p.tone] > RANK[had.tone] ? p : had), instructions: [...had.instructions, ...p.instructions] });
-    }
-    return [...all.values()].map((p) => ({ ...p, instructions: p.instructions.map((ix, k) => ({ ...ix, number: k + 1 })) }));
+    const all = new Map<string, { worst: ProgramView; each: { at: number; p: ProgramView }[] }>();
+    views.forEach((v, at) =>
+        v.programs.forEach((p) => {
+            const had = all.get(p.address);
+            if (!had) return void all.set(p.address, { worst: p, each: [{ at, p }] });
+            had.each.push({ at, p });
+            if (RANK[p.tone] > RANK[had.worst.tone]) had.worst = p;
+        }),
+    );
+    const told = (each: { at: number; p: ProgramView }[], of: (p: ProgramView) => string) => {
+        const said = each.filter(({ p }) => of(p));
+        if (new Set(said.map(({ p }) => of(p))).size <= 1) return said[0] ? of(said[0].p) : '';
+        return said.map(({ at, p }) => `${at + 1}: ${of(p)}`).join(' · ');
+    };
+    return [...all.values()].map(({ worst, each }) => ({
+        ...worst,
+        sub: told(each, (p) => p.sub),
+        subTone: each.reduce((t, { p }) => (RANK[p.subTone] > RANK[t] ? p.subTone : t), worst.subTone),
+        inner: told(each, (p) => p.inner),
+        instructions: each.flatMap(({ p }) => p.instructions).map((ix, k) => ({ ...ix, number: k + 1 })),
+    }));
 }
 
 // Guards across them: in all, or in how many; nothing when none of them has anything to say of guards.

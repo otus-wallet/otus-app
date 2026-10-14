@@ -193,7 +193,10 @@ export async function approvedAll(list: Uint8Array[], account: Account, way: Way
     const yours = { wallets: accounts.map((a) => a.address), contacts: new Map(contacts.map((c) => [c.address, c.label])), sent: Object.keys(sent) as Address[] };
     const tables = way.cluster === 'solana:mainnet' && rpcFor('solana:mainnet', settings) === OTUS_RPC ? shell.tables : undefined;
     const reading = tables ? { ...way.chain, tables } : way.chain;
-    const reviewing = pooled(list, (bytes) => review(bytes, { ...way.context, ...yours, wallet: account.address }, reading));
+    // On a network that turns out not to be theirs, no more reviews start there.
+    let elsewhere = false;
+    way.confirmed?.catch(() => (elsewhere = true));
+    const reviewing = pooled(list, (bytes) => review(bytes, { ...way.context, ...yours, wallet: account.address }, reading), () => elsewhere);
     reviewing.catch(() => {}); // heard below, once the cluster is confirmed
     await way.confirmed;
     const reviews = await reviewing;
@@ -260,12 +263,14 @@ export async function approvedAll(list: Uint8Array[], account: Account, way: Way
     return { items: reviews.map((r, i) => ({ r, p: ps[i] })), signatures };
 }
 
-// Each of `items` through `work`, AT_ONCE at a time, each result in its item's place.
-async function pooled<T, U>(items: T[], work: (item: T, i: number) => Promise<U>): Promise<U[]> {
+// Each of `items` through `work`, AT_ONCE at a time, each result in its item's place. `stop`: once it says so, no
+// more start, and the whole fails.
+async function pooled<T, U>(items: T[], work: (item: T, i: number) => Promise<U>, stop = () => false): Promise<U[]> {
     const out: U[] = new Array(items.length);
     let next = 0;
     const lane = async () => {
         while (next < items.length) {
+            if (stop()) throw new Error('stopped');
             const i = next++;
             out[i] = await work(items[i], i);
         }
@@ -274,10 +279,13 @@ async function pooled<T, U>(items: T[], work: (item: T, i: number) => Promise<U>
     return out;
 }
 
-// The blockhashes of several transactions, each watched once: the window hears the first to end, as the time to sign
-// all of them. Null when all wait on a nonce instead.
+const WATCHED_MOST = 3; // blockhashes of one request watched: each costs the network a read every WATCH_EVERY
+
+// The blockhashes of several transactions, each watched once, the first few at most (each one's is checked again
+// before it is signed): the window hears the first to end, as the time to sign all of them. Null when all wait on a
+// nonce instead.
 function watchedAll(reviews: Review[], chain: Chain, now: () => number): ReturnType<typeof watched> | null {
-    const hashes = [...new Set(reviews.filter((r) => !durable(r.message)).map((r) => r.message.lifetimeToken))];
+    const hashes = [...new Set(reviews.filter((r) => !durable(r.message)).map((r) => r.message.lifetimeToken))].slice(0, WATCHED_MOST);
     if (hashes.length === 0) return null;
     const watches = hashes.map((h) => watched(h, chain, now));
     const lives = new Map<number, Life>();

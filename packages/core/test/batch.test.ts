@@ -75,3 +75,30 @@ test('one that would fail alone, after others, may need one of them: said, and t
     const firstFails = describeBatch([failing, { ...a, known }], shown);
     assert.doesNotMatch(firstFails.changes[0].note, /may need/);
 });
+
+test('almost all your SOL leaving, split into several, warns as one transaction alone would', async () => {
+    // Two transfers of half of it each: neither alone says so.
+    const half = SOL - 10_000n;
+    const a = await reviewed(send(2, half), [account(PAYER, SYSTEM, 2n * SOL)], sent(2, half));
+    const b = await reviewed(send(3, half), [account(PAYER, SYSTEM, 2n * SOL)], sent(3, half), [a.r]);
+    const v = describeBatch([{ ...a, known }, { ...b, known }], shown);
+    assert.deepEqual(v.items.map((i) => i.verdict), ['ok', 'ok']);
+    assert.equal(v.verdict, 'warn');
+    assert.deepEqual(v.findings[0], { tone: 'warn', title: 'All · You send almost all your SOL', note: '' });
+    // A tenth each: nothing more.
+    const small = await reviewed(send(2, SOL / 10n), [account(PAYER, SYSTEM, 2n * SOL)], sent(2, SOL / 10n));
+    assert.equal(describeBatch([{ ...small, known }, { ...small, known }], shown).verdict, 'ok');
+});
+
+test('a clear line only some of them have says whose it is', async () => {
+    const a = await reviewed(send(2, SOL / 10n), [account(PAYER, SYSTEM, 2n * SOL)], sent(2, SOL / 10n));
+    const d = await reviewed(DRAIN, DRAIN_BEFORE, DRAIN_AFTER);
+    const v = describeBatch([{ ...a, known }, { ...d, known }], shown);
+    const clear = v.findings.filter((f) => f.tone === 'ok');
+    const onlyFirst = a.r && describeBatch([{ ...a, known }], shown).findings.filter((f) => f.tone === 'ok').map((f) => f.title);
+    for (const f of clear) {
+        const inDrain = v.items[1].findings.some((x) => x.tone === 'ok' && f.title.endsWith(x.title));
+        const inFirst = onlyFirst.some((t) => f.title.endsWith(t));
+        if (inFirst && !inDrain) assert.ok(f.title.startsWith('1 · '), f.title);
+    }
+});
