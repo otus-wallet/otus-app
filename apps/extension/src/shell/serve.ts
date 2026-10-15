@@ -381,9 +381,10 @@ export function own(bytes: Uint8Array, address: string, to: string, shell: Shell
             const { r, p, signature: signedOnDevice } = await approved(bytes, account, way, shell, (r) => {
                 if (r.signers.some((s) => s !== account.address)) throw new Refused('another account would have to sign it');
                 if (!r.accounts.some((a) => a.address === to)) throw new Refused('the transfer does not name the address you typed');
-                // A token account of its own opened for a token account or a mint: no key could ever move what lands there.
+                // A token account of its own opened for a token account (yours too) or a mint: no key could ever move what
+                // lands there.
                 const kind = r.assessment.kinds.get(to as Address);
-                if ((kind === 'tokens' || kind === 'mints') && opensFor(r, to)) throw new Refused('that address is a token account or a mint, not a wallet');
+                if ((kind === 'tokens' || kind === 'your-tokens' || kind === 'mints') && opensFor(r, to)) throw new Refused('that address is a token account or a mint, not a wallet');
             });
             if (!(signedOnDevice && onDevice(account))) await unexpired(r, chain); // signed on a device: sent all the same (as for a site's)
             const signature = await signFor(account, messageOf(p.bytes), shell, null, signedOnDevice);

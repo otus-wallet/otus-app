@@ -346,20 +346,24 @@ test('an endpoint of your own that says devnet, for a transaction mainnet knows,
     assert.equal(shown.kind === 'transaction' && shown.network, 'devnet');
 });
 
-test('a transfer made in the popup never opens a token account for an address that is a token account itself', async () => {
-    // key(2) holds tokens for key(6): an account opened for key(2) would be one no key can ever move.
-    const held = account(key(2), TOKEN_PROGRAM_ADDRESS, 2_039_280n, tokenAccountData({ mint: key(31), owner: key(6), amount: 5n }));
-    const w = await wallet({ chain: fakeChain([held], [held]) });
-    const open = getCreateAssociatedTokenIdempotentInstruction({ payer: createNoopSigner(w.me), ata: key(30), owner: key(2), mint: key(31) });
-    const tx = pipe(
-        createTransactionMessage({ version: 0 }),
-        (m) => setTransactionMessageFeePayer(w.me, m),
-        (m) => setTransactionMessageLifetimeUsingBlockhash({ blockhash: blockhash(key(9)), lastValidBlockHeight: 0n }, m),
-        (m) => appendTransactionMessageInstruction(open, m),
-    );
-    const reply = (await own(new Uint8Array(getTransactionEncoder().encode(compileTransaction(tx))), w.me, key(2), w.shell)) as { error: string };
-    assert.match(reply.error, /token account or a mint, not a wallet/);
-    assert.equal(w.sent.length, 0);
+test('a transfer made in the popup never opens a token account for an address that is a token account itself, yours too', async () => {
+    // key(2) holds tokens for someone, or for you: an account opened for key(2) would be one no key can ever move.
+    for (const owner of [key(6), null]) {
+        // The network as it is once the wallet's address is known: its token account needs it.
+        let held: ReturnType<typeof account>[] = [];
+        const w = await wallet({ chain: { accounts: (...a) => fakeChain(held).accounts(...a), simulate: (...a) => fakeChain(held).simulate(...a), heads: (...a) => fakeChain(held).heads(...a) } });
+        held = [account(key(2), TOKEN_PROGRAM_ADDRESS, 2_039_280n, tokenAccountData({ mint: key(31), owner: owner ?? w.me, amount: 5n }))];
+        const open = getCreateAssociatedTokenIdempotentInstruction({ payer: createNoopSigner(w.me), ata: key(30), owner: key(2), mint: key(31) });
+        const tx = pipe(
+            createTransactionMessage({ version: 0 }),
+            (m) => setTransactionMessageFeePayer(w.me, m),
+            (m) => setTransactionMessageLifetimeUsingBlockhash({ blockhash: blockhash(key(9)), lastValidBlockHeight: 0n }, m),
+            (m) => appendTransactionMessageInstruction(open, m),
+        );
+        const reply = (await own(new Uint8Array(getTransactionEncoder().encode(compileTransaction(tx))), w.me, key(2), w.shell)) as { error: string };
+        assert.match(reply.error, /token account or a mint, not a wallet/, String(owner));
+        assert.equal(w.sent.length, 0);
+    }
 });
 
 test('a site gets one review at a time, and what its bytes alone refuse costs no RPC', async () => {
