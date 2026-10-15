@@ -1520,7 +1520,7 @@
         "tone": "danger",
         "lines": [
           {
-            "note": "",
+            "note": "Anyone can take it",
             "amount": "−2",
             "tone": "danger"
           }
@@ -1674,12 +1674,12 @@
       "label": "Me",
       "address": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
     },
-    "verdict": "ok",
-    "title": "Looks safe",
-    "sub": "No warnings",
+    "verdict": "danger",
+    "title": "Not safe",
+    "sub": "1 critical",
     "chip": {
-      "text": "All clear",
-      "tone": "ok"
+      "text": "1 critical",
+      "tone": "danger"
     },
     "signer": "ready",
     "network": null,
@@ -1690,12 +1690,12 @@
         "icon": null,
         "verified": true,
         "amount": "−100.000005",
-        "tone": "plain",
+        "tone": "danger",
         "lines": [
           {
             "note": "To HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
             "amount": "−100",
-            "tone": "plain"
+            "tone": "danger"
           },
           {
             "note": "Network fee",
@@ -1706,7 +1706,13 @@
       }
     ],
     "proposals": [],
-    "changes": [],
+    "changes": [
+      {
+        "title": "Someone else can take the SOL you put in your token account",
+        "note": "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk can close it and take its SOL",
+        "tone": "danger"
+      }
+    ],
     "accounts": 3,
     "hash": "AsAa 5NMv 5xMu xFMk Mfae 7pfD MwrL QxY6 LNnB uFWn Pe8w",
     "wire": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAMFAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEuLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABN+teWL/sd2SXQqftebQDOYZW6i7OpH9B++YYMXpe7gDBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAAAkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJBAICAAEMAgAAAADodkgXAAAAAwEAOQYAAwB4SpNQ0QAAAAQBAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMBAV8KAAUCAAAAAAAAAAAEAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAAMAAAYAAAAAAAAAAAAHAfA2J2JGp1ud4zSe1CsV4jL2UY/CD1/NTx1k6B+b0lj3AAQABQKALAMA",
@@ -1736,12 +1742,12 @@
               {
                 "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "role": "source · signer · writable",
-                "tone": "plain"
+                "tone": "danger"
               },
               {
                 "name": "Your USDC account",
                 "role": "destination · writable",
-                "tone": "plain"
+                "tone": "danger"
               }
             ],
             "effects": [
@@ -1756,14 +1762,14 @@
     ],
     "findings": [
       {
-        "tone": "ok",
-        "title": "Changes",
-        "note": "−100 SOL"
+        "tone": "danger",
+        "title": "Someone else can take the SOL you put in your token account",
+        "note": "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk can close it and take its SOL"
       },
       {
         "tone": "ok",
-        "title": "No owner or authority changes",
-        "note": "Owners and authorities stay as they are"
+        "title": "Changes",
+        "note": "−100 SOL"
       },
       {
         "tone": "ok",

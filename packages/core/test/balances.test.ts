@@ -217,7 +217,7 @@ test('what leaves you shows where it ends: a stake set up by no one, SOL in a to
     };
     const into = getTransferSolInstruction({ source: me, destination: stake, amount: 100n * SOL });
     const left = await shown([withdraw, into], [account(PAYER, SYSTEM, 1000n * SOL), account(stake, STAKE, 2n * SOL, meta(2))], [account(PAYER, SYSTEM, 902n * SOL - FEE), account(stake, STAKE, 100n * SOL, meta(0))]);
-    assert.deepEqual(left.rows, ['SOL −98 To an account no one owns', 'SOL −0.000005 Network fee', 'Staked SOL −2 ']);
+    assert.deepEqual(left.rows, ['SOL −98 To an account no one owns', 'SOL −0.000005 Network fee', 'Staked SOL −2 Anyone can take it']);
     // Your token account, its close authority someone else's: SOL sent into it is theirs to take.
     const T = key(46);
     const held = (extra: bigint) => account(T, TOKEN_PROGRAM_ADDRESS, RENT + extra, tokenAccountData({ mint: USDC, owner: PAYER, amount: 0n, closer: THIEF }));

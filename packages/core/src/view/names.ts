@@ -133,23 +133,31 @@ export function names(r: Review, known: Known, wallet: Address, mainnet: boolean
         return PROGRAM_NAMES.get(a) ?? (SYSVARS.has(a) ? 'a sysvar' : a);
     };
     // What happened to an account, in words: its tokens, its SOL, a new owner or delegate, a close.
+    // Amounts as your part of it at each end (the SDK's `yours`): what of it leaves you, not what the account gains.
+    const yours = new Map(r.assessment.yours.accounts.map((c) => [c.address, c]));
     const changesOf = (a: Address): string[] => {
         const c = changed.get(a);
         if (!c) return [];
+        const part = yours.get(a) ?? c;
         const out: string[] = [];
         const [from, to] = [c.before?.token ?? null, c.after?.token ?? null];
         const held = to ?? from;
         if (held) {
-            const delta = (to?.amount ?? 0n) - (from?.amount ?? 0n);
+            const delta = (part.after?.token?.amount ?? 0n) - (part.before?.token?.amount ?? 0n);
             const t = token(held.mint);
             if (delta !== 0n) out.push(`${quantity(delta, t.decimals)} ${t.symbol} ${delta < 0n ? 'from' : 'to'} ${who(a)}`);
             if (from && to && from.owner !== to.owner) out.push(`${cap(who(a))} now belongs to ${to.owner}`);
             if (to?.delegate && to.delegate !== from?.delegate) out.push(`${to.delegate} may move the tokens in ${who(a)}`);
         } else {
-            const lamports = (c.after?.lamports ?? 0n) - (c.before?.lamports ?? 0n);
+            const lamports = (part.after?.lamports ?? 0n) - (part.before?.lamports ?? 0n);
             if (lamports !== 0n) out.push(`${amount(lamports, SOL_DECIMALS)} SOL ${lamports < 0n ? 'from' : 'to'} ${who(a)}`);
         }
         if (c.before && c.after && c.before.program !== c.after.program) out.push(`${cap(who(a))} now belongs to ${PROGRAM_NAMES.get(c.after.program) ?? c.after.program}`);
+        // Its SOL no longer yours when it ends, though it stays where it is: who can take it then.
+        else if (!held && r.assessment.leaves.get(a)?.sol !== undefined) {
+            const holder = r.assessment.leaves.get(a)?.sol;
+            out.push(holder ? `${holder} can take the SOL in ${who(a)}` : `Anyone can take the SOL in ${who(a)}`);
+        }
         if (c.before && !c.after) out.push(`${cap(who(a))} is closed`);
         return out;
     };

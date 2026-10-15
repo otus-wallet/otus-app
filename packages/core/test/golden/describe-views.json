@@ -124,7 +124,7 @@
             ],
             "effects": [
               {
-                "text": "−0.000005 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
+                "text": "−0.005 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
                 "tone": "danger"
               },
               {
@@ -182,7 +182,7 @@
       {
         "tone": "warn",
         "title": "An asset of yours goes to someone else",
-        "note": "−0.00703428 SOL and -1000 units 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9 → 2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr"
+        "note": "−0.00703428 SOL and -1000 units 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9 → 2VDW9dFE1ZXz4zWAbaBDQFynNVdRpQ73HyfSHMzBSL6Z"
       },
       {
         "tone": "ok",

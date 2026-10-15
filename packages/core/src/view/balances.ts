@@ -47,7 +47,8 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
 
     const party = (c: Change, moved: bigint, inSol: boolean) => {
         const state = c.after ?? c.before;
-        const holder = state?.token?.owner ?? c.address;
+        const token = state?.token;
+        const holder = (token && (inSol ? (token.closer ?? token.owner) : token.owner)) ?? c.address; // a token account's SOL: whoever can close it
         const size = moved < 0n ? -moved : moved;
         // An account of yours whose part no longer is when it ends: whoever controls it then.
         const left = r.assessment.leaves.get(c.address)?.[inSol ? 'sol' : 'tokens'];
@@ -108,7 +109,7 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
             const where = leaving(c.address, 'sol') ?? toward('SOL', c.address, moved);
             const note = [where, cap(n.who(c.address))].filter(Boolean).join(' · ');
             // Staked SOL says itself what it is: no note. Where it goes shows on the SOL lines.
-            if ((c.after ?? c.before)?.program === STAKE_PROGRAM) row('staked', 'Staked SOL', 'sol', '', moved, SOL_DECIMALS, true);
+            if ((c.after ?? c.before)?.program === STAKE_PROGRAM) row('staked', 'Staked SOL', 'sol', leaving(c.address, 'sol') ?? '', moved, SOL_DECIMALS, true);
             else solRow(note, moved);
             continue;
         }
