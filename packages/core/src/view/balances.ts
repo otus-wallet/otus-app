@@ -49,6 +49,9 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
         const state = c.after ?? c.before;
         const holder = state?.token?.owner ?? c.address;
         const size = moved < 0n ? -moved : moved;
+        // An account of yours whose part no longer is when it ends: whoever controls it then.
+        const left = r.assessment.leaves.get(c.address)?.[inSol ? 'sol' : 'tokens'];
+        if (left !== undefined) return { rank: 0, size, text: left === null ? 'an account no one owns' : n.who(left), via: null, opened: false };
         if (n.mine(c.address)) return { rank: 2, size, text: n.who(c.address), via: null, opened: false };
         if (state?.token ? !isOffCurveAddress(holder) : plain(state)) return { rank: 0, size, text: n.who(holder), via: null, opened: inSol && !!state?.token && !c.before };
         const via = programOf.get(c.address) ?? (holder !== c.address ? (programOf.get(holder) ?? null) : null);
@@ -66,6 +69,13 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
         const [first, ...more] = others;
         const text = first.opened ? 'Rent for new account' : first.via && trade && delta < 0n ? `Via ${first.via}` : `${delta < 0n ? 'To' : 'From'} ${first.text}`;
         return more.length ? `${text} +${more.length}` : text;
+    };
+    // A part of an account of yours that is no longer yours when it ends: who controls it then, as the SDK reads it.
+    const leaving = (address: Address, part: 'sol' | 'tokens'): string | null => {
+        const left = r.assessment.leaves.get(address);
+        if (!left || left[part] === undefined) return null;
+        const holder = left[part];
+        return holder === null ? 'Anyone can take it' : `To ${n.who(holder)}`;
     };
     const row = (key: string, asset: string, logo: Logo, note: string, units: bigint, places: number | null, verified: boolean, icon: string | null = null) =>
         units !== 0n && moved.push({ key, asset, logo, icon, verified, note, units, places });
@@ -86,7 +96,7 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
         rest += moved;
         handled.add(c.address);
     }
-    solRow(toward('SOL', wallet, rest) ?? 'Your wallet', rest);
+    solRow(leaving(wallet, 'sol') ?? toward('SOL', wallet, rest) ?? 'Your wallet', rest);
 
     for (const c of yours) {
         if (c.address === wallet) continue;
@@ -95,7 +105,7 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
         if (!t) {
             // SOL moving in an account of yours other than the wallet: which one is said too. In a stake account it is
             // staked SOL, an asset apart from the wallet's, so staking shows what it moves without opening the lines.
-            const where = toward('SOL', c.address, moved);
+            const where = leaving(c.address, 'sol') ?? toward('SOL', c.address, moved);
             const note = [where, cap(n.who(c.address))].filter(Boolean).join(' · ');
             // Staked SOL says itself what it is: no note. Where it goes shows on the SOL lines.
             if ((c.after ?? c.before)?.program === STAKE_PROGRAM) row('staked', 'Staked SOL', 'sol', '', moved, SOL_DECIMALS, true);
@@ -104,7 +114,7 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
         }
         if (t.native) {
             // Wrapped SOL: what moves is its account's SOL, and it is named as what it is, wSOL.
-            const where = toward('SOL', c.address, moved);
+            const where = leaving(c.address, 'sol') ?? toward('SOL', c.address, moved);
             row('wSOL', 'wSOL', 'sol', where === 'From you' ? 'Wrapped from wallet' : (where ?? 'Wrapped SOL'), moved, SOL_DECIMALS, true);
             continue;
         }
@@ -113,8 +123,8 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
         const hold = p?.holds.find((h) => h.kind === 'token' && h.account === c.address);
         const floor = hold?.kind === 'token' ? hold.atLeast - (c.before?.token?.amount ?? 0n) : 0n;
         const held = units > 0n && floor > 0n && decimals !== null ? amount(floor, decimals, false) : null;
-        row(t.mint, symbol, verified ? (LOGOS[t.mint] ?? 'chain') : 'chain', tokenNote(c, held, verified, toward(t.mint, c.address, units)), units, decimals, verified, verified && !LOGOS[t.mint] ? (n.icon?.(t.mint) ?? null) : null);
-        if (!handled.has(c.address)) solRow(rentNote(c, toward('SOL', c.address, moved)), moved);
+        row(t.mint, symbol, verified ? (LOGOS[t.mint] ?? 'chain') : 'chain', tokenNote(c, held, verified, leaving(c.address, 'tokens') ?? toward(t.mint, c.address, units)), units, decimals, verified, verified && !LOGOS[t.mint] ? (n.icon?.(t.mint) ?? null) : null);
+        if (!handled.has(c.address)) solRow(rentNote(c, leaving(c.address, 'sol') ?? toward('SOL', c.address, moved)), moved);
     }
     for (const [note, units] of rents) solRow(note, units);
     // The fee once prepared: Otus sets its priority part. Not guessed before.

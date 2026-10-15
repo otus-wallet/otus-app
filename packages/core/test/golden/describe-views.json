@@ -13,7 +13,7 @@
     },
     "verdict": "danger",
     "title": "Not safe",
-    "sub": "1 critical · 4 warnings",
+    "sub": "1 critical · 6 warnings",
     "chip": {
       "text": "1 critical",
       "tone": "danger"
@@ -21,6 +21,31 @@
     "signer": "ready",
     "network": null,
     "balances": [
+      {
+        "asset": "SOL",
+        "logo": "sol",
+        "icon": null,
+        "verified": true,
+        "amount": "−0.00703928",
+        "tone": "danger",
+        "lines": [
+          {
+            "note": "To 2VDW9dFE1ZXz4zWAbaBDQFynNVdRpQ73HyfSHMzBSL6Z",
+            "amount": "−0.004995",
+            "tone": "danger"
+          },
+          {
+            "note": "To 2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr",
+            "amount": "−0.00203928",
+            "tone": "danger"
+          },
+          {
+            "note": "Network fee",
+            "amount": "−0.000005",
+            "tone": "plain"
+          }
+        ]
+      },
       {
         "asset": "2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9",
         "logo": "chain",
@@ -30,24 +55,9 @@
         "tone": "danger",
         "lines": [
           {
-            "note": "Your account",
+            "note": "To 2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr",
             "amount": "-1000 units",
             "tone": "danger"
-          }
-        ]
-      },
-      {
-        "asset": "SOL",
-        "logo": "sol",
-        "icon": null,
-        "verified": true,
-        "amount": "−0.000005",
-        "tone": "danger",
-        "lines": [
-          {
-            "note": "Network fee",
-            "amount": "−0.000005",
-            "tone": "plain"
           }
         ]
       }
@@ -71,8 +81,8 @@
       }
     ],
     "accounts": 4,
-    "hash": "YoYK 7tTw thN9 nFSp 9xCR E6De CqHF aALd ho9D UpKt M32",
-    "wire": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAMGAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFwICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYE3615Yv+x3ZJdCp+15tAM5hlbqLs6kf0H75hgxel7uAMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAACQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkEAwMAAQIABAEAOQYAAwC4N0wAAAAAAAQBAAAAAAAAAAAAAhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWAAQBAV8KAAUCAAAAAAAAAAAEARUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVAAMBFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUABgAAAAAAAAAAAAcAAAUABQKALAMA",
+    "hash": "Av1x jgPc YSsi iZ2E QoYU 8Wsd RDBd 7mmQ wVtS LRg9 cp5G",
+    "wire": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAMGAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFwICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYE3615Yv+x3ZJdCp+15tAM5hlbqLs6kf0H75hgxel7uAMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAACQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkEAwMAAQIABAEAOQYAAwAAAAAAAAAAAAQBAAAAAAAAAAAAAhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWAAQBAV8KAAUCAAAAAAAAAAAEARUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVAAMBFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUABgAAAAAAAAAAAAcAAAUABQKALAMA",
     "counts": {
       "programs": 1,
       "instructions": 1,
@@ -156,6 +166,11 @@
       },
       {
         "tone": "warn",
+        "title": "You send almost all your SOL",
+        "note": ""
+      },
+      {
+        "tone": "warn",
         "title": "You send almost all of one of your tokens",
         "note": "2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9"
       },
@@ -165,9 +180,14 @@
         "note": "It uses 2 of your accounts · Otus can't read what it does"
       },
       {
+        "tone": "warn",
+        "title": "An asset of yours goes to someone else",
+        "note": "−0.00703428 SOL and -1000 units 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9 → 2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr"
+      },
+      {
         "tone": "ok",
         "title": "Changes",
-        "note": "-1000 units 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9"
+        "note": "−0.00703428 SOL · -1000 units 2MNus2KCpxwXnp19iyXNpWSFtBD2UGjQBAL8AbtywfT9"
       },
       {
         "tone": "ok",

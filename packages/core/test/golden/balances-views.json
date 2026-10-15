@@ -1481,6 +1481,331 @@
       "label": "Me",
       "address": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
     },
+    "verdict": "danger",
+    "title": "Not safe",
+    "sub": "1 critical",
+    "chip": {
+      "text": "1 critical",
+      "tone": "danger"
+    },
+    "signer": "ready",
+    "network": null,
+    "balances": [
+      {
+        "asset": "SOL",
+        "logo": "sol",
+        "icon": null,
+        "verified": true,
+        "amount": "−98.000005",
+        "tone": "danger",
+        "lines": [
+          {
+            "note": "To an account no one owns",
+            "amount": "−98",
+            "tone": "danger"
+          },
+          {
+            "note": "Network fee",
+            "amount": "−0.000005",
+            "tone": "plain"
+          }
+        ]
+      },
+      {
+        "asset": "Staked SOL",
+        "logo": "sol",
+        "icon": null,
+        "verified": true,
+        "amount": "−2",
+        "tone": "danger",
+        "lines": [
+          {
+            "note": "",
+            "amount": "−2",
+            "tone": "danger"
+          }
+        ]
+      }
+    ],
+    "proposals": [],
+    "changes": [
+      {
+        "title": "Your SOL goes into an account no one has set up",
+        "note": "Whoever sets it up first can take the SOL out",
+        "tone": "danger"
+      }
+    ],
+    "accounts": 6,
+    "hash": "2s3y MVUE McsB JMMD 21qp T9Bh qKbq m3Zn t4ME QDvT iD3F",
+    "wire": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAQGAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQErKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABqHYF5E3VCqYNDe9/ip6slV/U1yKeHIraKSdwAAAAAAGp9UXGMd0yShWY5hpHV62i164o5tLbVxzVVshAAAAAAan1RcZNYTQ/u2bs0MdEyBr5UQoG1e4VmzFN1/0AAAACQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkCAwUBAAQFAAwEAAAAAJQ1dwAAAAACAgABDAIAAAAA6HZIFwAAAA==",
+    "counts": {
+      "programs": 2,
+      "instructions": 2,
+      "inner": 0
+    },
+    "programs": [
+      {
+        "name": "Stake Program",
+        "address": "Stake11111111111111111111111111111111111111",
+        "standing": "known",
+        "tone": "ok",
+        "sub": "Uses 2 of your accounts",
+        "subTone": "plain",
+        "meta": "",
+        "metaTone": "plain",
+        "inner": "",
+        "instructions": [
+          {
+            "number": 1,
+            "name": "Withdraw",
+            "args": "2 SOL → 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
+            "source": "core",
+            "accounts": [
+              {
+                "name": "Your stake account 3uWi9x2SRpmjztkpkr2WWeBoVq3exjXG2YfDWLvm8KsQ",
+                "role": "stake · writable",
+                "tone": "danger"
+              },
+              {
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
+                "role": "recipient · signer · writable",
+                "tone": "danger"
+              },
+              {
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
+                "role": "withdrawAuthority · signer · writable",
+                "tone": "danger"
+              }
+            ],
+            "effects": [
+              {
+                "text": "2 SOL from your stake account 3uWi9x2SRpmjztkpkr2WWeBoVq3exjXG2YfDWLvm8KsQ to 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
+                "tone": "ok"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "System Program",
+        "address": "11111111111111111111111111111111",
+        "standing": "known",
+        "tone": "ok",
+        "sub": "Uses 2 of your accounts",
+        "subTone": "plain",
+        "meta": "",
+        "metaTone": "plain",
+        "inner": "",
+        "instructions": [
+          {
+            "number": 2,
+            "name": "TransferSol",
+            "args": "100 SOL → your stake account 3uWi9x2SRpmjztkpkr2WWeBoVq3exjXG2YfDWLvm8KsQ",
+            "source": "core",
+            "accounts": [
+              {
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
+                "role": "source · signer · writable",
+                "tone": "danger"
+              },
+              {
+                "name": "Your stake account 3uWi9x2SRpmjztkpkr2WWeBoVq3exjXG2YfDWLvm8KsQ",
+                "role": "destination · writable",
+                "tone": "danger"
+              }
+            ],
+            "effects": [
+              {
+                "text": "100 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) to your stake account 3uWi9x2SRpmjztkpkr2WWeBoVq3exjXG2YfDWLvm8KsQ",
+                "tone": "plain"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "findings": [
+      {
+        "tone": "danger",
+        "title": "Your SOL goes into an account no one has set up",
+        "note": "Whoever sets it up first can take the SOL out"
+      },
+      {
+        "tone": "ok",
+        "title": "Changes",
+        "note": "−100 SOL"
+      },
+      {
+        "tone": "ok",
+        "title": "Normal network fee",
+        "note": "0.000005 SOL for this transaction"
+      },
+      {
+        "tone": "ok",
+        "title": "Known programs",
+        "note": "Stake Program, System Program"
+      },
+      {
+        "tone": "ok",
+        "title": "Known site",
+        "note": "app.example.com · signed for before"
+      }
+    ],
+    "fee": "0.000005 SOL",
+    "guards": {
+      "held": false,
+      "text": "None: Otus can't add guards because the transaction has no room left for them",
+      "why": "Otus can't add guards because the transaction has no room left for them"
+    },
+    "added": [],
+    "cluster": "solana:mainnet",
+    "expiry": null,
+    "kept": []
+  },
+  {
+    "kind": "transaction",
+    "site": {
+      "origin": "https://app.example.com",
+      "host": "app.example.com",
+      "note": "Connected · 3 signatures",
+      "tone": "plain"
+    },
+    "account": {
+      "label": "Me",
+      "address": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+    },
+    "verdict": "ok",
+    "title": "Looks safe",
+    "sub": "No warnings",
+    "chip": {
+      "text": "All clear",
+      "tone": "ok"
+    },
+    "signer": "ready",
+    "network": null,
+    "balances": [
+      {
+        "asset": "SOL",
+        "logo": "sol",
+        "icon": null,
+        "verified": true,
+        "amount": "−100.000005",
+        "tone": "plain",
+        "lines": [
+          {
+            "note": "To HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk",
+            "amount": "−100",
+            "tone": "plain"
+          },
+          {
+            "note": "Network fee",
+            "amount": "−0.000005",
+            "tone": "plain"
+          }
+        ]
+      }
+    ],
+    "proposals": [],
+    "changes": [],
+    "accounts": 3,
+    "hash": "AsAa 5NMv 5xMu xFMk Mfae 7pfD MwrL QxY6 LNnB uFWn Pe8w",
+    "wire": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAMFAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEuLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABN+teWL/sd2SXQqftebQDOYZW6i7OpH9B++YYMXpe7gDBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAAAkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJBAICAAEMAgAAAADodkgXAAAAAwEAOQYAAwB4SpNQ0QAAAAQBAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMBAV8KAAUCAAAAAAAAAAAEAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAAMAAAYAAAAAAAAAAAAHAfA2J2JGp1ud4zSe1CsV4jL2UY/CD1/NTx1k6B+b0lj3AAQABQKALAMA",
+    "counts": {
+      "programs": 1,
+      "instructions": 1,
+      "inner": 0
+    },
+    "programs": [
+      {
+        "name": "System Program",
+        "address": "11111111111111111111111111111111",
+        "standing": "known",
+        "tone": "ok",
+        "sub": "Uses 2 of your accounts",
+        "subTone": "plain",
+        "meta": "",
+        "metaTone": "plain",
+        "inner": "",
+        "instructions": [
+          {
+            "number": 1,
+            "name": "TransferSol",
+            "args": "100 SOL → your USDC account",
+            "source": "core",
+            "accounts": [
+              {
+                "name": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you)",
+                "role": "source · signer · writable",
+                "tone": "plain"
+              },
+              {
+                "name": "Your USDC account",
+                "role": "destination · writable",
+                "tone": "plain"
+              }
+            ],
+            "effects": [
+              {
+                "text": "100 SOL from 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (you) to your USDC account",
+                "tone": "plain"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "findings": [
+      {
+        "tone": "ok",
+        "title": "Changes",
+        "note": "−100 SOL"
+      },
+      {
+        "tone": "ok",
+        "title": "No owner or authority changes",
+        "note": "Owners and authorities stay as they are"
+      },
+      {
+        "tone": "ok",
+        "title": "Normal network fee",
+        "note": "0.000005 SOL for this transaction"
+      },
+      {
+        "tone": "ok",
+        "title": "Known programs",
+        "note": "System Program"
+      },
+      {
+        "tone": "ok",
+        "title": "Known site",
+        "note": "app.example.com · signed for before"
+      }
+    ],
+    "fee": "0.000005 SOL",
+    "guards": {
+      "held": true,
+      "text": "2 guards lock your accounts to what you see"
+    },
+    "added": [
+      "Lighthouse: 2 guards on your accounts",
+      "Compute Budget: 208,000 compute units"
+    ],
+    "cluster": "solana:mainnet",
+    "expiry": null,
+    "kept": []
+  },
+  {
+    "kind": "transaction",
+    "site": {
+      "origin": "https://app.example.com",
+      "host": "app.example.com",
+      "note": "Connected · 3 signatures",
+      "tone": "plain"
+    },
+    "account": {
+      "label": "Me",
+      "address": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
+    },
     "verdict": "warn",
     "title": "Caution",
     "sub": "1 warning · nothing critical",

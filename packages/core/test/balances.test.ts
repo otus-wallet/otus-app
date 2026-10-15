@@ -192,6 +192,39 @@ test('your stake’s SOL to a wallet: a warning through a program Otus can’t r
     assert.deepEqual([effect?.name, effect?.effects[0].text], ['Withdraw', `50 SOL from your stake account ${stake} to ${THIEF}`]);
 });
 
+test('what leaves you shows where it ends: a stake set up by no one, SOL in a token account someone else closes', async () => {
+    const STAKE = address('Stake11111111111111111111111111111111111111');
+    const stake = key(43);
+    const meta = (kind: number) => {
+        const d = new Uint8Array(200);
+        d.set(getU32Encoder().encode(2));
+        d.set(getAddressEncoder().encode(PAYER), 12);
+        d.set(getAddressEncoder().encode(PAYER), 44);
+        d.set(getU32Encoder().encode(kind));
+        return d;
+    };
+    // Withdrawn in full, which leaves it set up by no one, then 100 SOL in: anyone may set it up and take them.
+    const withdraw: Instruction = {
+        programAddress: STAKE,
+        accounts: [
+            { address: stake, role: AccountRole.WRITABLE },
+            { address: PAYER, role: AccountRole.WRITABLE },
+            { address: address('SysvarC1ock11111111111111111111111111111111'), role: AccountRole.READONLY },
+            { address: address('SysvarStakeHistory1111111111111111111111111'), role: AccountRole.READONLY },
+            { address: PAYER, role: AccountRole.READONLY_SIGNER },
+        ],
+        data: new Uint8Array([...getU32Encoder().encode(4), ...getU64Encoder().encode(2n * SOL)]),
+    };
+    const into = getTransferSolInstruction({ source: me, destination: stake, amount: 100n * SOL });
+    const left = await shown([withdraw, into], [account(PAYER, SYSTEM, 1000n * SOL), account(stake, STAKE, 2n * SOL, meta(2))], [account(PAYER, SYSTEM, 902n * SOL - FEE), account(stake, STAKE, 100n * SOL, meta(0))]);
+    assert.deepEqual(left.rows, ['SOL −98 To an account no one owns', 'SOL −0.000005 Network fee', 'Staked SOL −2 ']);
+    // Your token account, its close authority someone else's: SOL sent into it is theirs to take.
+    const T = key(46);
+    const held = (extra: bigint) => account(T, TOKEN_PROGRAM_ADDRESS, RENT + extra, tokenAccountData({ mint: USDC, owner: PAYER, amount: 0n, closer: THIEF }));
+    const closable = await shown([getTransferSolInstruction({ source: me, destination: T, amount: 100n * SOL })], [account(PAYER, SYSTEM, 1000n * SOL), held(0n)], [account(PAYER, SYSTEM, 900n * SOL - FEE), held(100n * SOL)]);
+    assert.equal(closable.rows[0], `SOL −100 To ${THIEF}`);
+});
+
 test('a site is known a day after the first transaction you signed for it', async () => {
     const now = Math.floor(Date.now() / 1000);
     const pay = [getTransferSolInstruction({ source: me, destination: THIEF, amount: SOL })];
