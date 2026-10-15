@@ -103,8 +103,9 @@ export function endsYours(words: string, wallet: string | null): boolean {
     return wallet !== null && at.length > 1 && at[at.length - 1] === '' && at[at.length - 2] === wallet;
 }
 
-/** `tagged`: you named by your address, marked yours, where the window has room for no more than a line. */
-export function names(r: Review, known: Known, wallet: Address, mainnet: boolean, tagged = false): Names {
+/** `tagged`: you named by your address, marked yours, where the window has room for no more than a line. `signers`:
+ *  your wallets a key you hold signs for. */
+export function names(r: Review, known: Known, wallet: Address, mainnet: boolean, tagged = false, signers: readonly string[] = []): Names {
     const { mine } = r.assessment;
     const loaded = new Map(r.accounts.map((a) => [a.address, a.state]));
     const changed = new Map(r.changes.accounts.map((c) => [c.address, c]));
@@ -179,5 +180,6 @@ export function names(r: Review, known: Known, wallet: Address, mainnet: boolean
             return t?.verified ? t.icon : null; // an unverified token's image could be its maker's tracker
         },
         holds: (a) => (changed.get(a)?.before?.token ?? asLoaded(a)?.token)?.amount ?? null,
+        ours: (a) => a !== wallet && signers.includes(a),
     };
 }

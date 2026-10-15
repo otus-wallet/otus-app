@@ -144,7 +144,7 @@ export async function approved(bytes: Uint8Array, account: Account, way: Way, sh
     const away = way.cluster !== networkOf(settings); // for another network than the wallet shows: said in the window
     // Your wallets, watched ones too, and contacts, to tag; the addresses you sent to, to cut a copy apart from.
     const kept: Kept[] = [...accounts.map(({ address, label }) => ({ address, label, kind: 'wallet' as const })), ...contacts.map(({ address, label }) => ({ address, label, kind: 'contact' as const })), ...yours.sent.map((address) => ({ address, label: '', kind: 'sent' as const }))];
-    const shown = { site: way.site, account: accountView(account), signer: signerOf(account), cluster: way.cluster, known, expiry: null, recipient: way.recipient, later: way.later, away, kept };
+    const shown = { site: way.site, account: accountView(account), signer: signerOf(account), cluster: way.cluster, known, expiry: null, recipient: way.recipient, later: way.later, away, kept, signers: yours.signers };
     const blocked = unsignable ? LEDGER_V1 : undefined;
     const prepared = preparing.then(async ([p, told]): Promise<{ p: Prepared; approval: TransactionView }> => {
         ready?.(p); // refused as prepared: the window says no before it can be approved
@@ -228,7 +228,7 @@ export async function approvedAll(list: Uint8Array[], account: Account, way: Way
     const every = others.then((o): Known => (o ? { tokens: new Map([...known.tokens, ...o.tokens]), decimals: new Map([...known.decimals, ...o.decimals]) } : known));
     const away = way.cluster !== networkOf(settings);
     const kept: Kept[] = [...accounts.map(({ address, label }) => ({ address, label, kind: 'wallet' as const })), ...contacts.map(({ address, label }) => ({ address, label, kind: 'contact' as const })), ...yours.sent.map((address) => ({ address, label: '', kind: 'sent' as const }))];
-    const shown = { site: way.site, account: accountView(account), signer: signerOf(account), cluster: way.cluster, known, expiry: null, later: way.later, away, kept };
+    const shown = { site: way.site, account: accountView(account), signer: signerOf(account), cluster: way.cluster, known, expiry: null, later: way.later, away, kept, signers: yours.signers };
     const blocked = unsignable ? LEDGER_V1 : undefined;
     const prepared = preparing.then(async (done) => {
         const all = await every;

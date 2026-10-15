@@ -132,8 +132,9 @@ export type Known = { tokens: Map<string, TokenInfo | null>; decimals: Map<strin
  *  asks for the signature, and sends the transaction when it chooses. */
 /** `away`: the transaction is for another network than the one the wallet shows, which the window then names, mainnet
  *  included. */
-/** `kept`: your other wallets and your contacts, by your names for them. */
-export type Shown = { site: SiteView; account: AccountView; signer: Signer; cluster: Cluster; known: Known; expiry?: Expiry | null; recipient?: string; later?: boolean; away?: boolean; kept?: Kept[] };
+/** `kept`: your other wallets and your contacts, by your names for them. `signers`: your wallets a key you hold signs
+ *  for, watched ones left out: what goes to one stays yours. */
+export type Shown = { site: SiteView; account: AccountView; signer: Signer; cluster: Cluster; known: Known; expiry?: Expiry | null; recipient?: string; later?: boolean; away?: boolean; kept?: Kept[]; signers?: string[] };
 
 // Findings shown on the first step, before anything else: what you would lose, and a transaction that would fail.
 const FIRST = new Set(['simulation-failed', 'wallet-change', 'owner-change', 'token-owner-change', 'authority-change', 'delegate', 'close-authority', 'program-change', 'lookalike-address', 'stake-withdrawer', 'stake-lockup', 'high-fee', 'durable-nonce', 'guards-fail', 'guards-differ']);
@@ -149,14 +150,14 @@ export const accountView = (a: Account): AccountView => ({ label: a.label, addre
 
 /** Review, the transaction as prepared, and what else is shown → what the window shows. `p` null: shown as reviewed
  *  while it is being prepared, with nothing that preparing decides (guards, fee, hash, the verdict). */
-export function describe(r: Review, p: Prepared | null, { site, account, signer, cluster, known, expiry = null, recipient, later = false, away = false, kept = [] }: Shown): TransactionView {
+export function describe(r: Review, p: Prepared | null, { site, account, signer, cluster, known, expiry = null, recipient, later = false, away = false, kept = [], signers = [] }: Shown): TransactionView {
     const wallet = account.address as Address;
     const mainnet = cluster === 'solana:mainnet';
     const told = known.told ?? new Map();
     const named = selfNamed(r, told);
     // Guards hold what it does, and it lands now; signed with others, as tightly as alone.
     const held = p !== null && p.unguarded === null && p.loose.length === 0 && p.leeway.lamports === 0n && p.leeway.units === 0n && !later;
-    const n = names(r, known, wallet, mainnet);
+    const n = names(r, known, wallet, mainnet, false, signers);
     const proposals = proposalViews(known.squads ?? [], n);
     const { verdict, findings } = ranked([...described(r.assessment.findings, named, r.assessment.programs, held), ...(p?.findings ?? []), ...imitations(known.tokens, mainnet), ...misread(known), ...proposedTo(proposals, r, wallet, kept)]);
     const note = (f: Finding) => noteOf(f, r, p, n);
@@ -175,7 +176,7 @@ export function describe(r: Review, p: Prepared | null, { site, account, signer,
         hash: p ? (p.hash.match(/.{1,4}/g)?.join(' ') ?? p.hash) : '', // of the message signed: the site's, with guards and fees when prepared
         wire: p ? getBase64Decoder().decode(p.bytes) : '',
         counts: { programs: r.assessment.programs.length, instructions: r.message.instructions.length, inner: r.simulation.inner.reduce((k, g) => k + g.calls.length, 0) },
-        programs: programs(r, findings, names(r, known, wallet, mainnet, true), told, named),
+        programs: programs(r, findings, names(r, known, wallet, mainnet, true, signers), told, named),
         findings: findings.map((f) => ({ tone: f.level, title: f.text, note: note(f) })),
         fee: p ? `${sol(p.fee)} SOL` : '',
         guards: p ? guards(p) : { held: false, text: '' },
@@ -225,7 +226,7 @@ export function describeBatch(items: { r: Review; p: Prepared | null; known: Kno
     const verdict = worst([...views.map((v) => v.verdict), ...(drained.length ? (['warn'] as const) : [])]);
     const preparing = items.some((i) => i.p === null);
     const paid = items.reduce((sum, { r, p }) => (p && r.signers[0] === wallet ? sum + p.fee : sum), 0n);
-    const balances = batchBalances(items.map(({ r, p, known }) => ({ r, p, n: names(r, known, wallet, mainnet) })), wallet, verdict);
+    const balances = batchBalances(items.map(({ r, p, known }) => ({ r, p, n: names(r, known, wallet, mainnet, false, shown.signers) })), wallet, verdict);
     const programs = everyProgram(views);
     // The clear lines every one of them has that sum something up, said for all of them: what your balances come to,
     // the fees, the programs.

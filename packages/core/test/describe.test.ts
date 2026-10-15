@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 
 import { getTransferSolInstruction } from '@solana-program/system';
+import { AuthorityType, getSetAuthorityInstruction, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { createNoopSigner, isAddress, type Address, type MaybeEncodedAccount } from '@solana/kit';
 
 import assert from 'node:assert/strict';
@@ -13,16 +14,16 @@ import type { ProposalTold } from '@otus-wallet/sdk/review/squads';
 import { describe, siteView, type Signer } from '../src/view.ts';
 import type { Kept } from '../src/view/names.ts';
 import { golden } from './golden.ts';
-import { account, DRAIN, DRAIN_AFTER, DRAIN_BEFORE, fakeChain, key, PAYER, RECIPIENT, SYSTEM, transaction, transferV1 } from './helpers.ts';
+import { account, DRAIN, DRAIN_AFTER, DRAIN_BEFORE, fakeChain, key, MINT, PAYER, RECIPIENT, SYSTEM, tokenAccountData, transaction, transferV1 } from './helpers.ts';
 
 // What the window shows for a transaction, on a cluster, for a signer, from a site you signed for before or never.
-async function view(bytes: Uint8Array, before: MaybeEncodedAccount[], after: MaybeEncodedAccount[], o: { cluster?: Cluster; signer?: Signer; signedBefore?: number | null; simulation?: Partial<Simulation>; kept?: Kept[]; squads?: ProposalTold[] } = {}) {
+async function view(bytes: Uint8Array, before: MaybeEncodedAccount[], after: MaybeEncodedAccount[], o: { cluster?: Cluster; signer?: Signer; signedBefore?: number | null; simulation?: Partial<Simulation>; kept?: Kept[]; squads?: ProposalTold[]; signers?: Address[] } = {}) {
     const chain = fakeChain(before, after, o.simulation);
     const contacts = new Map((o.kept ?? []).filter((k) => k.kind !== 'wallet' && k.kind !== 'sent').map((k) => [k.address as Address, k.label])); // as the extension passes them
-    const r = await review(bytes, { wallet: PAYER, signedBefore: o.signedBefore === undefined ? 0 : o.signedBefore, host: 'app.example.com', contacts }, chain);
+    const r = await review(bytes, { wallet: PAYER, signedBefore: o.signedBefore === undefined ? 0 : o.signedBefore, host: 'app.example.com', contacts, signers: o.signers }, chain);
     const p = await prepare(r, PAYER, chain);
     const site = siteView('https://app.example.com', { account: PAYER, signatures: 3 });
-    return describe(r, p, { site, account: { label: 'Me', address: PAYER }, signer: o.signer ?? 'ready', cluster: o.cluster ?? 'solana:mainnet', known: { tokens: new Map(), decimals: new Map(), squads: o.squads }, kept: o.kept });
+    return describe(r, p, { site, account: { label: 'Me', address: PAYER }, signer: o.signer ?? 'ready', cluster: o.cluster ?? 'solana:mainnet', known: { tokens: new Map(), decimals: new Map(), squads: o.squads }, kept: o.kept, signers: o.signers });
 }
 
 const SOL = 1_000_000_000n;
@@ -113,4 +114,15 @@ test('a compute limit says what the simulation used; left as it came for a failu
     assert.equal(budget?.instructions[0].args, '1,400,000 CU · 301,777 used');
     const failed = await view(send, before, after, { simulation: { error: { InstructionError: [1, { Custom: 1 }] } } });
     assert.deepEqual([failed.guards, failed.added], [{ held: false, text: 'None: the simulation failed', why: 'the simulation failed' }, []]);
+});
+
+test('the ownership of your token account handed to another of your wallets is yellow in the details too, as its finding', async () => {
+    const [T, OTHER] = [key(46), key(47)];
+    const held = (owner: Address) => account(T, TOKEN_PROGRAM_ADDRESS, 2_039_280n, tokenAccountData({ mint: MINT, owner, amount: 5n }));
+    const hand = transaction([getSetAuthorityInstruction({ owned: T, owner: createNoopSigner(PAYER), authorityType: AuthorityType.AccountOwner, newAuthority: OTHER })]);
+    const [before, after] = [[account(PAYER, SYSTEM, SOL), held(PAYER)], [account(PAYER, SYSTEM, SOL - 5_000n), held(OTHER)]];
+    const tones = (v: Awaited<ReturnType<typeof view>>) => v.programs.flatMap((p) => p.instructions.flatMap((i) => i.effects.map((e) => e.tone)));
+    assert.deepEqual(tones(await view(hand, before, after, { signers: [PAYER, OTHER] })), ['warn']);
+    // Watched, or anyone's: red.
+    assert.deepEqual(tones(await view(hand, before, after)), ['danger']);
 });
