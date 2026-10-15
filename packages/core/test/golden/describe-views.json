@@ -13,9 +13,9 @@
     },
     "verdict": "danger",
     "title": "Not safe",
-    "sub": "2 critical · 3 warnings",
+    "sub": "1 critical · 4 warnings",
     "chip": {
-      "text": "2 critical",
+      "text": "1 critical",
       "tone": "danger"
     },
     "signer": "ready",
@@ -60,9 +60,9 @@
         "tone": "danger"
       },
       {
-        "title": "A token account of yours changes owner",
-        "note": "New owner 2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr. You lose control of it.",
-        "tone": "danger"
+        "title": "A token account of yours goes to a program's address",
+        "note": "New owner 2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr, an address no key holds: check it is the one you meant",
+        "tone": "warn"
       },
       {
         "title": "A token account of yours gets a delegate, or a bigger allowance",
@@ -145,9 +145,9 @@
         "note": "A program takes it over, with all it holds: 2VDW9dFE1ZXz4zWAbaBDQFynNVdRpQ73HyfSHMzBSL6Z"
       },
       {
-        "tone": "danger",
-        "title": "A token account of yours changes owner",
-        "note": "New owner 2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr. You lose control of it."
+        "tone": "warn",
+        "title": "A token account of yours goes to a program's address",
+        "note": "New owner 2RJD1KnDRGEkvuFfAGrJ7PD28LRE9LRDjZznDywagzmr, an address no key holds: check it is the one you meant"
       },
       {
         "tone": "warn",
