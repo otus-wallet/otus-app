@@ -6,7 +6,7 @@ import { amount, cap, quantity, SOL_DECIMALS } from '@otus-wallet/sdk/format';
 import { LIGHTHOUSE, STAKE_PROGRAM, TOKEN_PROGRAMS, USDC, USDT, WSOL } from '@otus-wallet/sdk/programs/addresses';
 import { CORE_PROGRAMS } from '@otus-wallet/sdk/programs/core';
 import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
-import { HIGH_FEE, type Tone, type Verdict } from '@otus-wallet/sdk/review/assess';
+import { HIGH_FEE, solOf, type Tone, type Verdict } from '@otus-wallet/sdk/review/assess';
 import { plain, units as unitsIn, type Change } from '@otus-wallet/sdk/review/changes';
 import type { Names } from '@otus-wallet/sdk/review/effects';
 import type { Review } from '@otus-wallet/sdk/review/review';
@@ -48,7 +48,7 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
     const party = (c: Change, moved: bigint, inSol: boolean) => {
         const state = c.after ?? c.before;
         const token = state?.token;
-        const holder = (token && (inSol ? (token.closer ?? token.owner) : token.owner)) ?? c.address; // a token account's SOL: whoever can close it
+        const holder = (token && (inSol ? solOf(token, wallet) : token.owner)) ?? c.address; // a token account's SOL, as the SDK reads it
         const size = moved < 0n ? -moved : moved;
         // An account of yours whose part no longer is when it ends: whoever controls it then.
         const left = r.assessment.leaves.get(c.address)?.[inSol ? 'sol' : 'tokens'];
