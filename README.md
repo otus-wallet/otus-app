@@ -22,12 +22,12 @@ their own.
 
 ## Build
 
-Until the SDK is on npm, clone it next to this repo:
-
-    git clone https://github.com/otus-wallet/otus-sdk ../otus-sdk
-    (cd ../otus-sdk && npm ci && npm run build)
     npm ci
     npm run build      # or: npm run watch
+
+The SDK comes from npm, pinned in the lockfile. To try a change to it first, clone
+[otus-sdk](https://github.com/otus-wallet/otus-sdk) next to this repo and build it there (`npm ci && npm run build`),
+then `npm run sdk:local` here; `npm ci` puts the published one back.
 
 In `chrome://extensions`: Developer mode, "Load unpacked", pick `apps/extension/dist`.
 The release zip (`npm run package`) is the store's build: loaded unpacked, it gets an extension ID Otus's RPC
@@ -38,7 +38,6 @@ doesn't serve, so set your own RPC in Settings (a Helius one for Activity).
 The Otus you installed can be checked against this code: build the release's tag and compare.
 
     git checkout vX.Y.Z    # the version chrome://extensions shows for Otus
-    (cd ../otus-sdk && git checkout <the commit in the release notes> && npm ci && npm run build)
     npm ci
     npm run verify -- <path>
 
@@ -47,6 +46,8 @@ The Otus you installed can be checked against this code: build the release's tag
 matches, byte for byte. Left out is only what the store adds: its signature of the files (`_metadata/`) and the
 manifest's `key` and `update_url`. With the same `zip`, `npm run package` gives the release's `otus.zip` byte for byte
 too.
+
+Up to v1.0.0 the SDK came from a clone next to this repo, at the commit in the release notes: see that tag's README.
 
 ## Test
 
