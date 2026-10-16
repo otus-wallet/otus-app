@@ -203,6 +203,30 @@ test('a worker keeps what Jupiter said a while: woken again, a fresh answer is n
     assert.deepEqual(asked.at(-1)?.split(',').sort(), [key(85), key(86)].sort());
 });
 
+test('a kept name, however old, names a mint at once, asked the same way only; the mint is asked again all the same', async (t) => {
+    const { platform } = await import('../src/platform.ts'); // the session storage installed above
+    const asked: string[] = [];
+    t.mock.method(globalThis, 'fetch', async (url: string) => {
+        asked.push(new URL(url).searchParams.get('query') ?? '');
+        return new Response('[]');
+    });
+    const hour = 60 * 60_000;
+    await platform.storage.session.set({ tokens: [
+        [key(87), { id: key(87), name: 'Old', symbol: 'OLD', isVerified: true }, Date.now() - hour, true],
+        [key(88), null, Date.now() - hour, true], // Jupiter did not know it
+        [key(89), { id: key(89), name: 'Ahead', symbol: 'AHD', isVerified: true }, Date.now() + hour, true],
+        [key(91), { id: key(91), name: 'Fake', symbol: 'USDC', isVerified: true }, Date.now(), true], // a borrowed name
+    ] });
+    const popup = (await import(`../src/tokens.ts?worker=${'popup'}`)) as typeof import('../src/tokens.ts');
+    await popup.keepTokens();
+    assert.deepEqual(popup.keptName(key(87), true), { symbol: 'OLD', verified: true });
+    assert.deepEqual([popup.keptName(key(87), false), popup.keptName(key(88), true), popup.keptName(key(89), true)], [null, null, null]);
+    assert.deepEqual(popup.keptName(key(91), true), { symbol: 'USDC', verified: false }); // read again with the same care
+    assert.equal(popup.cachedToken(key(87)), null); // nothing else of it: no price, no icon
+    await popup.tokens([key(87)], true);
+    assert.deepEqual(asked, [key(87)]); // old: asked again
+});
+
 test('what is kept of an answer is what is read of it: words cut as read, numbers only, no long icon address', async (t) => {
     const huge = { id: key(90), name: 'N'.repeat(5000), symbol: 'S\u0000YM', icon: `https://example.com/${'x'.repeat(5000)}`, isVerified: true, usdPrice: { nested: 'x'.repeat(5000) }, extra: 'y'.repeat(5000) };
     t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify([huge])));

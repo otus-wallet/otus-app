@@ -27,8 +27,8 @@ const WAIT = 8_000; // ms for Jupiter to answer, after which the tokens go witho
 const looked = new Map<string, TokenInfo | null>(); // null: Jupiter does not know it
 const asked = new Map<string, Promise<void>>(); // mints asked, until Jupiter answers
 
-// Kept in session storage, by a worker that sleeps when idle (keepTokens): each answer as Jupiter gave it (null: it
-// does not know the mint), read again with the same care, while fresh.
+// Kept in session storage, by a worker that sleeps when idle and by the popup (keepTokens): each answer as Jupiter gave
+// it (null: it does not know the mint), read again with the same care, while fresh; an older one only names a mint.
 const KEPT = 'tokens';
 const FRESH = 10 * 60_000; // ms an answer is kept: prices age; names hardly
 const MOST_KEPT = 300; // answers kept: the latest
@@ -49,7 +49,7 @@ export function keepTokens(now = Date.now): Promise<void> {
             for (const entry of list) {
                 if (!Array.isArray(entry) || entry.length !== 4) continue;
                 const [mint, said, at, throughOtus] = entry as Kept;
-                if (typeof mint !== 'string' || !isAddress(mint) || typeof at !== 'number' || !fresh(at) || typeof throughOtus !== 'boolean') continue;
+                if (typeof mint !== 'string' || !isAddress(mint) || typeof at !== 'number' || at > clock() || typeof throughOtus !== 'boolean') continue;
                 if (said !== null && info(said)?.id !== mint) continue; // not an answer for this mint
                 kept!.push([mint, said, at, throughOtus]);
             }
@@ -153,6 +153,15 @@ const methodFor = (throughOtus: boolean) => (throughOtus ? 'POST' : 'GET');
 
 /** What Jupiter said of a mint already, this page or worker: no request. */
 export const cachedToken = (mint: string): TokenInfo | null => looked.get(mint) ?? null;
+
+/** A mint's name and whether it is verified, from the latest answer kept for it, asked this way, however old: so a list
+ *  the popup draws at once is named at once, and named again as a fresh answer comes. Names hardly change; nothing else
+ *  of an old answer is read. */
+export function keptName(mint: string, throughOtus: boolean): Pick<TokenInfo, 'symbol' | 'verified'> | null {
+    const last = (kept ?? []).findLast(([m, , , through]) => m === mint && through === throughOtus);
+    const t = last && last[1] !== null ? info(last[1]) : null;
+    return t && { symbol: t.symbol, verified: t.verified };
+}
 
 // One of Jupiter's answers, read with care: its names come from token makers.
 function info(t: unknown): TokenInfo | null {

@@ -11,7 +11,7 @@ import { PROGRAM_NAMES } from '@otus-wallet/sdk/programs/known';
 import { explorerOf, networkOf, OTUS_RPC, walletRpc } from '@otus-wallet/core/settings.ts';
 import { outsideKey, unchecked } from '@otus-wallet/core/outside.ts';
 import type { State } from '@otus-wallet/core/state.ts';
-import { cachedToken } from '@otus-wallet/core/tokens.ts';
+import { cachedToken, keptName } from '@otus-wallet/core/tokens.ts';
 import { Button } from '../components/ui/button.tsx';
 import { Icon } from '../components/icons.tsx';
 import type { Cut } from '../components/address.tsx';
@@ -39,11 +39,13 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
     const held = useHeldNow(rpc, account.address);
     const history = useMemo(() => once(read.data?.pages.flatMap((p) => p.rows) ?? []), [read.data]);
     // The page's tokens, named in one search when it came: asked again here only for a name that came late.
-    const looked = useTokens(useMemo(() => mintsIn(history), [history]), rpc === OTUS_RPC, mainnet);
+    const throughOtus = rpc === OTUS_RPC;
+    const looked = useTokens(useMemo(() => mintsIn(history), [history]), throughOtus, mainnet);
     const naming = useMemo((): Naming => {
         const verified = new Map((held?.assets ?? []).filter((a) => a.verified && a.symbol && !a.native).map((a) => [a.mint, a.symbol]));
         const names = new Map<string, string>([...state.contacts, ...state.accounts].map((k) => [k.address, k.label]));
-        const said = (mint: string) => looked.data?.get(mint) ?? cachedToken(mint);
+        // Until this page's answer comes, the name kept from an earlier one: the list shows named, not renamed.
+        const said = (mint: string) => looked.data?.get(mint) ?? cachedToken(mint) ?? keptName(mint, throughOtus);
         // The verified tokens' symbols in view: an unverified one named as one of them is a fake.
         const known = [...Object.values(KNOWN_SYMBOLS), ...verified.values()];
         return {
@@ -56,7 +58,7 @@ export function ActivityScreen({ state, go }: { state: State; go: (to: Screen) =
             program: (a) => PROGRAM_NAMES.get(a) ?? a,
             known: [...state.accounts.map((k) => k.address), ...state.contacts.map((k) => k.address), ...(Object.keys(state.sent) as Address[])],
         };
-    }, [account.address, held, looked.data, mainnet, state.accounts, state.contacts, state.sent]);
+    }, [account.address, held, looked.data, mainnet, throughOtus, state.accounts, state.contacts, state.sent]);
     const list = useMemo(() => rows(history, naming), [history, naming]);
     const cut = useMemo(() => cuts(history, naming.known), [history, naming]);
     const [open, setOpen] = useState<string | null>(null);
