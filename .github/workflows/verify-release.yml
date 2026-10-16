@@ -1,0 +1,52 @@
+# Rebuilds a release on Linux and compares it with the otus.zip attached to it, file by file (npm run verify): the
+# check anyone can run, done here in the open. Runs when a release is published, or by hand for any tag.
+name: verify release
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release's tag, such as v1.0.0
+        required: true
+permissions:
+  contents: read
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash # -eo pipefail: a step fails when any command in a pipe does
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.10.0
+          package-manager-cache: false
+      - name: The release's otus.zip
+        run: curl -fsSL -o "$RUNNER_TEMP/otus.zip" "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/otus.zip"
+      # Up to v1.0.0 the SDK came from a clone next to this repo, at the commit the release notes name.
+      - name: The SDK, for a tag that takes it from a clone
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          grep -q '"file:../../../otus-sdk"' packages/core/package.json || exit 0
+          sdk=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body | grep -m1 -oE 'otus-sdk@[0-9a-f]{7,40}' | cut -d@ -f2)
+          test -n "$sdk"
+          git clone -q https://github.com/otus-wallet/otus-sdk ../otus-sdk
+          git -C ../otus-sdk checkout -q "$sdk"
+          (cd ../otus-sdk && npm ci && npm run build)
+      - run: npm ci
+      - name: File by file
+        run: npm run verify -- "$RUNNER_TEMP/otus.zip" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: The zip itself (information only, zip tools compress differently)
+        run: |
+          npm run package
+          rebuilt=$(sha256sum apps/extension/otus.zip | cut -d' ' -f1)
+          released=$(sha256sum "$RUNNER_TEMP/otus.zip" | cut -d' ' -f1)
+          echo "release otus.zip ${released}, rebuilt here ${rebuilt}: $([ "$rebuilt" = "$released" ] && echo 'byte for byte the same' || echo 'not the same bytes')" | tee -a "$GITHUB_STEP_SUMMARY"
