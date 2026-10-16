@@ -256,3 +256,38 @@ test('a mint read with other decimals than the token list gives: its amounts may
     const told = await shown(pay, before, after, { tokens, decimals: new Map([[USDC, 6]]) });
     assert.ok(!told.codes.some((c) => c.includes('may be wrong')));
 });
+
+test('a line names who takes most of it: a tip beside a payment to a program is the "+1"', async () => {
+    const PROGRAM = address('675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8');
+    const [vault] = await getProgramDerivedAddress({ programAddress: PROGRAM, seeds: ['vault'] });
+    const tip = 10_000n;
+    const { rows } = await shown(
+        [getTransferSolInstruction({ source: me, destination: vault, amount: 5n * SOL }), getTransferSolInstruction({ source: me, destination: THIEF, amount: tip })],
+        [account(PAYER, SYSTEM, 10n * SOL), account(vault, PROGRAM, SOL), account(THIEF, SYSTEM, SOL)],
+        [account(PAYER, SYSTEM, 5n * SOL - tip - FEE), account(vault, PROGRAM, 6n * SOL), account(THIEF, SYSTEM, SOL + tip)],
+    );
+    assert.equal(rows[0], `SOL −5.00001 To ${vault} (program) +1`);
+});
+
+test('tokens going out to no account read here never read as staying yours', async () => {
+    const [mine, vault, pool] = [key(44), key(45), key(46)];
+    const usdc = new Map([[USDC, { id: USDC, name: 'USD Coin', symbol: 'USDC', icon: null, verified: true, usdPrice: 1, change24h: 0, decimals: 6 }]]);
+    const { rows } = await shown(
+        [getTransferCheckedInstruction({ source: mine, mint: USDC, destination: vault, authority: me, amount: 1_000_000n, decimals: 6 })],
+        [account(PAYER, SYSTEM, SOL), account(mine, TOKEN_PROGRAM_ADDRESS, RENT, tokenAccountData({ mint: USDC, owner: PAYER, amount: 5_000_000n })), account(vault, TOKEN_PROGRAM_ADDRESS, RENT, tokenAccountData({ mint: USDC, owner: pool, amount: 100_000_000n }))],
+        // The busy vault read a slot before the simulation: others took more out of it than this puts in.
+        [account(PAYER, SYSTEM, SOL - FEE), account(mine, TOKEN_PROGRAM_ADDRESS, RENT, tokenAccountData({ mint: USDC, owner: PAYER, amount: 4_000_000n })), account(vault, TOKEN_PROGRAM_ADDRESS, RENT, tokenAccountData({ mint: USDC, owner: pool, amount: 58_000_000n }))],
+        { tokens: usdc },
+    );
+    assert.ok(rows.includes('USDC −1 Leaves your account'), rows.join(' | '));
+});
+
+test('your wallet in a balance note is its address, tagged yours, never a bare "you"', async () => {
+    const wsol = key(47);
+    const { rows } = await shown(
+        [getCloseAccountInstruction({ account: wsol, destination: PAYER, owner: me })],
+        [account(PAYER, SYSTEM, SOL), account(wsol, TOKEN_PROGRAM_ADDRESS, 10n * SOL + RENT, tokenAccountData({ mint: WSOL, owner: PAYER, amount: 10n * SOL, native: RENT }))],
+        [account(PAYER, SYSTEM, 11n * SOL + RENT - FEE)],
+    );
+    assert.ok(rows.includes(`wSOL −10.00203928 To ${PAYER} (you)`), rows.join(' | '));
+});

@@ -19,10 +19,10 @@ const LOGOS: Record<string, Logo> = { [WSOL]: 'sol', [USDC]: 'usdc', [USDT]: 'us
 type Moved = { key: string; asset: string; logo: Logo; icon: string | null; verified: boolean; note: string; units: bigint; places: number | null; tone?: Tone };
 
 // Your balances: your wallet's SOL, with the network fee and the rent of the token accounts it opens or closes on lines
-// of their own; each token account of yours; your stake accounts' SOL, as staked SOL; your other accounts. Each line says where its asset goes or comes from,
-// by its own direction: a wallet that is not yours first, as that is where a drainer sends, then program accounts by
-// the program the transaction gives them to, then your own. A trade out to a program reads "Via". The lines are then
-// put under their asset, which says what they come to.
+// of their own; each token account of yours; your stake accounts' SOL, as staked SOL; your other accounts. Each line says where its asset goes or comes from:
+// the account that takes (or gives) the most of it, with how many others; a program account by the program the
+// transaction gives it to. A trade out to a program reads "Via". The lines are then put under their asset, which says
+// what they come to.
 export const balances = (r: Review, p: Prepared | null, wallet: Address, n: Names, verdict: Verdict): AssetChange[] => grouped(moves(r, p, wallet, n), verdict);
 
 /** Your balances across transactions signed together: what each asset comes to with all of them, and under it each
@@ -58,17 +58,19 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
         const via = programOf.get(c.address) ?? (holder !== c.address ? (programOf.get(holder) ?? null) : null);
         return { rank: 1, size, text: via ?? `${n.who(holder)} (program)`, via, opened: false };
     };
-    // Where what moves in this account goes, or comes from: the accounts where the same asset moved the other way.
+    // Where what moves in this account goes, or comes from: the accounts where the same asset moved the other way, the
+    // one that moved most named first.
     const toward = (asset: 'SOL' | Address, from: Address, delta: bigint): string | null => {
         const inSol = asset === 'SOL';
         const moved = (c: Change) => (inSol ? lamports(c) : unitsIn(c.after, asset) - unitsIn(c.before, asset));
         const others = all
             .filter((c) => c.address !== from && !(inSol && handled.has(c.address)) && moved(c) !== 0n && moved(c) > 0n !== delta > 0n)
             .map((c) => party(c, moved(c), inSol))
-            .toSorted((a, b) => a.rank - b.rank || (b.size > a.size ? 1 : b.size < a.size ? -1 : 0));
+            .toSorted((a, b) => (b.size > a.size ? 1 : b.size < a.size ? -1 : a.rank - b.rank));
         if (!others.length) return null;
         const [first, ...more] = others;
-        const text = first.opened ? 'Rent for new account' : first.via && trade && delta < 0n ? `Via ${first.via}` : `${delta < 0n ? 'To' : 'From'} ${first.text}`;
+        const whole = first.size === (delta < 0n ? -delta : delta); // the opened account's rent is all this line moves
+        const text = first.opened && whole ? 'Rent for new account' : first.via && trade && delta < 0n ? `Via ${first.via}` : `${delta < 0n ? 'To' : 'From'} ${first.text}`;
         return more.length ? `${text} +${more.length}` : text;
     };
     // A part of an account of yours that is no longer yours when it ends: who controls it then, as the SDK reads it.
@@ -97,7 +99,7 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
         rest += moved;
         handled.add(c.address);
     }
-    solRow(leaving(wallet, 'sol') ?? toward('SOL', wallet, rest) ?? 'Your wallet', rest);
+    solRow(leaving(wallet, 'sol') ?? toward('SOL', wallet, rest) ?? (rest < 0n ? 'Leaves your wallet' : 'Your wallet'), rest);
 
     for (const c of yours) {
         if (c.address === wallet) continue;
@@ -116,7 +118,7 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
         if (t.native) {
             // Wrapped SOL: what moves is its account's SOL, and it is named as what it is, wSOL.
             const where = leaving(c.address, 'sol') ?? toward('SOL', c.address, moved);
-            row('wSOL', 'wSOL', 'sol', where === 'From you' ? 'Wrapped from wallet' : (where ?? 'Wrapped SOL'), moved, SOL_DECIMALS, true);
+            row('wSOL', 'wSOL', 'sol', where === `From ${n.who(wallet)}` ? 'Wrapped from wallet' : (where ?? 'Wrapped SOL'), moved, SOL_DECIMALS, true);
             continue;
         }
         const { symbol, decimals, verified } = n.token(t.mint);
@@ -124,7 +126,7 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
         const hold = p?.holds.find((h) => h.kind === 'token' && h.account === c.address);
         const floor = hold?.kind === 'token' ? hold.atLeast - (c.before?.token?.amount ?? 0n) : 0n;
         const held = units > 0n && floor > 0n && decimals !== null ? amount(floor, decimals, false) : null;
-        row(t.mint, symbol, verified ? (LOGOS[t.mint] ?? 'chain') : 'chain', tokenNote(c, held, verified, leaving(c.address, 'tokens') ?? toward(t.mint, c.address, units)), units, decimals, verified, verified && !LOGOS[t.mint] ? (n.icon?.(t.mint) ?? null) : null);
+        row(t.mint, symbol, verified ? (LOGOS[t.mint] ?? 'chain') : 'chain', tokenNote(c, units, held, verified, leaving(c.address, 'tokens') ?? toward(t.mint, c.address, units)), units, decimals, verified, verified && !LOGOS[t.mint] ? (n.icon?.(t.mint) ?? null) : null);
         if (!handled.has(c.address)) solRow(rentNote(c, leaving(c.address, 'sol') ?? toward('SOL', c.address, moved)), moved);
     }
     for (const [note, units] of rents) solRow(note, units);
@@ -146,12 +148,13 @@ function grouped(moved: Moved[], verdict: Verdict): AssetChange[] {
 }
 
 // A token row's note: how much of what comes in is guaranteed, or where it goes or comes from, or what the account is.
-function tokenNote(c: Change, held: string | null, verified: boolean, where: string | null): string {
+// Tokens going out to no account read here never read as staying yours.
+function tokenNote(c: Change, units: bigint, held: string | null, verified: boolean, where: string | null): string {
     if (held) return verified ? `≥ ${held} guaranteed` : `Unverified · ≥ ${held}`;
     if (where) return where;
     if (!c.before) return 'New account';
     if (!c.after) return 'Closed account';
-    return 'Your account';
+    return units < 0n ? 'Leaves your account' : 'Your account';
 }
 
 // The note of the SOL in a token account of yours: its rent when opened or closed, else where that SOL goes.

@@ -169,7 +169,7 @@ export function describe(r: Review, p: Prepared | null, { site, account, signer,
         ...summary(verdict, findings.map((f) => f.level)),
         signer,
         network: mainnet && !away ? null : cluster.slice('solana:'.length),
-        balances: balances(r, p, wallet, n, verdict),
+        balances: balances(r, p, wallet, names(r, known, wallet, mainnet, true, signers), verdict),
         proposals,
         changes: findings.filter((f) => FIRST.has(f.code) && f.level !== 'ok').map((f) => ({ title: f.text, note: note(f), tone: f.level })),
         accounts: r.assessment.kinds.size,
@@ -226,7 +226,7 @@ export function describeBatch(items: { r: Review; p: Prepared | null; known: Kno
     const verdict = worst([...views.map((v) => v.verdict), ...(drained.length ? (['warn'] as const) : [])]);
     const preparing = items.some((i) => i.p === null);
     const paid = items.reduce((sum, { r, p }) => (p && r.signers[0] === wallet ? sum + p.fee : sum), 0n);
-    const balances = batchBalances(items.map(({ r, p, known }) => ({ r, p, n: names(r, known, wallet, mainnet, false, shown.signers) })), wallet, verdict);
+    const balances = batchBalances(items.map(({ r, p, known }) => ({ r, p, n: names(r, known, wallet, mainnet, true, shown.signers) })), wallet, verdict);
     const programs = everyProgram(views);
     // The clear lines every one of them has that sum something up, said for all of them: what your balances come to,
     // the fees, the programs.
