@@ -1,5 +1,7 @@
 # Otus Wallet
 
+![Otus: know what you sign](apps/extension/store/images/screenshot-1-review.png)
+
 A self-custodial, open-source Solana wallet that shows you exactly what you're signing, and lets you check
 it in as much detail as you want.
 
