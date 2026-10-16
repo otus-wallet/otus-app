@@ -301,3 +301,22 @@ test("your own account never hides someone else's: 9 SOL wrapped beside 0.5 SOL 
     );
     assert.equal(rows[0], `SOL −9.5 To ${THIEF} +1`);
 });
+
+test('tokens you get that their mint lets someone else move or burn: the line says who', async () => {
+    const [mint, sender, mine] = [key(49), key(50), key(51)];
+    const lender = key(52);
+    // A Token-2022 mint (82 bytes, then its type and a PermanentDelegate extension).
+    const data = new Uint8Array(166 + 36);
+    data[44] = 6;
+    data[45] = 1;
+    data[165] = 1;
+    data.set([12, 0, 32, 0, ...getAddressEncoder().encode(lender)], 166);
+    const t22 = (a: Address, owner: Address, amount: bigint) => account(a, TOKEN_2022_PROGRAM_ADDRESS, RENT, tokenAccountData({ mint, owner, amount }));
+    const { rows, codes } = await shown(
+        [getTransferCheckedInstruction({ source: sender, mint, destination: mine, authority: createNoopSigner(THIEF), amount: 5_000_000n, decimals: 6 }, { programAddress: TOKEN_2022_PROGRAM_ADDRESS })],
+        [account(PAYER, SYSTEM, SOL), t22(sender, THIEF, 10_000_000n), account(mint, TOKEN_2022_PROGRAM_ADDRESS, RENT, data)],
+        [account(PAYER, SYSTEM, SOL - FEE), t22(sender, THIEF, 5_000_000n), t22(mine, PAYER, 5_000_000n), account(mint, TOKEN_2022_PROGRAM_ADDRESS, RENT, data)],
+    );
+    assert.ok(rows.some((r) => r.startsWith(`${mint} `) && r.endsWith(` · ${lender} can move or burn them`)), rows.join(' | '));
+    assert.ok(!codes.some((c) => c.includes('permanent')), codes.join());
+});

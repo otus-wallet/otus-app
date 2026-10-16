@@ -137,7 +137,7 @@ export type Known = { tokens: Map<string, TokenInfo | null>; decimals: Map<strin
 export type Shown = { site: SiteView; account: AccountView; signer: Signer; cluster: Cluster; known: Known; expiry?: Expiry | null; recipient?: string; later?: boolean; away?: boolean; kept?: Kept[]; signers?: string[] };
 
 // Findings shown on the first step, before anything else: what you would lose, and a transaction that would fail.
-const FIRST = new Set(['simulation-failed', 'wallet-change', 'owner-change', 'token-owner-change', 'authority-change', 'delegate', 'close-authority', 'permanent-delegate', 'frozen', 'program-change', 'lookalike-address', 'stake-withdrawer', 'stake-lockup', 'high-fee', 'durable-nonce', 'guards-fail', 'guards-differ']);
+const FIRST = new Set(['simulation-failed', 'wallet-change', 'owner-change', 'token-owner-change', 'authority-change', 'delegate', 'close-authority', 'frozen', 'token-terms-unread', 'program-change', 'lookalike-address', 'stake-withdrawer', 'stake-lockup', 'high-fee', 'durable-nonce', 'guards-fail', 'guards-differ']);
 
 export function siteView(origin: string, site: Site | undefined): SiteView {
     const host = new URL(origin).host;

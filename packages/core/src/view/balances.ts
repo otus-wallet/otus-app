@@ -126,7 +126,10 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
         const hold = p?.holds.find((h) => h.kind === 'token' && h.account === c.address);
         const floor = hold?.kind === 'token' ? hold.atLeast - (c.before?.token?.amount ?? 0n) : 0n;
         const held = units > 0n && floor > 0n && decimals !== null ? amount(floor, decimals, false) : null;
-        row(t.mint, symbol, verified ? (LOGOS[t.mint] ?? 'chain') : 'chain', tokenNote(c, units, held, verified, leaving(c.address, 'tokens') ?? toward(t.mint, c.address, units)), units, decimals, verified, verified && !LOGOS[t.mint] ? (n.icon?.(t.mint) ?? null) : null);
+        // Tokens you get that someone else can move or burn at any time, as their mint lets its permanent delegate: said.
+        const lender = r.assessment.shared.get(c.address);
+        const note = tokenNote(c, units, held, verified, leaving(c.address, 'tokens') ?? toward(t.mint, c.address, units));
+        row(t.mint, symbol, verified ? (LOGOS[t.mint] ?? 'chain') : 'chain', lender ? `${note} · ${n.who(lender)} can move or burn them` : note, units, decimals, verified, verified && !LOGOS[t.mint] ? (n.icon?.(t.mint) ?? null) : null);
         if (!handled.has(c.address)) solRow(rentNote(c, leaving(c.address, 'sol') ?? toward('SOL', c.address, moved)), moved);
     }
     for (const [note, units] of rents) solRow(note, units);
