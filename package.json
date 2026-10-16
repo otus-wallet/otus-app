@@ -17,6 +17,7 @@
     "verify": "npm run verify -w @otus-wallet/extension --",
     "watch": "npm run watch -w @otus-wallet/extension",
     "test": "npm test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "sdk:local": "d=$(mktemp -d) && npm pack ../otus-sdk --pack-destination $d --loglevel=error >/dev/null && rm -rf node_modules/@otus-wallet/sdk && mkdir -p node_modules/@otus-wallet/sdk && tar -xzf $d/*.tgz -C node_modules/@otus-wallet/sdk --strip-components=1 && rm -rf $d"
   }
 }
