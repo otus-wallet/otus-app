@@ -49,8 +49,6 @@ matches, byte for byte. Left out is only what the store adds: its signature of t
 manifest's `key` and `update_url`. With the same `zip`, `npm run package` gives the release's `otus.zip` byte for byte
 too.
 
-Up to v1.0.0 the SDK came from a clone next to this repo, at the commit in the release notes: see that tag's README.
-
 ## Test
 
     npm test
