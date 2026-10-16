@@ -60,7 +60,7 @@ export function noteOf(f: Finding, r: Review, p: Prepared | null, n: Names): str
     if (f.code === 'large-outflow' && f.subject) return n.token(f.subject).symbol; // the token, by its symbol when verified
     if (f.code === 'guards-leeway' && p) {
         const what = [p.leeway.lamports > 0n && `up to ${sol(p.leeway.lamports)} SOL`, p.leeway.units > 0n && 'some of your tokens'].filter(Boolean).join(' and ');
-        return `${cap(what)} more than shown, as others here move them between your accounts: the site may never send those`;
+        return `${cap(what)} more than shown, as others here move them into or between your accounts: the site may never send those`;
     }
     if (f.code === 'check-balances') {
         const [out, back] = [r.assessment.flows.filter((flow) => flow.change < 0n), r.assessment.flows.filter((flow) => flow.change > 0n)];
