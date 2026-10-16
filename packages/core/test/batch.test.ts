@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { getTransferSolInstruction } from '@solana-program/system';
-import { createNoopSigner, type MaybeEncodedAccount } from '@solana/kit';
+import { address, createNoopSigner, type MaybeEncodedAccount } from '@solana/kit';
 
 import { review, type Review } from '@otus-wallet/sdk/review/review';
 import { prepare, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
@@ -110,7 +110,7 @@ test('a clear line only some of them have says whose it is', async () => {
     }
 });
 
-test('room the others leave, moving funds between your accounts, is said with how much', async () => {
+test('each one is held to its own change: the others moving funds between your accounts leave it no room', async () => {
     // B: 1 SOL from your wallet into your own token account's lamports, nothing of yours leaving.
     const OWN = key(30);
     const own = (lamports: bigint) => account(OWN, TOKEN_PROGRAM_ADDRESS, lamports, tokenAccountData({ mint: key(31), owner: PAYER, amount: 0n }));
@@ -118,8 +118,17 @@ test('room the others leave, moving funds between your accounts, is said with ho
     const b = await reviewed(touch, [account(PAYER, SYSTEM, 2n * SOL), own(2_039_280n)], [account(PAYER, SYSTEM, SOL - 5_000n), own(SOL + 2_039_280n)]);
     const a = await reviewed(send(2, SOL / 10n), [account(PAYER, SYSTEM, 2n * SOL)], sent(2, SOL / 10n), [b.r]);
     const v = describeBatch([{ ...a, known }, { ...b, known }], shown);
-    const said = v.findings.find((f) => f.title.endsWith('Its guards leave room for the others'));
-    assert.ok(said?.title.startsWith('1 · '), JSON.stringify(v.findings));
+    assert.ok(!v.findings.some((f) => f.title.endsWith('Its guards leave room for the others')), JSON.stringify(v.findings));
+    assert.equal(v.items[0].guards.held, true);
+    // One that reads its own instructions keeps floors, which leave that room: said, with how much.
+    const reads = transaction([
+        getTransferSolInstruction({ source: createNoopSigner(PAYER), destination: key(2), amount: SOL / 10n }),
+        { programAddress: key(33), accounts: [{ address: PAYER, role: AccountRole.WRITABLE_SIGNER }, { address: address('Sysvar1nstructions1111111111111111111111111'), role: AccountRole.READONLY }] },
+    ]);
+    const c = await reviewed(reads, [account(PAYER, SYSTEM, 2n * SOL)], sent(2, SOL / 10n), [b.r]);
+    const w = describeBatch([{ ...c, known }, { ...b, known }], shown);
+    const said = w.findings.find((f) => f.title.endsWith('Its guards leave room for the others'));
+    assert.ok(said?.title.startsWith('1 · '), JSON.stringify(w.findings));
     assert.match(said!.note, /^Up to 1 SOL more than shown/);
-    assert.equal(v.items[0].guards.held, false);
+    assert.equal(w.items[0].guards.held, false);
 });
