@@ -291,3 +291,13 @@ test('your wallet in a balance note is its address, tagged yours, never a bare "
     );
     assert.ok(rows.includes(`wSOL −10.00203928 To ${PAYER} (you)`), rows.join(' | '));
 });
+
+test("your own account never hides someone else's: 9 SOL wrapped beside 0.5 SOL to a stranger names the stranger", async () => {
+    const wsol = key(48);
+    const { rows } = await shown(
+        [getTransferSolInstruction({ source: me, destination: wsol, amount: 9n * SOL }), getSyncNativeInstruction({ account: wsol }), getTransferSolInstruction({ source: me, destination: THIEF, amount: SOL / 2n })],
+        [account(PAYER, SYSTEM, 10n * SOL), account(wsol, TOKEN_PROGRAM_ADDRESS, RENT, tokenAccountData({ mint: WSOL, owner: PAYER, amount: 0n, native: RENT })), account(THIEF, SYSTEM, SOL)],
+        [account(PAYER, SYSTEM, SOL / 2n - FEE), account(wsol, TOKEN_PROGRAM_ADDRESS, 9n * SOL + RENT, tokenAccountData({ mint: WSOL, owner: PAYER, amount: 9n * SOL, native: RENT })), account(THIEF, SYSTEM, SOL + SOL / 2n)],
+    );
+    assert.equal(rows[0], `SOL −9.5 To ${THIEF} +1`);
+});

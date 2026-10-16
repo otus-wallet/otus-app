@@ -20,9 +20,9 @@ type Moved = { key: string; asset: string; logo: Logo; icon: string | null; veri
 
 // Your balances: your wallet's SOL, with the network fee and the rent of the token accounts it opens or closes on lines
 // of their own; each token account of yours; your stake accounts' SOL, as staked SOL; your other accounts. Each line says where its asset goes or comes from:
-// the account that takes (or gives) the most of it, with how many others; a program account by the program the
-// transaction gives it to. A trade out to a program reads "Via". The lines are then put under their asset, which says
-// what they come to.
+// the account that takes (or gives) the most of it, with how many others, your own accounts last, as each has a line
+// of its own; a program account by the program the transaction gives it to. A trade out to a program reads "Via". The
+// lines are then put under their asset, which says what they come to.
 export const balances = (r: Review, p: Prepared | null, wallet: Address, n: Names, verdict: Verdict): AssetChange[] => grouped(moves(r, p, wallet, n), verdict);
 
 /** Your balances across transactions signed together: what each asset comes to with all of them, and under it each
@@ -59,14 +59,14 @@ function moves(r: Review, p: Prepared | null, wallet: Address, n: Names): Moved[
         return { rank: 1, size, text: via ?? `${n.who(holder)} (program)`, via, opened: false };
     };
     // Where what moves in this account goes, or comes from: the accounts where the same asset moved the other way, the
-    // one that moved most named first.
+    // one that moved most named first, yours after everyone else's.
     const toward = (asset: 'SOL' | Address, from: Address, delta: bigint): string | null => {
         const inSol = asset === 'SOL';
         const moved = (c: Change) => (inSol ? lamports(c) : unitsIn(c.after, asset) - unitsIn(c.before, asset));
         const others = all
             .filter((c) => c.address !== from && !(inSol && handled.has(c.address)) && moved(c) !== 0n && moved(c) > 0n !== delta > 0n)
             .map((c) => party(c, moved(c), inSol))
-            .toSorted((a, b) => (b.size > a.size ? 1 : b.size < a.size ? -1 : a.rank - b.rank));
+            .toSorted((a, b) => Number(a.rank === 2) - Number(b.rank === 2) || (b.size > a.size ? 1 : b.size < a.size ? -1 : a.rank - b.rank));
         if (!others.length) return null;
         const [first, ...more] = others;
         const whole = first.size === (delta < 0n ? -delta : delta); // the opened account's rent is all this line moves
