@@ -14,10 +14,12 @@ import { Settings } from './Settings.tsx';
 import { platform } from '@otus-wallet/core/platform.ts';
 import type { KeyStatus } from '@otus-wallet/core/keystore.ts';
 import { signs, type State } from '@otus-wallet/core/state.ts';
+import { accepted } from '@otus-wallet/core/terms.ts';
 import { YourWallet } from '../components/you.tsx';
 import { current, useLookOutside, useOtus } from './store.ts';
 import { StakeScreen } from './Stake.tsx';
 import { SwapScreen } from './Swap.tsx';
+import { Terms } from './Terms.tsx';
 import { WalletScreen } from './WalletScreen.tsx';
 import { Wallets } from './Wallets.tsx';
 
@@ -60,11 +62,16 @@ function Screens() {
     const { state, keys } = now;
     if (state.accounts.length === 0) return <Empty setUp={() => void setUp()} />;
     // Each screen starts over when the wallet in use changes, as the setup tab can do: nothing typed or confirmed for one
-    // wallet carries over to another.
+    // wallet carries over to another. Until the terms of use are accepted, they sit over it, and nothing under them
+    // takes a click or the focus.
+    const terms = !accepted(state.terms);
     return (
         <Fragment key={state.active ?? ''}>
             {signs(current(state)) && <Lookout state={state} />}
-            <YourWallet.Provider value={current(state).address}>{shown(screen, state, keys, go)}</YourWallet.Provider>
+            <div className="contents" inert={terms}>
+                <YourWallet.Provider value={current(state).address}>{shown(screen, state, keys, go)}</YourWallet.Provider>
+            </div>
+            {terms && <Terms />}
         </Fragment>
     );
 }

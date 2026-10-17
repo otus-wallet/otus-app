@@ -85,6 +85,7 @@ async function wallet(o: { key?: boolean; ledger?: boolean; locked?: boolean; an
             outside: {},
             disconnected: [],
             settings: DEFAULT_SETTINGS,
+            terms: null,
         } as State,
     };
     const approvals: Approval[] = [];

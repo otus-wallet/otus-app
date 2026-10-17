@@ -6,6 +6,7 @@ import { pathBytes } from './ledger/solana.ts';
 import type { Outside } from './outside.ts';
 import { platform } from './platform.ts';
 import { DEFAULT_SETTINGS, settingsOf, type Settings } from './settings.ts';
+import type { Accepted } from './terms.ts';
 
 /** An account Otus shows. `key`: where the vault keeps its key (a secret, and the account's index on a phrase).
  *  `ledger`: its key is on a Ledger, at this derivation path. None for an address you only watch. */
@@ -47,7 +48,8 @@ export type Contact = { address: Address; label: string };
  *  account never brings back; `waiting` and `given`: what sites were signed for that others can still use, the latest
  *  last; `signedHere`: the transactions' signatures Otus made with each account, the latest last; `outside`: what the
  *  popup checked of each one's activity for those signed elsewhere, by network (outsideKey), the popup's alone;
- *  `disconnected`: what is kept of the sites disconnected, back when each connects again, the latest last. */
+ *  `disconnected`: what is kept of the sites disconnected, back when each connects again, the latest last; `terms`: the
+ *  terms of use as last accepted, the popup's alone. */
 export type State = {
     accounts: Account[];
     active: Address | null;
@@ -61,9 +63,10 @@ export type State = {
     signedHere: Record<string, string[]>;
     outside: Record<string, Outside>;
     settings: Settings;
+    terms: Accepted | null;
 };
 
-const DEFAULTS: State = { accounts: [], active: null, sites: {}, disconnected: [], contacts: [], sent: {}, removed: [], waiting: [], given: [], signedHere: {}, outside: {}, settings: DEFAULT_SETTINGS };
+const DEFAULTS: State = { accounts: [], active: null, sites: {}, disconnected: [], contacts: [], sent: {}, removed: [], waiting: [], given: [], signedHere: {}, outside: {}, settings: DEFAULT_SETTINGS, terms: null };
 /** Signatures kept an account: far more than it makes between two looks at its activity. */
 export const MAX_SIGNED_HERE = 200;
 const MAX_CONTACTS = 200;

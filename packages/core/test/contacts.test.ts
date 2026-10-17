@@ -21,6 +21,7 @@ const state = (part: Partial<State> = {}): State => ({
     outside: {},
     disconnected: [],
     settings: DEFAULT_SETTINGS,
+    terms: null,
     ...part,
 });
 // An edit made on a state, as the background makes it.
