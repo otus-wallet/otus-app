@@ -227,6 +227,21 @@ test('a kept name, however old, names a mint at once, asked the same way only; t
     assert.deepEqual(asked, [key(87)]); // old: asked again
 });
 
+test('a page keeping answers only for their names asks again for a fresh one, its name kept all the same', async (t) => {
+    const { platform } = await import('../src/platform.ts');
+    const asked: string[] = [];
+    t.mock.method(globalThis, 'fetch', async (url: string) => {
+        asked.push(new URL(url).searchParams.get('query') ?? '');
+        return new Response('[]');
+    });
+    await platform.storage.session.set({ tokens: [[key(93), { id: key(93), name: 'Fresh', symbol: 'FRS', isVerified: true, usdPrice: 2 }, Date.now(), true]] });
+    const page = (await import(`../src/tokens.ts?worker=${'names'}`)) as typeof import('../src/tokens.ts');
+    await page.keepTokens(Date.now, false);
+    assert.deepEqual(page.keptName(key(93), true), { symbol: 'FRS', verified: true });
+    await page.tokens([key(93)], true);
+    assert.deepEqual(asked, [key(93)]); // fresh, and asked again: its price as it is now
+});
+
 test('what is kept of an answer is what is read of it: words cut as read, numbers only, no long icon address', async (t) => {
     const huge = { id: key(90), name: 'N'.repeat(5000), symbol: 'S\u0000YM', icon: `https://example.com/${'x'.repeat(5000)}`, isVerified: true, usdPrice: { nested: 'x'.repeat(5000) }, extra: 'y'.repeat(5000) };
     t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify([huge])));

@@ -36,13 +36,15 @@ type Kept = [mint: string, said: unknown, at: number, throughOtus: boolean];
 let kept: Kept[] | null = null; // null: nothing kept
 let restored: Promise<void> = Promise.resolve();
 let clock = Date.now;
+let reused = true; // what was kept answers again while fresh; the popup's own only names (keepTokens)
 const fresh = (at: number) => clock() - at >= 0 && clock() - at < FRESH;
 
 /** Keeps what Jupiter says of mints for a while, in session storage, and takes back what was kept fresh before: for a
  *  worker, which starts over each time it wakes. Each answer is used only the way it was asked, through Otus's server
- *  or not, as an icon's host learns who looks otherwise. `now`: ms. */
-export function keepTokens(now = Date.now): Promise<void> {
-    [kept, clock] = [[], now];
+ *  or not, as an icon's host learns who looks otherwise. `now`: ms. `reuse`: false for a page that keeps answers only
+ *  for their names (keptName), asking again for prices each time it opens. */
+export function keepTokens(now = Date.now, reuse = true): Promise<void> {
+    [kept, clock, reused] = [[], now, reuse];
     restored = platform.storage.session.get(KEPT).then(
         (stored) => {
             const list = Array.isArray(stored[KEPT]) ? (stored[KEPT] as unknown[]) : [];
@@ -61,6 +63,7 @@ export function keepTokens(now = Date.now): Promise<void> {
 
 // What was kept of these mints, asked this way and fresh still, known again: not asked.
 function fromKept(mints: string[], throughOtus: boolean) {
+    if (!reused) return;
     for (const [mint, said, at, through] of kept ?? []) {
         if (through !== throughOtus || !fresh(at) || looked.has(mint) || !mints.includes(mint)) continue;
         looked.set(mint, said === null ? null : served(info(said)!, throughOtus));
