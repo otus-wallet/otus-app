@@ -13,9 +13,11 @@ const DURABLE_ROUNDS = 45; // a durable transaction never expires: stop watching
 
 const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
-/** A signed transaction → sent, then watched until it is confirmed, fails or can no longer land. Throws only if the RPC
- *  refuses the first send; a send that timed out or lost its connection may have gone out, so it is watched too.
- *  `preflight` false (the user's setting) sends it even if it would fail: it lands and pays its fee. */
+/** A signed transaction → sent, and watched from that moment, every 200 ms, until it is confirmed, fails or can no
+ *  longer land: never after the RPC answers the send, as a slow answer (Sender's, say) must not hide that it landed or
+ *  failed. Throws only if the RPC refuses the first send before any node saw it; a send that timed out or lost its
+ *  connection may have gone out, so it is watched too. `preflight` false (the user's setting) sends it even if it would
+ *  fail: it lands and pays its fee. */
 export async function send(signed: Uint8Array, chain: Chain, wait = sleep, preflight = true): Promise<Sent> {
     const { message, signers, signed: present } = await decode(signed);
     if (present.length < signers.length) throw new Error('the transaction is missing signatures');
@@ -25,9 +27,10 @@ export async function send(signed: Uint8Array, chain: Chain, wait = sleep, prefl
     const status = () => chain.status(signature).catch(() => undefined); // undefined: no answer this time
     const expires = !durable(message);
 
-    // With a preflight: the RPC simulates it first and refuses what would fail.
-    await chain.send(signed, preflight).catch((e: unknown) => {
-        if (!uncertain(e)) throw e;
+    // With a preflight: the RPC simulates it first and refuses what would fail. Not awaited: the watch starts now.
+    let refused: { error: unknown } | null = null;
+    void chain.send(signed, preflight).catch((e: unknown) => {
+        if (!uncertain(e)) refused = { error: e };
     });
     let stale = 0; // rounds in a row that found its blockhash too old; one alone could come from a lagging node
     let sighted = false; // a node has seen it, not confirmed yet
@@ -35,6 +38,7 @@ export async function send(signed: Uint8Array, chain: Chain, wait = sleep, prefl
         let seen = false; // this round
         for (let check = 0; check < CHECKS; check++) {
             await wait(CHECK);
+            if (refused && !sighted && !seen) throw (refused as { error: unknown }).error; // the RPC's refusal: never sent
             const now = await status();
             const settled = settle(now ?? null);
             if (settled) return settled;

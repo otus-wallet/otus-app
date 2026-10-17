@@ -113,3 +113,16 @@ test('a first send the RPC never answered may have gone out: it is watched, and 
     await assert.rejects(failing(new SolanaError(SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, { headers: new Headers(), message: '', statusCode: 429 })));
     await assert.rejects(failing(new SolanaError(SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE, {} as never)));
 });
+
+test('watched from the moment it is sent: a send whose answer never comes still says at once that it failed onchain', async () => {
+    const failed = { InstructionError: [2, { Custom: 21 }] } as unknown as TransactionError;
+    const statuses: Status[] = [null, null, { error: failed, confirmed: true }];
+    let checks = 0;
+    const chain: Chain = fakeChain([], [], {}, {
+        send: () => new Promise<void>(() => {}), // Sender slow to answer: never, here
+        status: async () => (checks++, statuses.shift() ?? null),
+        valid: async () => true,
+    });
+    const s = await send(signed(transfer()), chain, instantly);
+    assert.deepEqual([s.outcome, s.error, checks], ['failed', failed, 3]);
+});
