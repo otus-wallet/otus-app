@@ -47,13 +47,19 @@ const sideOf = (a: Holding): Side => ({ mint: address(a.native ? WSOL : a.mint),
 // Only a verified token's icon is fetched, as everywhere in Otus: anyone can put any address in an unverified one's.
 const sideFrom = (t: TokenInfo): Side | null => (t.decimals === null ? null : { mint: address(t.id), symbol: nameOr(t.symbol, short(t.id)), name: t.name, icon: t.verified ? t.icon : null, verified: t.verified, decimals: t.decimals, price: t.usdPrice });
 
+// What the screen holds, by wallet, while the popup is open: back on Swap, or back from a review said no to, it is as it
+// was. A swap that may have gone out starts it over.
+const kept = new Map<Address, { pay: Side; get: Side; text: string }>();
+
 export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => void }) {
     const account = current(state);
     const mainnet = networkOf(state.settings) === 'solana:mainnet';
     const held = useHoldings(walletRpc(state.settings), account.address, mainnet);
-    const [pay, setPay] = useState<Side>(SOL);
-    const [get, setGet] = useState<Side>(USD_COIN);
-    const [text, setText] = useState('');
+    const was = kept.get(account.address);
+    const [pay, setPay] = useState<Side>(was?.pay ?? SOL);
+    const [get, setGet] = useState<Side>(was?.get ?? USD_COIN);
+    const [text, setText] = useState(was?.text ?? '');
+    useEffect(() => void kept.set(account.address, { pay, get, text }), [account.address, pay, get, text]);
     const [picking, setPicking] = useState<'pay' | 'get' | null>(null);
     const [doing, setDoing] = useState<{ job: Job; title: string } | null>(null);
     // What you can pay with: SOL, and every token you hold some of (wrapped SOL in a token account aside: Jupiter takes
@@ -86,11 +92,16 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
 
     if (doing) {
         // Gone out (on its way, landed, or not confirmed yet): what it moved shows in Activity, read again once it lands,
-        // and the amount is cleared, so that it is not swapped twice by mistake.
+        // and the screen starts over, so that it is not swapped twice by mistake. Said no to, not sent, or failed
+        // onchain: back to it as it was, to try again.
         const done = (landed: boolean, gone = landed) => {
             setDoing(null);
+            if (!gone) return;
+            kept.delete(account.address);
+            setPay(SOL);
+            setGet(USD_COIN);
             setText('');
-            if (gone) go('activity');
+            go('activity');
         };
         return <Doing account={account} job={doing.job} title={doing.title} settings={state.settings} done={done} />;
     }
