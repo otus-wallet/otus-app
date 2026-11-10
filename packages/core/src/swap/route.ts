@@ -56,8 +56,11 @@ export function readRoute(body: unknown, ask: Ask): Route {
     const b = record(body, 'the route');
     if (b.inputMint !== ask.input || b.outputMint !== ask.output || b.inAmount !== String(ask.amount) || b.swapMode !== 'ExactIn' || b.slippageBps !== ask.slippageBps) throw new Error('the route is not for what was asked');
     const out = units(b.outAmount);
-    const least = units(b.otherAmountThreshold);
-    if (least === 0n || least > out || least < out - (out * BigInt(ask.slippageBps) + 9_999n) / 10_000n) throw new Error('the route says too little');
+    const stated = units(b.otherAmountThreshold);
+    if (stated === 0n || stated > out || stated < out - (out * BigInt(ask.slippageBps) + 9_999n) / 10_000n) throw new Error('the route says too little');
+    // The least is counted here, from the quote and the slippage the swap itself carries: what the answer states is
+    // only held to be near it, and never reaches the chain.
+    const least = out - (out * BigInt(ask.slippageBps)) / 10_000n;
     if (b.tipInstruction !== null && b.tipInstruction !== undefined) throw new Error('the route carries a tip');
     if (!Array.isArray(b.otherInstructions) || b.otherInstructions.length > 0) throw new Error('the route carries more to run');
     const ix = (v: unknown) => instruction(v, ask.taker);

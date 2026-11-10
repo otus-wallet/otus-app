@@ -180,6 +180,8 @@ test('a route at another slippage, or with too low a least for its own, is refus
     const out = BigInt(route.outAmount as string);
     assert.throws(() => readRoute({ ...route, otherAmountThreshold: String(out - (out * 50n) / 10_000n - 2n) }, ask), /too little/);
     assert.doesNotThrow(() => readRoute({ ...route, otherAmountThreshold: String(out - (out * 50n + 9_999n) / 10_000n) }, ask));
+    // Whatever least the answer states within those bounds, the one shown is counted from the quote and the slippage.
+    assert.equal(readRoute({ ...route, otherAmountThreshold: String(out) }, ask).least, out - (out * 50n) / 10_000n);
 });
 
 test('an account opened with another program as its token program, or for another wallet, is refused', () => {
