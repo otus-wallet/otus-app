@@ -24,7 +24,7 @@ import { Input } from '../components/ui/input.tsx';
 import { cn } from '../lib/cn.ts';
 import type { Screen } from './App.tsx';
 import { Bar, ErrorLine, Fact, Seal, Sheet, TokenLogo } from './common.tsx';
-import { current, said, useHoldings } from './store.ts';
+import { current, said, useHoldings, useTokenTerms } from './store.ts';
 import { Doing, type Job } from './TakeBack.tsx';
 
 const SLIPPAGE = 50; // bps: the most the price may move against you between the quote and the swap
@@ -67,9 +67,12 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
     const mine = useMemo(() => (held && !(held instanceof Error) ? held.assets.filter((a) => a.native || (a.units > 0n && a.source && !isWrappedSol(a.mint))) : []), [held]);
     const holding = (s: Side) => mine.find((a) => sideOf(a).mint === s.mint);
     const payHeld = holding(pay);
-    // A token you hold counts its decimals as your balances read them from its mint.
+    // A token you hold counts its decimals as your balances read them from its mint; one you would get and hold none
+    // of, as its mint says them, read onchain: what a search says of a token is never taken for an amount.
     const payDecimals = payHeld?.decimals ?? pay.decimals;
-    const getDecimals = holding(get)?.decimals ?? get.decimals;
+    const getHeld = holding(get);
+    const getMint = useTokenTerms(walletRpc(state.settings), get.mint, mainnet && !getHeld && get.mint !== WSOL);
+    const getDecimals = getHeld?.decimals ?? (get.mint === WSOL ? 9 : (getMint.data?.terms?.decimals ?? null));
     const available = !payHeld ? 0n : payHeld.native ? (payHeld.units > RESERVE ? payHeld.units - RESERVE : 0n) : (payHeld.source?.units ?? 0n);
     const units = unitsOf(text.trim(), payDecimals);
     const asked = useSettled(units, LOOK_AFTER);
@@ -78,7 +81,7 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
     const quote = useQuery({
         queryKey: ['route', account.address, pay.mint, get.mint, String(asked)],
         queryFn: () => fittingRoute({ input: pay.mint, output: get.mint, amount: asked!, taker: account.address, slippageBps: SLIPPAGE }),
-        enabled: mainnet && read !== null && asked !== null && asked === units && !problem && !doing && !picking,
+        enabled: mainnet && read !== null && getDecimals !== null && asked !== null && asked === units && !problem && !doing && !picking,
         refetchInterval: REQUOTE,
         staleTime: REQUOTE,
         gcTime: 0, // a quote for another amount or token is never shown again
@@ -87,7 +90,7 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
     });
     // The quote for what is typed now, by this wallet, and fresh: another, or an old one, is never swapped.
     const r = quote.data;
-    const route = r && !quote.isPlaceholderData && Date.now() - quote.dataUpdatedAt < FRESH && r.ask.amount === units && r.ask.input === pay.mint && r.ask.output === get.mint && r.ask.taker === account.address ? r : null;
+    const route = r && getDecimals !== null && !quote.isPlaceholderData && Date.now() - quote.dataUpdatedAt < FRESH && r.ask.amount === units && r.ask.input === pay.mint && r.ask.output === get.mint && r.ask.taker === account.address ? r : null;
     const quotedAt = quote.dataUpdatedAt;
 
     if (doing) {
@@ -146,7 +149,9 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
         return price === null ? null : (Number(u) / 10 ** decimals) * price;
     };
     const paid = units !== null ? value(pay, units, payDecimals) : null;
-    const got = route ? value(get, route.out, getDecimals) : null;
+    const outDecimals = getDecimals ?? 0; // read by the time there is a route
+    const got = route ? value(get, route.out, outDecimals) : null;
+    const unread = getHeld || getMint.isPending ? '' : getMint.isError ? `Otus couldn't read ${get.symbol} onchain: ${said(getMint.error)}` : getMint.data && !getMint.data.terms ? `Otus can't read ${get.symbol}'s mint` : '';
     const impact = route?.impact ?? null;
     const heavy = impact !== null && impact >= HEAVY;
     return (
@@ -172,15 +177,15 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
             </button>
             <Pane
                 label="You get"
-                amount={<Amount aria-label="You get" readOnly tabIndex={-1} value={route ? decimal(route.out, getDecimals) : ''} />}
+                amount={<Amount aria-label="You get" readOnly tabIndex={-1} value={route ? decimal(route.out, outDecimals) : ''} />}
                 token={<TokenButton side={get} onClick={() => setPicking('get')} />}
                 worth={got !== null ? `≈ ${dollars(got)}` : ''}
             />
             {route && (
                 <dl className="flex flex-col gap-1.5 rounded-md border border-rule px-3.5 py-2.5 text-xs">
-                    <Fact name="Rate">{`1 ${pay.symbol} ≈ ${rate(route, payDecimals, getDecimals)} ${get.symbol}`}</Fact>
+                    <Fact name="Rate">{`1 ${pay.symbol} ≈ ${rate(route, payDecimals, outDecimals)} ${get.symbol}`}</Fact>
                     <Fact name="Slippage">{`${route.ask.slippageBps / 100}%`}</Fact>
-                    <Fact name="At least">{`${decimal(route.least, getDecimals)} ${get.symbol}`}</Fact>
+                    <Fact name="At least">{`${decimal(route.least, outDecimals)} ${get.symbol}`}</Fact>
                     <Fact name="Route">{[...new Set(route.venues.map((v) => v.label))].join(', ')}</Fact>
                 </dl>
             )}
@@ -190,7 +195,7 @@ export function SwapScreen({ state, go }: { state: State; go: (to: Screen) => vo
                     <Addressed text={`${get.symbol} is not verified: check its address, ${get.mint}`} />
                 </p>
             )}
-            <ErrorLine>{problem || (quote.isError ? said(quote.error) : '')}</ErrorLine>
+            <ErrorLine>{problem || unread || (quote.isError ? said(quote.error) : '')}</ErrorLine>
         </Sheet>
     );
 }

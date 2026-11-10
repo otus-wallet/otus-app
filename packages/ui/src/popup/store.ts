@@ -202,7 +202,7 @@ const AHEAD = 50; // tokens whose details are read ahead: their mints and metada
 
 /** A token's terms and whether its metadata can change: read ahead with the wallet's other tokens, or on its own once
  *  its details are opened. */
-export const useTokenTerms = (rpc: string, mint: Address) => useQuery({ queryKey: ['mintTerms', rpc, mint], queryFn: () => tokenTerms(rpcAt(rpc), mint), staleTime: MINT_FRESH, refetchOnReconnect: false });
+export const useTokenTerms = (rpc: string, mint: Address, on = true) => useQuery({ queryKey: ['mintTerms', rpc, mint], queryFn: () => tokenTerms(rpcAt(rpc), mint), enabled: on, staleTime: MINT_FRESH, refetchOnReconnect: false });
 
 /** Reads ahead the details of the tokens a wallet shows, the first AHEAD of them in one request, at most every ten
  *  minutes: each opens complete, at once. */
