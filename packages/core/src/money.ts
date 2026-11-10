@@ -2,7 +2,14 @@
 import { USDC, USDT, WSOL, type Holding, type Holdings } from './holdings.ts';
 
 export const dollars = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: n !== 0 && Math.abs(n) < 0.01 ? 6 : 2 });
-export const amount = (a: Pick<Holding, 'units' | 'decimals'>) => (Number(a.units) / 10 ** a.decimals).toLocaleString('en-US', { maximumFractionDigits: Math.min(a.decimals, 6) });
+
+/** A balance with up to six decimals, cut and never rounded: it never reads as more than is held. */
+export function amount(a: Pick<Holding, 'units' | 'decimals'>): string {
+    const shown = Math.min(a.decimals, 6);
+    const cut = a.units / 10n ** BigInt(a.decimals - shown);
+    const fraction = (cut % 10n ** BigInt(shown)).toString().padStart(shown, '0').replace(/0+$/, '');
+    return `${(cut / 10n ** BigInt(shown)).toLocaleString('en-US')}${fraction ? `.${fraction}` : ''}`;
+}
 
 /** A price as people read it: cents from about a dollar up, then four decimals, then a few significant digits. */
 export const price = (n: number) =>
