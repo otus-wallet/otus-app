@@ -36,7 +36,7 @@ import { notice, squadsTold, type Inside, type ProposalTold } from '@otus-wallet
 import { SQUADS_V4 } from '@otus-wallet/sdk/programs/squads';
 import { prepare, type Prepared } from '@otus-wallet/sdk/prepare/prepare';
 import type { Sent } from '@otus-wallet/core/send/send.ts';
-import { networkOf, OTUS_RPC, rpcFor, type Settings } from '@otus-wallet/core/settings.ts';
+import { networkOf, OTUS_RPC, rpcFor, SOLANA_RPCS, type Settings } from '@otus-wallet/core/settings.ts';
 import { accountView, describe, describeBatch, LEDGER_CLEAR, type Known, type Life, type Outcome, type Signer, type SiteView, type TransactionView } from '@otus-wallet/core/view.ts';
 import type { Answer } from './approvals.ts';
 import type { Shell } from './serve.ts';
@@ -404,15 +404,18 @@ export async function followed(id: Signature, r: Review, chain: Chain): Promise<
 }
 
 /** Refuses a transaction for another network than mainnet that would land on mainnet all the same. An endpoint of your
- *  own says which network it serves, and could say devnet while it passes everything to mainnet: Otus's own mainnet
- *  RPC is asked whether it knows the transaction's blockhash (or holds its nonce). A real devnet one is unknown there.
- *  Solana's public endpoints are taken at their word. */
+ *  own says which network it serves, and could say devnet while it passes everything to mainnet; so could whatever
+ *  listens where a local validator would, which a site reaches by naming localnet. Otus's own mainnet RPC is asked
+ *  whether it knows the transaction's blockhash (or holds its nonce). A real devnet one is unknown there. Solana's
+ *  public endpoints are taken at their word. */
 export async function notMainnet(r: Review, cluster: Cluster, settings: Settings, shell: Shell) {
-    if (cluster === 'solana:mainnet' || rpcFor(cluster, settings) !== settings.rpc) return;
+    if (cluster === 'solana:mainnet' || SOLANA_RPCS.includes(rpcFor(cluster, settings))) return;
     const mainnet = shell.chain(rpcFor('solana:mainnet', { ...settings, network: 'mainnet' }));
     const lands = await landsOn(r.message, mainnet).catch(() => null);
     if (lands === null) throw new Refused("Otus couldn't check that this transaction is not for mainnet: try again");
-    if (lands) throw new Refused(`your RPC says it serves ${cluster.slice('solana:'.length)}, but this transaction is for mainnet`);
+    if (!lands) return;
+    const named = cluster.slice('solana:'.length);
+    throw new Refused(rpcFor(cluster, settings) === settings.rpc ? `your RPC says it serves ${named}, but this transaction is for mainnet` : `this transaction is for mainnet, not ${named}`);
 }
 
 /** Refuses a transaction no block can take any more: one read for longer than its blockhash lives would not land. */

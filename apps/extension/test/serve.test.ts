@@ -347,6 +347,18 @@ test('an endpoint of your own that says devnet, for a transaction mainnet knows,
     assert.equal(shown.kind === 'transaction' && shown.network, 'devnet');
 });
 
+test('a site that names localnet for a transaction mainnet knows is refused, whatever answers there', async () => {
+    const LOCAL = 'http://127.0.0.1:8899';
+    // Something listens where a local validator would, and says it knows every blockhash; mainnet knows this one too.
+    const lying = await wallet({ validOn: [LOCAL, OTUS_RPC] });
+    assert.deepEqual(await lying.call('signTransaction', { account: lying.me, chain: 'solana:localnet', transactions: [lying.transfer()] }), { ok: false, error: 'this transaction is for mainnet, not localnet' });
+    assert.equal(lying.approvals.length, 0);
+    // A local validator's own transaction, unknown to mainnet, is reviewed there as before.
+    const local = await wallet({ validOn: [LOCAL] });
+    result(await local.call('signTransaction', { account: local.me, chain: 'solana:localnet', transactions: [local.transfer()] }));
+    assert.equal(local.approvals.length, 1);
+});
+
 test('a transfer made in the popup never opens a token account for an address that is a token account itself, yours too', async () => {
     // key(2) holds tokens for someone, or for you: an account opened for key(2) would be one no key can ever move.
     for (const owner of [key(6), null]) {

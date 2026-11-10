@@ -91,6 +91,9 @@ const PUBLIC_RPC: Record<Cluster, string> = {
     'solana:localnet': 'http://127.0.0.1:8899',
 };
 
+/** Solana's own public endpoints: what each says of a transaction is that network's word. */
+export const SOLANA_RPCS = [PUBLIC_RPC['solana:devnet'], PUBLIC_RPC['solana:testnet']];
+
 /** The endpoint for a cluster: your own while the network is yours and it serves that cluster; else the public one. */
 export const rpcFor = (cluster: Cluster, settings: Settings) => (settings.network === 'custom' && settings.rpc && settings.custom === cluster ? settings.rpc : PUBLIC_RPC[cluster]);
 
