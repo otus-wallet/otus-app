@@ -93,6 +93,6 @@ function parsed(data: unknown): { mint: string; units: bigint; decimals: number 
     const info = (data as { parsed?: { info?: { mint?: unknown; tokenAmount?: { amount?: unknown; decimals?: unknown } } } })?.parsed?.info;
     const amount = info?.tokenAmount?.amount;
     const decimals = info?.tokenAmount?.decimals;
-    if (typeof info?.mint !== 'string' || !isAddress(info.mint) || typeof amount !== 'string' || !/^\d+$/.test(amount) || typeof decimals !== 'number') return null;
-    return { mint: info.mint, units: BigInt(amount), decimals };
+    if (typeof info?.mint !== 'string' || !isAddress(info.mint) || typeof amount !== 'string' || !/^\d+$/.test(amount) || !Number.isInteger(decimals) || (decimals as number) < 0 || (decimals as number) > 255) return null; // a mint keeps its decimals in one byte
+    return { mint: info.mint, units: BigInt(amount), decimals: decimals as number };
 }
